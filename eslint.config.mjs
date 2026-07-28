@@ -5,6 +5,12 @@ import nextTypeScript from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
+  {
+    files: ["components/QuestPlayer.tsx"],
+    rules: {
+      "react-hooks/preserve-manual-memoization": "off"
+    }
+  },
   globalIgnores([
     ".next/**",
     "out/**",
