@@ -26,22 +26,40 @@ export function AdminConsole() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    try {
-      const supabase = getBrowserClient();
-      void supabase.auth.getSession().then(({ data }) => {
-        setSessionToken(data.session?.access_token ?? "");
+    let active = true;
+    let unsubscribe = () => undefined;
+
+    void Promise.resolve()
+      .then(async () => {
+        const supabase = getBrowserClient();
+        const { data } = await supabase.auth.getSession();
+        if (active) setSessionToken(data.session?.access_token ?? "");
+
+        const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (active) setSessionToken(session?.access_token ?? "");
+        });
+        unsubscribe = () => listener.subscription.unsubscribe();
+      })
+      .catch((errorValue) => {
+        if (active) {
+          setError(
+            errorValue instanceof Error
+              ? errorValue.message
+              : "Supabase Auth unavailable"
+          );
+        }
       });
-      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSessionToken(session?.access_token ?? "");
-      });
-      return () => listener.subscription.unsubscribe();
-    } catch (errorValue) {
-      setError(errorValue instanceof Error ? errorValue.message : "Supabase Auth unavailable");
-    }
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (!sessionToken) return;
+    let active = true;
+
     const load = async () => {
       const response = await fetch("/api/admin/health", {
         headers: { authorization: `Bearer ${sessionToken}` },
@@ -51,11 +69,22 @@ export function AdminConsole() {
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Admin access failed");
       }
-      setHealth(payload.data);
+      if (active) setHealth(payload.data);
     };
-    void load().catch((errorValue) =>
-      setError(errorValue instanceof Error ? errorValue.message : "Unexpected error")
-    );
+
+    void Promise.resolve()
+      .then(load)
+      .catch((errorValue) => {
+        if (active) {
+          setError(
+            errorValue instanceof Error ? errorValue.message : "Unexpected error"
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [sessionToken]);
 
   async function sendMagicLink(event: FormEvent) {
@@ -82,8 +111,14 @@ export function AdminConsole() {
       <main className="site-shell page">
         <span className="badge">Admin</span>
         <h1 className="page-title">כניסה מאובטחת</h1>
-        <p className="lead">הכניסה מתבצעת באמצעות Magic Link ורשימת מנהלים מאושרת.</p>
-        <form className="card form-grid" style={{ marginTop: 32, maxWidth: 600 }} onSubmit={sendMagicLink}>
+        <p className="lead">
+          הכניסה מתבצעת באמצעות Magic Link ורשימת מנהלים מאושרת.
+        </p>
+        <form
+          className="card form-grid"
+          style={{ marginTop: 32, maxWidth: 600 }}
+          onSubmit={sendMagicLink}
+        >
           <div className="field">
             <label htmlFor="adminEmail">אימייל מנהל</label>
             <input
@@ -94,7 +129,9 @@ export function AdminConsole() {
               required
             />
           </div>
-          <button className="button button-primary" disabled={busy}>שליחת Magic Link</button>
+          <button className="button button-primary" disabled={busy}>
+            שליחת Magic Link
+          </button>
           {message && <div className="success">{message}</div>}
           {error && <div className="error">{error}</div>}
         </form>
@@ -106,19 +143,32 @@ export function AdminConsole() {
     <main className="site-shell page">
       <span className="badge">System health</span>
       <h1 className="page-title">המערכת במבט אחד.</h1>
-      <p className="lead">מסך פנימי לזיהוי משחקים תקועים, הודעות שנכשלו ומחיקות שלא הושלמו.</p>
+      <p className="lead">
+        מסך פנימי לזיהוי משחקים תקועים, הודעות שנכשלו ומחיקות שלא הושלמו.
+      </p>
 
       {health && (
         <>
           <section className="grid grid-3" style={{ marginTop: 32 }}>
-            <article className="card metric"><span>הודעות שנכשלו</span><strong>{health.summary.failedMessages}</strong></article>
-            <article className="card metric"><span>קבוצות תקועות</span><strong>{health.summary.staleTeams}</strong></article>
-            <article className="card metric"><span>מחיקות באיחור</span><strong>{health.summary.overdueRetentionRuns}</strong></article>
+            <article className="card metric">
+              <span>הודעות שנכשלו</span>
+              <strong>{health.summary.failedMessages}</strong>
+            </article>
+            <article className="card metric">
+              <span>קבוצות תקועות</span>
+              <strong>{health.summary.staleTeams}</strong>
+            </article>
+            <article className="card metric">
+              <span>מחיקות באיחור</span>
+              <strong>{health.summary.overdueRetentionRuns}</strong>
+            </article>
           </section>
           <section className="grid grid-2" style={{ marginTop: 20 }}>
             <article className="card">
               <h2>הודעות כושלות</h2>
-              <pre className="code">{JSON.stringify(health.failedMessages, null, 2)}</pre>
+              <pre className="code">
+                {JSON.stringify(health.failedMessages, null, 2)}
+              </pre>
             </article>
             <article className="card">
               <h2>קבוצות ללא התקדמות</h2>
@@ -127,7 +177,11 @@ export function AdminConsole() {
           </section>
         </>
       )}
-      {error && <div className="error" style={{ marginTop: 20 }}>{error}</div>}
+      {error && (
+        <div className="error" style={{ marginTop: 20 }}>
+          {error}
+        </div>
+      )}
     </main>
   );
 }
