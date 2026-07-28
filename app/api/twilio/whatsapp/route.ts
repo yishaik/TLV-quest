@@ -1,4 +1,5 @@
 import twilio from "twilio";
+import { publicEnv } from "@/lib/env";
 import { linkWhatsappParticipant } from "@/lib/repository";
 import { handleWhatsappGameMessage } from "@/lib/whatsapp-game";
 import {
@@ -28,14 +29,14 @@ const whatsappErrorMessage = (error: unknown) => {
         : "";
 
   if (/location_verification_required/i.test(message)) {
-    return "לפני שליחת תשובה, פתחו את אתר המשחק ולחצו על ‘אימות מיקום’. לאחר שהמיקום יאושר, שלחו את התשובה שוב.\nBefore answering, open the game site and verify your location, then send the answer again.";
+    return `לפני שליחת תשובה, פתחו את אתר המשחק ולחצו על ‘אימות מיקום’. לאחר שהמיקום יאושר, שלחו את התשובה שוב.\n${publicEnv.appUrl}/resume\n\nBefore answering, open the game site and verify your location, then send the answer again.`;
   }
 
   if (/team_not_active|no active checkpoint/i.test(message)) {
-    return "המשחק או התחנה אינם פעילים כרגע. פתחו את אתר המשחק כדי לבדוק את הסטטוס.\nThe game or checkpoint is not active right now. Check the game site for status.";
+    return `המשחק או התחנה אינם פעילים כרגע. פתחו את אתר המשחק כדי לבדוק את הסטטוס.\n${publicEnv.appUrl}/resume\n\nThe game or checkpoint is not active right now. Check the game site for status.`;
   }
 
-  return "אירעה תקלה זמנית. נסו שוב בעוד רגע או השתמשו באתר המשחק.\nA temporary error occurred. Try again or use the web app.";
+  return `אירעה תקלה זמנית. נסו שוב בעוד רגע או השתמשו באתר המשחק.\n${publicEnv.appUrl}/resume\n\nA temporary error occurred. Try again or use the web app.`;
 };
 
 export async function POST(request: Request) {
@@ -58,7 +59,11 @@ export async function POST(request: Request) {
 
   try {
     const linked = await linkWhatsappParticipant({ from, body });
-    if (linked) return twiml(linked.message);
+    if (linked) {
+      return twiml(
+        `${linked.message}\n\nלממשק המשחק, המפה והניקוד:\n${publicEnv.appUrl}/resume\n\nOpen the web game, map and score:\n${publicEnv.appUrl}/resume`
+      );
+    }
 
     if (Number(params.NumMedia ?? "0") > 0 && params.MediaUrl0) {
       const reply = await handleWhatsappPhoto({
