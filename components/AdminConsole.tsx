@@ -17,13 +17,21 @@ type Health = {
   overdueRuns: Array<Record<string, unknown>>;
 };
 
+type OrganizerInvite = {
+  createUrl: string;
+  expiresAt: string;
+  externalMessagesEnabled: boolean;
+};
+
 export function AdminConsole() {
   const [email, setEmail] = useState("");
   const [sessionToken, setSessionToken] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
+  const [invite, setInvite] = useState<OrganizerInvite | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -106,6 +114,31 @@ export function AdminConsole() {
     }
   }
 
+  async function createOrganizerInvite() {
+    setInviteBusy(true);
+    setInvite(null);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/invites", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${sessionToken}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ expiresInHours: 48 })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error?.message ?? "Invite creation failed");
+      }
+      setInvite(payload.data);
+    } catch (errorValue) {
+      setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
   if (!sessionToken) {
     return (
       <main className="site-shell page">
@@ -144,8 +177,56 @@ export function AdminConsole() {
       <span className="badge">System health</span>
       <h1 className="page-title">המערכת במבט אחד.</h1>
       <p className="lead">
-        מסך פנימי לזיהוי משחקים תקועים, הודעות שנכשלו ומחיקות שלא הושלמו.
+        מסך פנימי ליצירת משחקים ולזיהוי משחקים תקועים, הודעות שנכשלו ומחיקות שלא
+        הושלמו.
       </p>
+
+      <section className="card" style={{ marginTop: 32 }}>
+        <span className="badge">הרצה חדשה</span>
+        <h2>יצירת קישור חד־פעמי למארגן</h2>
+        <p className="muted">
+          הקישור תקף ל־48 שעות ומאפשר ליצור הרצת משחק אחת בלבד.
+        </p>
+        <div className="actions">
+          <button
+            className="button button-primary"
+            onClick={createOrganizerInvite}
+            disabled={inviteBusy}
+          >
+            {inviteBusy ? "יוצר קישור…" : "יצירת הזמנה למשחק"}
+          </button>
+        </div>
+
+        {invite && (
+          <div className="success" style={{ marginTop: 20 }}>
+            <strong>ההזמנה מוכנה.</strong>
+            <p>
+              בתוקף עד {new Date(invite.expiresAt).toLocaleString("he-IL")}.
+            </p>
+            <div className="actions">
+              <a
+                className="button button-dark"
+                href={invite.createUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                פתיחת טופס יצירת המשחק
+              </a>
+              <button
+                className="button button-secondary"
+                onClick={() => navigator.clipboard.writeText(invite.createUrl)}
+              >
+                העתקת הקישור
+              </button>
+            </div>
+            {!invite.externalMessagesEnabled && (
+              <p className="muted" style={{ marginTop: 12 }}>
+                שליחת הודעות יזומות עדיין כבויה במצב הבדיקה.
+              </p>
+            )}
+          </div>
+        )}
+      </section>
 
       {health && (
         <>
