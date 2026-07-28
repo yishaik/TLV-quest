@@ -3,6 +3,11 @@ const read = (name: string): string | undefined => {
   return value || undefined;
 };
 
+const readPublic = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  return trimmed || undefined;
+};
+
 const required = (name: string): string => {
   const value = read(name);
   if (!value) {
@@ -12,16 +17,17 @@ const required = (name: string): string => {
 };
 
 export const publicEnv = {
-  appUrl: read("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000",
+  appUrl:
+    readPublic(process.env.NEXT_PUBLIC_APP_URL) ?? "http://localhost:3000",
   supabaseUrl:
-    read("NEXT_PUBLIC_SUPABASE_URL") ??
+    readPublic(process.env.NEXT_PUBLIC_SUPABASE_URL) ??
     "https://vybivdkskrkafcuedvbg.supabase.co",
   supabasePublishableKey:
-    read("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ?? "",
+    readPublic(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ?? "",
   twilioSandboxNumber:
-    read("NEXT_PUBLIC_TWILIO_SANDBOX_NUMBER") ?? "14155238886",
+    readPublic(process.env.NEXT_PUBLIC_TWILIO_SANDBOX_NUMBER) ?? "14155238886",
   twilioSandboxJoinCode:
-    read("NEXT_PUBLIC_TWILIO_SANDBOX_JOIN_CODE") ?? ""
+    readPublic(process.env.NEXT_PUBLIC_TWILIO_SANDBOX_JOIN_CODE) ?? ""
 };
 
 export const getServerEnv = () => ({
