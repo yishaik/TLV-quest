@@ -31,10 +31,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: package.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund 2>&1 | tee install.log
+        run: npm ci --no-audit --no-fund 2>&1 | tee install.log
 
       - name: Lint
         shell: bash
@@ -75,12 +75,4 @@ jobs:
             build.log
             playwright-install.log
             e2e.log
-          if-no-files-found: ignore
-
-      - name: Upload generated lockfile
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-lockfile
-          path: package-lock.json
           if-no-files-found: ignore
