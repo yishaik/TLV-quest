@@ -28,16 +28,27 @@ export function LiveLeaderboard({ code }: { code: string }) {
   }, [code]);
 
   useEffect(() => {
-    void load().catch((errorValue) =>
-      setError(errorValue instanceof Error ? errorValue.message : "Unexpected error")
-    );
+    let active = true;
+
+    void Promise.resolve()
+      .then(load)
+      .catch((errorValue) => {
+        if (active) {
+          setError(
+            errorValue instanceof Error ? errorValue.message : "Unexpected error"
+          );
+        }
+      });
 
     let client: ReturnType<typeof getBrowserClient> | null = null;
     try {
       client = getBrowserClient();
     } catch {
       const interval = window.setInterval(() => void load(), 4000);
-      return () => window.clearInterval(interval);
+      return () => {
+        active = false;
+        window.clearInterval(interval);
+      };
     }
 
     const channel = client
@@ -52,10 +63,13 @@ export function LiveLeaderboard({ code }: { code: string }) {
         },
         () => void load()
       )
-      .subscribe((status) => setConnected(status === "SUBSCRIBED"));
+      .subscribe((status) => {
+        if (active) setConnected(status === "SUBSCRIBED");
+      });
 
     const fallback = window.setInterval(() => void load(), 15000);
     return () => {
+      active = false;
       window.clearInterval(fallback);
       void client?.removeChannel(channel);
     };
@@ -63,11 +77,21 @@ export function LiveLeaderboard({ code }: { code: string }) {
 
   return (
     <main className="site-shell page">
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 16,
+          alignItems: "start",
+          flexWrap: "wrap"
+        }}
+      >
         <div>
           <span className="badge">משחק {code}</span>
           <h1 className="page-title">לוח חי</h1>
-          <p className="lead">הדירוג מתעדכן בזמן אמת. התחנה הנוכחית והמיקום המדויק אינם מוצגים.</p>
+          <p className="lead">
+            הדירוג מתעדכן בזמן אמת. התחנה הנוכחית והמיקום המדויק אינם מוצגים.
+          </p>
         </div>
         <span className="badge">{connected ? "Realtime מחובר" : "מתעדכן"}</span>
       </div>
@@ -76,7 +100,13 @@ export function LiveLeaderboard({ code }: { code: string }) {
         <div className="table-wrap">
           <table className="leaderboard">
             <thead>
-              <tr><th>מקום</th><th>קבוצה</th><th>ניקוד</th><th>תחנות</th><th>מצב</th></tr>
+              <tr>
+                <th>מקום</th>
+                <th>קבוצה</th>
+                <th>ניקוד</th>
+                <th>תחנות</th>
+                <th>מצב</th>
+              </tr>
             </thead>
             <tbody>
               {entries.map((entry, index) => (
@@ -91,7 +121,9 @@ export function LiveLeaderboard({ code }: { code: string }) {
             </tbody>
           </table>
         </div>
-        {!entries.length && !error && <p className="muted">הלוח יתמלא לאחר יצירת הקבוצות.</p>}
+        {!entries.length && !error && (
+          <p className="muted">הלוח יתמלא לאחר יצירת הקבוצות.</p>
+        )}
         {error && <div className="error">{error}</div>}
       </section>
     </main>
