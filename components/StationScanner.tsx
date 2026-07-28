@@ -7,36 +7,52 @@ export function StationScanner({ stationSlug }: { stationSlug: string }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("tlvQuestParticipantToken");
-    if (!token) {
-      setError("לא נמצא קישור אישי במכשיר. פתחו קודם את קישור המשחק האישי ואז סרקו שוב.");
-      return;
-    }
+    let active = true;
 
     const scan = async () => {
-      try {
-        const response = await fetch(`/api/participants/${encodeURIComponent(token)}/scan`, {
+      const token = localStorage.getItem("tlvQuestParticipantToken");
+      if (!token) {
+        throw new Error(
+          "לא נמצא קישור אישי במכשיר. פתחו קודם את קישור המשחק האישי ואז סרקו שוב."
+        );
+      }
+
+      const response = await fetch(
+        `/api/participants/${encodeURIComponent(token)}/scan`,
+        {
           method: "POST",
           headers: {
             "content-type": "application/json",
             "idempotency-key": `station:${stationSlug}:${token}`
           },
           body: JSON.stringify({ stationSlug })
-        });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error?.message ?? "התחנה אינה זמינה כרגע");
         }
-        setStatus("התחנה זוהתה. חוזרים למשימה…");
-        window.setTimeout(() => {
-          window.location.href = `/play/${token}`;
-        }, 900);
-      } catch (errorValue) {
-        setError(errorValue instanceof Error ? errorValue.message : "שגיאה לא צפויה");
+      );
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error?.message ?? "התחנה אינה זמינה כרגע");
       }
+
+      if (!active) return;
+      setStatus("התחנה זוהתה. חוזרים למשימה…");
+      window.setTimeout(() => {
+        window.location.href = `/play/${token}`;
+      }, 900);
     };
 
-    void scan();
+    void Promise.resolve()
+      .then(scan)
+      .catch((errorValue) => {
+        if (active) {
+          setError(
+            errorValue instanceof Error ? errorValue.message : "שגיאה לא צפויה"
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [stationSlug]);
 
   return (
