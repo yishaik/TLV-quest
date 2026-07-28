@@ -19,6 +19,25 @@ const twiml = (message?: string) => {
   });
 };
 
+const whatsappErrorMessage = (error: unknown) => {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" && error && "message" in error
+        ? String((error as { message?: unknown }).message ?? "")
+        : "";
+
+  if (/location_verification_required/i.test(message)) {
+    return "לפני שליחת תשובה, פתחו את אתר המשחק ולחצו על ‘אימות מיקום’. לאחר שהמיקום יאושר, שלחו את התשובה שוב.\nBefore answering, open the game site and verify your location, then send the answer again.";
+  }
+
+  if (/team_not_active|no active checkpoint/i.test(message)) {
+    return "המשחק או התחנה אינם פעילים כרגע. פתחו את אתר המשחק כדי לבדוק את הסטטוס.\nThe game or checkpoint is not active right now. Check the game site for status.";
+  }
+
+  return "אירעה תקלה זמנית. נסו שוב בעוד רגע או השתמשו באתר המשחק.\nA temporary error occurred. Try again or use the web app.";
+};
+
 export async function POST(request: Request) {
   const formData = await request.formData();
   const params: Record<string, string> = {};
@@ -70,8 +89,6 @@ export async function POST(request: Request) {
     return twiml(reply);
   } catch (error) {
     console.error("Twilio webhook failed", error);
-    return twiml(
-      "אירעה תקלה זמנית. נסו שוב בעוד רגע או השתמשו באתר המשחק.\nA temporary error occurred. Try again or use the web app."
-    );
+    return twiml(whatsappErrorMessage(error));
   }
 }
