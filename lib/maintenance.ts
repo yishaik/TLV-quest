@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processOutbox } from "@/lib/providers";
+import { sendDueHints, startDueRuns } from "@/lib/automation";
 
 export const purgeExpiredRunsWithStorage = async () => {
   const supabase = createAdminClient();
@@ -41,12 +42,14 @@ export const purgeExpiredRunsWithStorage = async () => {
 };
 
 export const runMaintenanceWorker = async () => {
-  const [outbox, purge] = await Promise.all([
-    processOutbox(30),
-    purgeExpiredRunsWithStorage()
-  ]);
+  const starts = await startDueRuns();
+  const hints = await sendDueHints();
+  const outbox = await processOutbox(30);
+  const purge = await purgeExpiredRunsWithStorage();
 
   return {
+    starts,
+    hints,
     outbox: {
       processed: outbox.length,
       failed: outbox.filter((result) => result.status === "failed").length
