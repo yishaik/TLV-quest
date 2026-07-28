@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "agent/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SUPABASE_URL: https://vybivdkskrkafcuedvbg.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_grXh4GXsoiFworQI6LNtgw_Ib_ac_e4
+      NEXT_PUBLIC_TWILIO_SANDBOX_NUMBER: "14155238886"
+      NEXT_PUBLIC_TWILIO_SANDBOX_JOIN_CODE: test-code
+      SUPABASE_SECRET_KEY: test-secret
+      PII_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      TOKEN_PEPPER: ci-token-pepper
+      ENABLE_EXTERNAL_MESSAGES: "false"
+      TWILIO_VALIDATE_SIGNATURES: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Upload generated lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-lockfile
+          path: package-lock.json
+          if-no-files-found: ignore
