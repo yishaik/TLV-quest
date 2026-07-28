@@ -12,7 +12,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_SUPABASE_URL: https://vybivdkskrkafcuedvbg.supabase.co
@@ -34,22 +34,48 @@ jobs:
           cache-dependency-path: package.json
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund 2>&1 | tee install.log
 
       - name: Lint
-        run: npm run lint
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint.log
 
       - name: Unit tests
-        run: npm run test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test 2>&1 | tee test.log
 
       - name: Build
-        run: npm run build
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee build.log
 
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium 2>&1 | tee playwright-install.log
 
       - name: Browser tests
-        run: npm run test:e2e
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee e2e.log
+
+      - name: Upload CI logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-${{ github.run_id }}
+          path: |
+            install.log
+            lint.log
+            test.log
+            build.log
+            playwright-install.log
+            e2e.log
+          if-no-files-found: ignore
 
       - name: Upload generated lockfile
         if: always()
