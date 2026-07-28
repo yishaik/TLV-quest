@@ -14,14 +14,28 @@ export const jsonError = (
   );
 
 export const handleRouteError = (error: unknown) => {
-  const message = error instanceof Error ? error.message : "Unexpected error";
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" && error && "message" in error
+        ? String((error as { message?: unknown }).message ?? "Unexpected error")
+        : "Unexpected error";
+
+  if (/location_verification_required/i.test(rawMessage)) {
+    return jsonError(
+      "יש לאמת את המיקום בתחנה לפני שליחת התשובה. לחצו על ‘אימות מיקום’ ונסו שוב.",
+      409,
+      { code: "location_verification_required" }
+    );
+  }
+
   const status =
-    /not found|invalid|expired/i.test(message)
+    /not found|invalid|expired/i.test(rawMessage)
       ? 404
-      : /closed|full|not active|locked|cannot/i.test(message)
+      : /closed|full|not active|locked|cannot/i.test(rawMessage)
         ? 409
         : 400;
-  return jsonError(message, status);
+  return jsonError(rawMessage, status);
 };
 
 export const readJson = async <T extends Record<string, unknown>>(
