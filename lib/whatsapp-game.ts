@@ -2,11 +2,11 @@ import "server-only";
 
 import {
   deliverCheckpointToTeam,
-  formatCheckpointMessage,
-  resumeUrl
+  formatCheckpointMessage
 } from "@/lib/checkpoint-delivery";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findParticipantTokenlessByPhone } from "@/lib/repository";
+import { participantResumeUrl } from "@/lib/participant-resume";
 import {
   calculateScoreDelta,
   evaluateTextAnswer,
@@ -81,16 +81,17 @@ export const handleWhatsappGameMessage = async ({
   );
   const locale = participant.language as Locale;
   const isHebrew = locale === "he";
+  const webAppUrl = participantResumeUrl(participant.id);
 
   if (run.status !== "active") {
     return isHebrew
-      ? `המשחק עדיין לא פעיל. כשהמארגן יתחיל, המשימה הראשונה תגיע לכאן.\n\nממשק המשחק: ${resumeUrl}`
-      : `The game is not active yet. The first mission will arrive here when the organizer starts it.\n\nWeb game: ${resumeUrl}`;
+      ? `המשחק עדיין לא פעיל. כשהמארגן יתחיל, המשימה הראשונה תגיע לכאן.\n\nממשק המשחק: ${webAppUrl}`
+      : `The game is not active yet. The first mission will arrive here when the organizer starts it.\n\nWeb game: ${webAppUrl}`;
   }
   if (!checkpoint) {
     return isHebrew
-      ? `המסלול הושלם.\n\nלוח התוצאות: ${resumeUrl}`
-      : `The route is complete.\n\nResults: ${resumeUrl}`;
+      ? `המסלול הושלם.\n\nלוח התוצאות: ${webAppUrl}`
+      : `The route is complete.\n\nResults: ${webAppUrl}`;
   }
 
   const normalizedCommand = body.trim().toLocaleLowerCase("he-IL");
@@ -110,7 +111,8 @@ export const handleWhatsappGameMessage = async ({
     return formatCheckpointMessage({
       contentValue: checkpoint.content,
       locale,
-      sequenceNo: checkpoint.sequence_no
+      sequenceNo: checkpoint.sequence_no,
+      resumeLink: webAppUrl
     });
   }
 
@@ -158,8 +160,8 @@ export const handleWhatsappGameMessage = async ({
       : null;
   if (!accepted) {
     return isHebrew
-      ? `התחנה הזאת דורשת פעולה באתר או צילום, ולא תשובת טקסט.\n${resumeUrl}`
-      : `This checkpoint requires a web action or photo rather than a text answer.\n${resumeUrl}`;
+      ? `התחנה הזאת דורשת פעולה באתר או צילום, ולא תשובת טקסט.\n${webAppUrl}`
+      : `This checkpoint requires a web action or photo rather than a text answer.\n${webAppUrl}`;
   }
 
   const rule: TextValidation = {
@@ -225,7 +227,7 @@ export const handleWhatsappGameMessage = async ({
     isHebrew ? "נכון!" : "Correct!"
   );
 
-  if (!nextCheckpoint) return success;
+  if (!nextCheckpoint) return `${success}\n\n${webAppUrl}`;
 
   await deliverCheckpointToTeam({
     runId: run.id,
@@ -237,7 +239,8 @@ export const handleWhatsappGameMessage = async ({
   const nextMission = formatCheckpointMessage({
     contentValue: nextCheckpoint.content,
     locale,
-    sequenceNo: nextCheckpoint.sequence_no
+    sequenceNo: nextCheckpoint.sequence_no,
+    resumeLink: webAppUrl
   });
   return `${success}\n\n━━━━━━━━━━\n\n${nextMission}`;
 };
