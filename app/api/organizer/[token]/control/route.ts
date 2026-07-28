@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { encryptPii, hashSecret } from "@/lib/crypto";
-import { decryptPii } from "@/lib/crypto";
+import { hashSecret } from "@/lib/crypto";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
 
 export const runtime = "nodejs";
