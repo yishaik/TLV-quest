@@ -2,6 +2,7 @@ import "server-only";
 
 import { decryptPii } from "@/lib/crypto";
 import { publicEnv } from "@/lib/env";
+import { participantResumeUrl } from "@/lib/participant-resume";
 import { sendWhatsapp } from "@/lib/providers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -20,11 +21,13 @@ export const resumeUrl = `${publicEnv.appUrl}/resume`;
 export const formatCheckpointMessage = ({
   contentValue,
   locale,
-  sequenceNo
+  sequenceNo,
+  resumeLink = resumeUrl
 }: {
   contentValue: unknown;
   locale: Locale;
   sequenceNo?: number | null;
+  resumeLink?: string;
 }): string => {
   const content = asObject(contentValue);
   const localized = asObject(content[locale]);
@@ -41,8 +44,8 @@ export const formatCheckpointMessage = ({
   const locationLabel = locale === "he" ? "📍 איפה:" : "📍 Where:";
   const appLabel =
     locale === "he"
-      ? `למפה, ניקוד והמשך המשחק:\n${resumeUrl}`
-      : `Open the map, score and web game:\n${resumeUrl}`;
+      ? `למפה, ניקוד והמשך המשחק:\n${resumeLink}`
+      : `Open the map, score and web game:\n${resumeLink}`;
 
   return [
     stationLabel,
@@ -58,11 +61,13 @@ export const formatCheckpointMessage = ({
 export const getCheckpointMessage = async ({
   runId,
   slug,
-  locale
+  locale,
+  participantId
 }: {
   runId: string;
   slug: string;
   locale: Locale;
+  participantId?: string;
 }) => {
   const supabase = createAdminClient();
   const { data, error } = await supabase
@@ -76,7 +81,8 @@ export const getCheckpointMessage = async ({
   return formatCheckpointMessage({
     contentValue: data.content,
     locale,
-    sequenceNo: data.sequence_no
+    sequenceNo: data.sequence_no,
+    resumeLink: participantId ? participantResumeUrl(participantId) : resumeUrl
   });
 };
 
@@ -92,21 +98,23 @@ export const deliverCheckpointToTeam = async ({
   excludeParticipantId?: string;
 }) => {
   const supabase = createAdminClient();
-  const [{ data: checkpoint, error: checkpointError }, { data: participants, error: participantError }] =
-    await Promise.all([
-      supabase
-        .from("run_checkpoints")
-        .select("sequence_no,content")
-        .eq("run_id", runId)
-        .eq("slug", slug)
-        .single(),
-      supabase
-        .from("participants")
-        .select("id,language,phone_ciphertext,whatsapp_connected_at")
-        .eq("team_id", teamId)
-        .not("phone_ciphertext", "is", null)
-        .not("whatsapp_connected_at", "is", null)
-    ]);
+  const [
+    { data: checkpoint, error: checkpointError },
+    { data: participants, error: participantError }
+  ] = await Promise.all([
+    supabase
+      .from("run_checkpoints")
+      .select("sequence_no,content")
+      .eq("run_id", runId)
+      .eq("slug", slug)
+      .single(),
+    supabase
+      .from("participants")
+      .select("id,language,phone_ciphertext,whatsapp_connected_at")
+      .eq("team_id", teamId)
+      .not("phone_ciphertext", "is", null)
+      .not("whatsapp_connected_at", "is", null)
+  ]);
 
   if (checkpointError || !checkpoint) {
     throw checkpointError ?? new Error("Checkpoint was not found");
@@ -121,7 +129,8 @@ export const deliverCheckpointToTeam = async ({
     const body = formatCheckpointMessage({
       contentValue: checkpoint.content,
       locale,
-      sequenceNo: checkpoint.sequence_no
+      sequenceNo: checkpoint.sequence_no,
+      resumeLink: participantResumeUrl(participant.id)
     });
     try {
       await sendWhatsapp({
