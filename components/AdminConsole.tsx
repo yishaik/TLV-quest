@@ -3,6 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/browser";
 
+type RecentRun = {
+  id: string;
+  public_code: string;
+  status: string;
+  created_at: string;
+  scheduled_at: string | null;
+  max_participants: number;
+};
+
 type Health = {
   admin: string;
   checkedAt: string;
@@ -15,6 +24,7 @@ type Health = {
   failedMessages: Array<Record<string, unknown>>;
   staleTeams: Array<Record<string, unknown>>;
   overdueRuns: Array<Record<string, unknown>>;
+  recentRuns: RecentRun[];
 };
 
 type OrganizerInvite = {
@@ -23,15 +33,23 @@ type OrganizerInvite = {
   externalMessagesEnabled: boolean;
 };
 
+type RecoveredOrganizerLink = {
+  runId: string;
+  publicCode: string;
+  manageUrl: string;
+};
+
 export function AdminConsole() {
   const [email, setEmail] = useState("");
   const [sessionToken, setSessionToken] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
   const [invite, setInvite] = useState<OrganizerInvite | null>(null);
+  const [recoveredLink, setRecoveredLink] = useState<RecoveredOrganizerLink | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [rotateBusy, setRotateBusy] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -139,6 +157,31 @@ export function AdminConsole() {
     }
   }
 
+  async function rotateOrganizerLink(runId: string) {
+    setRotateBusy(runId);
+    setRecoveredLink(null);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/runs/rotate-organizer", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${sessionToken}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ runId })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error?.message ?? "Management link creation failed");
+      }
+      setRecoveredLink(payload.data);
+    } catch (errorValue) {
+      setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
+    } finally {
+      setRotateBusy("");
+    }
+  }
+
   if (!sessionToken) {
     return (
       <main className="site-shell page">
@@ -177,8 +220,8 @@ export function AdminConsole() {
       <span className="badge">System health</span>
       <h1 className="page-title">המערכת במבט אחד.</h1>
       <p className="lead">
-        מסך פנימי ליצירת משחקים ולזיהוי משחקים תקועים, הודעות שנכשלו ומחיקות שלא
-        הושלמו.
+        מסך פנימי ליצירת משחקים, שחזור גישת ניהול ולזיהוי משחקים תקועים, הודעות
+        שנכשלו ומחיקות שלא הושלמו.
       </p>
 
       <section className="card" style={{ marginTop: 32 }}>
@@ -230,6 +273,79 @@ export function AdminConsole() {
 
       {health && (
         <>
+          <section className="card" style={{ marginTop: 20 }}>
+            <span className="badge">הרצות אחרונות</span>
+            <h2>פתיחת חדר בקרה קיים</h2>
+            <p className="muted">
+              יצירת קישור ניהול חדש מבטלת מיד את הקישור הקודם של אותה הרצה.
+            </p>
+            <div className="grid" style={{ marginTop: 18 }}>
+              {health.recentRuns.length === 0 && (
+                <div className="muted">עדיין לא נוצרו הרצות.</div>
+              )}
+              {health.recentRuns.map((run) => {
+                const closed = ["finished", "cancelled"].includes(run.status);
+                return (
+                  <article className="card" key={run.id}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "start",
+                        gap: 16,
+                        flexWrap: "wrap"
+                      }}
+                    >
+                      <div>
+                        <h3 style={{ margin: 0 }}>קוד משחק: {run.public_code}</h3>
+                        <p className="muted" style={{ marginBottom: 0 }}>
+                          נוצר {new Date(run.created_at).toLocaleString("he-IL")} · עד {run.max_participants} משתתפים
+                        </p>
+                      </div>
+                      <span className="badge">{run.status}</span>
+                    </div>
+                    <div className="actions" style={{ marginTop: 16 }}>
+                      <button
+                        className="button button-secondary"
+                        disabled={closed || rotateBusy === run.id}
+                        onClick={() => rotateOrganizerLink(run.id)}
+                      >
+                        {rotateBusy === run.id
+                          ? "יוצר קישור…"
+                          : closed
+                            ? "ההרצה סגורה"
+                            : "יצירת קישור ניהול חדש"}
+                      </button>
+                    </div>
+                    {recoveredLink?.runId === run.id && (
+                      <div className="success" style={{ marginTop: 16 }}>
+                        <strong>קישור הניהול החדש מוכן.</strong>
+                        <div className="actions" style={{ marginTop: 12 }}>
+                          <a
+                            className="button button-primary"
+                            href={recoveredLink.manageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            פתיחת חדר הבקרה
+                          </a>
+                          <button
+                            className="button button-secondary"
+                            onClick={() =>
+                              navigator.clipboard.writeText(recoveredLink.manageUrl)
+                            }
+                          >
+                            העתקת הקישור
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
           <section className="grid grid-3" style={{ marginTop: 32 }}>
             <article className="card metric">
               <span>הודעות שנכשלו</span>
