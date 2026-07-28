@@ -11,14 +11,18 @@ export function ResumeQuest() {
       window.location.replace(`/play/${encodeURIComponent(token)}`);
       return;
     }
-    setMissing(true);
+
+    const timer = window.setTimeout(() => setMissing(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
     <main className="site-shell page">
       <section className="card" style={{ maxWidth: 680, margin: "40px auto" }}>
         <span className="badge">TLV Quest</span>
-        <h1 className="page-title">{missing ? "לא נמצא משחק במכשיר הזה" : "פותח את המסע…"}</h1>
+        <h1 className="page-title">
+          {missing ? "לא נמצא משחק במכשיר הזה" : "פותח את המסע…"}
+        </h1>
         {missing && (
           <>
             <p className="lead">
