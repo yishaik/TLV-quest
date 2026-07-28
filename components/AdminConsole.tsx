@@ -27,7 +27,7 @@ export function AdminConsole() {
 
   useEffect(() => {
     let active = true;
-    let unsubscribe = () => undefined;
+    let unsubscribe: () => void = () => undefined;
 
     void Promise.resolve()
       .then(async () => {
