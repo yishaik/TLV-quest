@@ -1,9 +1,14 @@
 import twilio from "twilio";
 import { linkWhatsappParticipant } from "@/lib/repository";
 import { handleWhatsappGameMessage } from "@/lib/whatsapp-game";
+import {
+  handleWhatsappLocation,
+  handleWhatsappPhoto
+} from "@/lib/whatsapp-attachments";
 import { verifyTwilioWebhook } from "@/lib/providers";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const twiml = (message?: string) => {
   const response = new twilio.twiml.MessagingResponse();
@@ -36,16 +41,29 @@ export async function POST(request: Request) {
     const linked = await linkWhatsappParticipant({ from, body });
     if (linked) return twiml(linked.message);
 
-    if (Number(params.NumMedia ?? "0") > 0) {
-      return twiml(
-        "התמונה התקבלה. אימות תמונות מ־WhatsApp יופעל לאחר הגדרת מפתחות Twilio ו־Gemini. בינתיים ניתן להעלות דרך האתר.\nPhoto received. Web upload is available for the pilot."
-      );
+    if (Number(params.NumMedia ?? "0") > 0 && params.MediaUrl0) {
+      const reply = await handleWhatsappPhoto({
+        from,
+        mediaUrl: params.MediaUrl0,
+        mediaContentType: params.MediaContentType0 ?? "application/octet-stream",
+        messageSid
+      });
+      return twiml(reply);
     }
 
     if (params.Latitude && params.Longitude) {
-      return twiml(
-        "המיקום התקבל. פתחו את מסך המשחק כדי להשלים את אימות התחנה.\nLocation received. Open the game screen to complete checkpoint verification."
-      );
+      const latitude = Number(params.Latitude);
+      const longitude = Number(params.Longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        throw new Error("invalid_whatsapp_location");
+      }
+      const reply = await handleWhatsappLocation({
+        from,
+        latitude,
+        longitude,
+        messageSid
+      });
+      return twiml(reply);
     }
 
     const reply = await handleWhatsappGameMessage({ from, body, messageSid });
