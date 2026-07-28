@@ -1,5 +1,6 @@
 import twilio from "twilio";
 import { publicEnv } from "@/lib/env";
+import { participantResumeUrl } from "@/lib/participant-resume";
 import { linkWhatsappParticipant } from "@/lib/repository";
 import { handleWhatsappGameMessage } from "@/lib/whatsapp-game";
 import {
@@ -60,8 +61,9 @@ export async function POST(request: Request) {
   try {
     const linked = await linkWhatsappParticipant({ from, body });
     if (linked) {
+      const webAppUrl = participantResumeUrl(linked.participantId);
       return twiml(
-        `${linked.message}\n\nלממשק המשחק, המפה והניקוד:\n${publicEnv.appUrl}/resume\n\nOpen the web game, map and score:\n${publicEnv.appUrl}/resume`
+        `${linked.message}\n\nלממשק המשחק, המפה והניקוד:\n${webAppUrl}\n\nOpen the web game, map and score:\n${webAppUrl}`
       );
     }
 
