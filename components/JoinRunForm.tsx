@@ -52,8 +52,14 @@ export function JoinRunForm({ code }: { code: string }) {
     return (
       <div className="grid">
         <div className="card">
-          <span className="badge">{language === "he" ? "נרשמת בהצלחה" : "Registration complete"}</span>
-          <h2>{language === "he" ? `הקבוצה שלך: ${joined.teamName}` : `Your team: ${joined.teamName}`}</h2>
+          <span className="badge">
+            {language === "he" ? "נרשמת בהצלחה" : "Registration complete"}
+          </span>
+          <h2>
+            {language === "he"
+              ? `הקבוצה שלך: ${joined.teamName}`
+              : `Your team: ${joined.teamName}`}
+          </h2>
           <p>
             {language === "he"
               ? "קוד השחזור שלך. שמור אותו עד סוף המשחק:"
@@ -66,24 +72,57 @@ export function JoinRunForm({ code }: { code: string }) {
           <h2>{language === "he" ? "חיבור WhatsApp" : "Connect WhatsApp"}</h2>
           <p className="muted">
             {language === "he"
-              ? "בסנדבוקס נדרשים שני צעדים: הצטרפות לסנדבוקס ואז חיבור להרצה."
-              : "The sandbox requires two steps: join the sandbox, then link this game."}
+              ? "בסנדבוקס נדרשים שני צעדים: הצטרפות לסנדבוקס ואז חיבור להרצה. לאחר החיבור, המשימות והקישור לאתר יגיעו גם ל־WhatsApp."
+              : "The sandbox requires two steps: join the sandbox, then link this game. Missions and the web-app link will also arrive in WhatsApp."}
           </p>
           <div className="actions">
             {joined.sandboxJoinUrl && (
-              <a className="button button-secondary" href={joined.sandboxJoinUrl} target="_blank" rel="noreferrer">
+              <a
+                className="button button-secondary"
+                href={joined.sandboxJoinUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
                 1. {language === "he" ? "הצטרפות לסנדבוקס" : "Join sandbox"}
               </a>
             )}
-            <a className="button button-primary" href={joined.gameLinkUrl} target="_blank" rel="noreferrer">
+            <a
+              className="button button-primary"
+              href={joined.gameLinkUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
               2. {language === "he" ? "חיבור למשחק" : "Link game"}
             </a>
           </div>
         </div>
 
-        <a className="button button-dark" href={joined.playUrl}>
-          {language === "he" ? "כניסה למסע" : "Enter the quest"}
-        </a>
+        <div className="card">
+          <span className="badge">3</span>
+          <h2>{language === "he" ? "ממשק המשחק" : "Web game"}</h2>
+          <p className="muted">
+            {language === "he"
+              ? "כאן רואים את הסיפור, המשימה הנוכחית, אימות המיקום, המפה והניקוד. אפשר להשאיר את המסך פתוח; הוא מתעדכן אוטומטית."
+              : "Use this screen for the story, current mission, location verification, map and score. It refreshes automatically."}
+          </p>
+          <div className="actions">
+            <a
+              className="button button-dark"
+              href={joined.playUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {language === "he" ? "3. פתיחת ממשק המשחק" : "3. Open the web game"}
+            </a>
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => navigator.clipboard.writeText(joined.playUrl)}
+            >
+              {language === "he" ? "העתקת הקישור" : "Copy link"}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -105,22 +144,42 @@ export function JoinRunForm({ code }: { code: string }) {
 
       <div className="grid grid-2">
         <div className="field">
-          <label htmlFor="firstName">{language === "he" ? "שם פרטי" : "First name"}</label>
-          <input id="firstName" name="firstName" required maxLength={40} autoComplete="given-name" />
+          <label htmlFor="firstName">
+            {language === "he" ? "שם פרטי" : "First name"}
+          </label>
+          <input
+            id="firstName"
+            name="firstName"
+            required
+            maxLength={40}
+            autoComplete="given-name"
+          />
         </div>
         <div className="field">
-          <label htmlFor="publicAlias">{language === "he" ? "כינוי ציבורי" : "Public alias"}</label>
+          <label htmlFor="publicAlias">
+            {language === "he" ? "כינוי ציבורי" : "Public alias"}
+          </label>
           <input id="publicAlias" name="publicAlias" maxLength={40} />
         </div>
       </div>
 
       <div className="grid grid-2">
         <div className="field">
-          <label htmlFor="phone">{language === "he" ? "מספר WhatsApp" : "WhatsApp number"}</label>
-          <input id="phone" name="phone" type="tel" autoComplete="tel" placeholder="050-0000000" />
+          <label htmlFor="phone">
+            {language === "he" ? "מספר WhatsApp" : "WhatsApp number"}
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            autoComplete="tel"
+            placeholder="050-0000000"
+          />
         </div>
         <div className="field">
-          <label htmlFor="requestedTeamName">{language === "he" ? "שם קבוצה, אם נקבע מראש" : "Preassigned team name"}</label>
+          <label htmlFor="requestedTeamName">
+            {language === "he" ? "שם קבוצה, אם נקבע מראש" : "Preassigned team name"}
+          </label>
           <input id="requestedTeamName" name="requestedTeamName" maxLength={40} />
         </div>
       </div>
@@ -134,11 +193,19 @@ export function JoinRunForm({ code }: { code: string }) {
         </span>
       </label>
 
-      {error && <div className="error" role="alert">{error}</div>}
+      {error && (
+        <div className="error" role="alert">
+          {error}
+        </div>
+      )}
       <button className="button button-primary" disabled={loading}>
         {loading
-          ? language === "he" ? "מצטרף…" : "Joining…"
-          : language === "he" ? "הצטרפות למשחק" : "Join game"}
+          ? language === "he"
+            ? "מצטרף…"
+            : "Joining…"
+          : language === "he"
+            ? "הצטרפות למשחק"
+            : "Join game"}
       </button>
     </form>
   );
