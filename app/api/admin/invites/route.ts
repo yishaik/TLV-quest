@@ -1,13 +1,26 @@
+import { requireAdmin } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashSecret, randomToken } from "@/lib/crypto";
 import { getServerEnv, publicEnv } from "@/lib/env";
-import { handleRouteError, jsonOk, readJson, requireBearer } from "@/lib/http";
+import { handleRouteError, jsonOk, readJson } from "@/lib/http";
 
 export const runtime = "nodejs";
 
+const authorizeInviteCreation = async (request: Request) => {
+  const authorization = request.headers.get("authorization") ?? "";
+  const apiSecret = process.env.ADMIN_API_SECRET?.trim();
+
+  if (apiSecret && authorization === `Bearer ${apiSecret}`) {
+    return createAdminClient();
+  }
+
+  const { supabase } = await requireAdmin(request);
+  return supabase;
+};
+
 export async function POST(request: Request) {
   try {
-    requireBearer(request, process.env.ADMIN_API_SECRET);
+    const supabase = await authorizeInviteCreation(request);
     const body = await readJson<{ expiresInHours?: unknown }>(request);
     const expiresInHours =
       typeof body.expiresInHours === "number"
@@ -18,7 +31,6 @@ export async function POST(request: Request) {
     const expiresAt = new Date(
       Date.now() + expiresInHours * 60 * 60 * 1000
     ).toISOString();
-    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("organizer_invites")
       .insert({ token_hash: hashSecret(token), expires_at: expiresAt })
