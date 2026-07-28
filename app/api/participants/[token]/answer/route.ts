@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { submitTextAnswer } from "@/lib/repository";
+import { deliverCheckpointToTeam } from "@/lib/checkpoint-delivery";
+import { getParticipantState, submitTextAnswer } from "@/lib/repository";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -16,7 +17,20 @@ export async function POST(
 
     const idempotencyKey =
       request.headers.get("idempotency-key") ?? `web-answer:${randomUUID()}`;
-    return jsonOk(await submitTextAnswer({ token, answer, idempotencyKey }));
+    const result = await submitTextAnswer({ token, answer, idempotencyKey });
+
+    if (result.evaluation.correct) {
+      const state = await getParticipantState(token);
+      if (state.checkpoint) {
+        await deliverCheckpointToTeam({
+          runId: state.run.id,
+          teamId: state.team.id,
+          slug: state.checkpoint.slug
+        });
+      }
+    }
+
+    return jsonOk(result);
   } catch (error) {
     return handleRouteError(error);
   }

@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  deliverCheckpointToTeam,
+  formatCheckpointMessage,
+  resumeUrl
+} from "@/lib/checkpoint-delivery";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findParticipantTokenlessByPhone } from "@/lib/repository";
 import {
@@ -57,34 +62,6 @@ const getContext = async (participantId: string) => {
   return { supabase, participant, run, team, checkpoint };
 };
 
-const queueTeamBroadcast = async ({
-  runId,
-  teamId,
-  body
-}: {
-  runId: string;
-  teamId: string;
-  body: string;
-}) => {
-  const supabase = createAdminClient();
-  const { data: recipients } = await supabase
-    .from("participants")
-    .select("id,phone_ciphertext")
-    .eq("team_id", teamId)
-    .not("phone_ciphertext", "is", null);
-
-  if (!recipients?.length) return;
-  await supabase.from("message_outbox").insert(
-    recipients.map((recipient) => ({
-      run_id: runId,
-      participant_id: recipient.id,
-      channel: "whatsapp",
-      recipient_ciphertext: recipient.phone_ciphertext,
-      payload: { body }
-    }))
-  );
-};
-
 export const handleWhatsappGameMessage = async ({
   from,
   body,
@@ -107,14 +84,36 @@ export const handleWhatsappGameMessage = async ({
 
   if (run.status !== "active") {
     return isHebrew
-      ? "המשחק עדיין לא פעיל. נעדכן אתכם כשהמסע יתחיל."
-      : "The game is not active yet. You will be notified when the quest begins.";
+      ? `המשחק עדיין לא פעיל. כשהמארגן יתחיל, המשימה הראשונה תגיע לכאן.\n\nממשק המשחק: ${resumeUrl}`
+      : `The game is not active yet. The first mission will arrive here when the organizer starts it.\n\nWeb game: ${resumeUrl}`;
   }
   if (!checkpoint) {
-    return isHebrew ? "המסלול הושלם." : "The route is complete.";
+    return isHebrew
+      ? `המסלול הושלם.\n\nלוח התוצאות: ${resumeUrl}`
+      : `The route is complete.\n\nResults: ${resumeUrl}`;
   }
 
   const normalizedCommand = body.trim().toLocaleLowerCase("he-IL");
+  if (
+    [
+      "mission",
+      "/mission",
+      "status",
+      "/status",
+      "start",
+      "/start",
+      "משימה",
+      "סטטוס",
+      "התחל"
+    ].includes(normalizedCommand)
+  ) {
+    return formatCheckpointMessage({
+      contentValue: checkpoint.content,
+      locale,
+      sequenceNo: checkpoint.sequence_no
+    });
+  }
+
   if (["hint", "/hint", "רמז", "עזרה"].includes(normalizedCommand)) {
     const hints = asArray(checkpoint.hints);
     const { data: previousHints } = await supabase
@@ -159,8 +158,8 @@ export const handleWhatsappGameMessage = async ({
       : null;
   if (!accepted) {
     return isHebrew
-      ? "התחנה הזאת דורשת פעולה באתר או צילום, ולא תשובת טקסט."
-      : "This checkpoint requires a web action or photo rather than a text answer.";
+      ? `התחנה הזאת דורשת פעולה באתר או צילום, ולא תשובת טקסט.\n${resumeUrl}`
+      : `This checkpoint requires a web action or photo rather than a text answer.\n${resumeUrl}`;
   }
 
   const rule: TextValidation = {
@@ -188,7 +187,7 @@ export const handleWhatsappGameMessage = async ({
 
   const { data: nextCheckpoint } = await supabase
     .from("run_checkpoints")
-    .select("slug,sequence_no")
+    .select("slug,sequence_no,content")
     .eq("run_id", run.id)
     .eq("is_disabled", false)
     .gt("sequence_no", checkpoint.sequence_no)
@@ -225,6 +224,20 @@ export const handleWhatsappGameMessage = async ({
     "success",
     isHebrew ? "נכון!" : "Correct!"
   );
-  await queueTeamBroadcast({ runId: run.id, teamId: team.id, body: success });
-  return success;
+
+  if (!nextCheckpoint) return success;
+
+  await deliverCheckpointToTeam({
+    runId: run.id,
+    teamId: team.id,
+    slug: nextCheckpoint.slug,
+    excludeParticipantId: participant.id
+  });
+
+  const nextMission = formatCheckpointMessage({
+    contentValue: nextCheckpoint.content,
+    locale,
+    sequenceNo: nextCheckpoint.sequence_no
+  });
+  return `${success}\n\n━━━━━━━━━━\n\n${nextMission}`;
 };

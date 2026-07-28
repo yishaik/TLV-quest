@@ -13,6 +13,11 @@ export type SendResult = {
 
 const externalDeliveryAllowed = (recipient: string): boolean => {
   const env = getServerEnv();
+  const isTwilioSandbox = env.twilioWhatsappFrom === "whatsapp:+14155238886";
+
+  // Twilio's WhatsApp Sandbox only accepts recipients who explicitly joined it,
+  // so real delivery is safe during an otherwise mocked test run.
+  if (isTwilioSandbox) return true;
   if (!env.enableExternalMessages) return false;
   if (isProduction) return true;
   return env.testPhoneAllowlist.has(recipient);
