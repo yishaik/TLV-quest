@@ -1,0 +1,49 @@
+.visual {
+  position: fixed;
+  z-index: 6;
+  top: 112px;
+  inset-inline-end: max(22px, env(safe-area-inset-right));
+  width: clamp(190px, 20vw, 280px);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(244, 214, 141, 0.34);
+  background: #0c2030;
+  box-shadow: 0 24px 75px rgba(0, 0, 0, 0.42);
+  animation: reveal 420ms ease-out;
+}
+
+.visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 52%, rgba(7, 17, 28, 0.88));
+  pointer-events: none;
+}
+
+.visual img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.visual figcaption {
+  position: absolute;
+  z-index: 1;
+  inset: auto 14px 12px;
+  overflow: hidden;
+  color: #f4d68d;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+@media (max-width: 1240px) {
+  .visual { display: none; }
+}

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 export function AppChrome() {
   const pathname = usePathname();
 
-  if (pathname === "/") return null;
+  if (pathname === "/" || pathname.startsWith("/admin/content")) return null;
 
   return (
     <div className="site-shell app-chrome">
