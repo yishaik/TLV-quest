@@ -1,0 +1,610 @@
+.shell {
+  min-height: 100vh;
+  padding: 28px 22px 80px;
+  background:
+    radial-gradient(circle at 15% -10%, rgba(215, 164, 76, 0.2), transparent 34rem),
+    linear-gradient(180deg, #07131f 0, #10263a 420px, #eee9df 420px);
+  color: #f8f3e8;
+}
+
+.frame {
+  width: min(1540px, 100%);
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 28px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.kicker {
+  color: #d7a44c;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  margin: 9px 0 10px;
+  font-size: clamp(2.5rem, 5vw, 5rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+
+.header p {
+  max-width: 770px;
+  margin: 0;
+  color: rgba(248, 243, 232, 0.68);
+  line-height: 1.7;
+}
+
+.actions,
+.compactActions,
+.toolbar,
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+}
+
+.button {
+  min-height: 42px;
+  padding: 9px 16px;
+  border: 1px solid rgba(215, 164, 76, 0.38);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  font-weight: 850;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: #d7a44c;
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.primary {
+  border-color: #d7a44c;
+  background: #d7a44c;
+  color: #07131f;
+}
+
+.secondary {
+  background: #f4efe5;
+  color: #172435;
+  border-color: #d6dde3;
+}
+
+.danger {
+  border-color: #df7566;
+  background: #fff0ed;
+  color: #9a3527;
+}
+
+.iconButton {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #d9dfe4;
+  border-radius: 10px;
+  background: #fff;
+  color: #243247;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.iconButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.notice,
+.error,
+.success {
+  margin-bottom: 14px;
+  padding: 12px 15px;
+  border-radius: 14px;
+  line-height: 1.5;
+}
+
+.notice { background: #fff4d6; color: #775313; }
+.error { background: #ffe6e1; color: #8d2d21; }
+.success { background: #e0f3e6; color: #20683a; }
+
+.workspace {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.sidebar,
+.card,
+.editorCard,
+.loginCard,
+.emptyCard {
+  border: 1px solid rgba(21, 38, 55, 0.12);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.97);
+  color: #162334;
+  box-shadow: 0 24px 70px rgba(4, 15, 26, 0.14);
+}
+
+.sidebar {
+  position: sticky;
+  top: 16px;
+  overflow: hidden;
+}
+
+.sidebarHeader {
+  padding: 20px;
+  background: #f7f2e9;
+  border-bottom: 1px solid #e4e1db;
+}
+
+.sidebarHeader h2,
+.card h2,
+.editorCard h2 {
+  margin: 5px 0 0;
+}
+
+.routeButton,
+.versionButton,
+.checkpointButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.routeButton {
+  padding: 16px 18px;
+  border-bottom: 1px solid #ece8e1;
+}
+
+.routeButton strong,
+.versionButton strong,
+.checkpointButton strong {
+  display: block;
+}
+
+.routeButton small,
+.versionButton small,
+.checkpointButton small,
+.muted {
+  color: #687586;
+}
+
+.active {
+  background: rgba(215, 164, 76, 0.14);
+}
+
+.versionList {
+  padding: 10px;
+  background: #faf8f3;
+}
+
+.versionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border-radius: 13px;
+}
+
+.versionButton {
+  padding: 11px 10px;
+  border-radius: 13px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e9edf1;
+  color: #536172;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.statusPublished { background: #dff3e5; color: #1d6d39; }
+.statusDraft { background: #fff0c8; color: #866012; }
+.statusReview { background: #e6e8ff; color: #4d4f99; }
+.statusInactive { background: #f1e8e6; color: #855347; }
+
+.main {
+  display: grid;
+  gap: 16px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric {
+  padding: 16px;
+  border: 1px solid rgba(215, 164, 76, 0.24);
+  border-radius: 18px;
+  background: rgba(7, 19, 31, 0.94);
+}
+
+.metric span {
+  display: block;
+  color: rgba(248, 243, 232, 0.55);
+  font-size: 0.7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 6px;
+  color: #d7a44c;
+  font-size: 1.75rem;
+}
+
+.card,
+.editorCard {
+  padding: 22px;
+}
+
+.cardHeader,
+.editorHeader,
+.checkpointHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 5px;
+  border-radius: 14px;
+  background: #f0f3f5;
+}
+
+.tab {
+  flex: 1;
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #566375;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.tabActive {
+  background: #fff;
+  color: #172435;
+  box-shadow: 0 4px 14px rgba(10, 25, 40, 0.09);
+}
+
+.grid2,
+.grid3,
+.grid4,
+.localeGrid,
+.healthGrid {
+  display: grid;
+  gap: 13px;
+}
+
+.grid2,
+.localeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid3,
+.healthGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.field,
+.textarea,
+.select {
+  display: grid;
+  gap: 6px;
+}
+
+.field span,
+.textarea span,
+.select span,
+.legend {
+  color: #566375;
+  font-size: 0.75rem;
+  font-weight: 850;
+}
+
+.field input,
+.textarea textarea,
+.select select {
+  width: 100%;
+  border: 1px solid #d6dde3;
+  border-radius: 12px;
+  background: #fff;
+  color: #172435;
+  font: inherit;
+}
+
+.field input,
+.select select {
+  min-height: 42px;
+  padding: 8px 11px;
+}
+
+.textarea textarea {
+  min-height: 100px;
+  padding: 11px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.code textarea {
+  min-height: 160px;
+  direction: ltr;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.full { grid-column: 1 / -1; }
+
+.section {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid #e3e8ec;
+}
+
+.sectionTitle {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.sectionTitle h3 {
+  margin: 0;
+}
+
+.checkpointLayout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.checkpointRail {
+  overflow: hidden;
+  border: 1px solid #dce2e7;
+  border-radius: 17px;
+  background: #f7f9fa;
+}
+
+.railToolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 11px;
+  border-bottom: 1px solid #dfe5e9;
+}
+
+.checkpointRow {
+  display: grid;
+  grid-template-columns: 24px 34px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #e4e8ec;
+}
+
+.checkpointRow[draggable="true"] { cursor: grab; }
+.checkpointRow[draggable="true"]:active { cursor: grabbing; }
+.dragging { opacity: 0.4; }
+.dropTarget { box-shadow: inset 0 2px 0 #d7a44c; }
+
+.dragHandle {
+  color: #8994a0;
+  font-weight: 900;
+  letter-spacing: -2px;
+  user-select: none;
+}
+
+.sequence {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #172435;
+  color: #d7a44c;
+  font-size: 0.73rem;
+  font-weight: 900;
+}
+
+.checkpointButton {
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.checkpointMeta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.healthDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #bfc7cf;
+}
+
+.healthVerified { background: #44a86c; }
+.healthPending { background: #d7a44c; }
+.healthAttention { background: #dc6c5b; }
+
+.editorPanel {
+  border: 1px solid #dde3e8;
+  border-radius: 18px;
+  padding: 20px;
+  background: #fff;
+}
+
+.switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.check,
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  color: #445366;
+  font-weight: 750;
+}
+
+.check input,
+.switch input {
+  width: 18px;
+  height: 18px;
+  accent-color: #b8862f;
+}
+
+.hintList {
+  display: grid;
+  gap: 10px;
+}
+
+.hintCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 100px auto;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid #dfe5e9;
+  border-radius: 14px;
+  background: #f8fafb;
+}
+
+.publishReport {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.issue {
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #fff4d7;
+  color: #795414;
+}
+
+.audit {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.auditItem {
+  display: grid;
+  grid-template-columns: 165px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #e5e9ed;
+  font-size: 0.86rem;
+}
+
+.auditItem time { color: #7a8591; }
+
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(3, 10, 17, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.dialog {
+  width: min(680px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: 24px;
+  border-radius: 22px;
+  background: #fff;
+  color: #172435;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.35);
+}
+
+.dialog h2 { margin-top: 0; }
+.dialogActions { justify-content: flex-end; margin-top: 20px; }
+
+.emptyCard,
+.loginCard {
+  max-width: 760px;
+  margin: 80px auto 0;
+  padding: 32px;
+  text-align: center;
+}
+
+.loading {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  color: rgba(248, 243, 232, 0.68);
+}
+
+@media (max-width: 1180px) {
+  .workspace,
+  .checkpointLayout { grid-template-columns: 1fr; }
+  .sidebar { position: static; }
+  .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .shell { padding: 20px 10px 70px; }
+  .header,
+  .cardHeader,
+  .editorHeader,
+  .checkpointHeader { flex-direction: column; }
+  .metrics,
+  .grid2,
+  .grid3,
+  .grid4,
+  .localeGrid,
+  .healthGrid { grid-template-columns: 1fr; }
+  .hintCard { grid-template-columns: 1fr; }
+  .checkpointRow { grid-template-columns: 20px 32px minmax(0, 1fr); }
+  .checkpointRow > :last-child { grid-column: 2 / -1; }
+  .card,
+  .editorCard { padding: 16px; border-radius: 19px; }
+  .auditItem { grid-template-columns: 1fr; gap: 2px; }
+}

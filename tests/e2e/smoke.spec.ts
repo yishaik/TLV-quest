@@ -25,7 +25,28 @@ test("join page exposes guided bilingual registration and privacy consent", asyn
 });
 
 test("create page requires a single-use invitation", async ({ page }) => {
+  await page.route("**/api/routes", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        data: [
+          {
+            slug: "test-route",
+            title: { he: "מסלול בדיקה", en: "Test route" },
+            description: { he: "מסלול לצורכי בדיקה", en: "A route for tests" },
+            version: 1,
+            checkpointCount: 3,
+            releaseName: "Test release"
+          }
+        ]
+      })
+    });
+  });
+
   await page.goto("/create");
+  await expect(page.getByRole("heading", { name: "מסלול בדיקה" })).toBeVisible();
   await page.getByRole("button", { name: "המשך" }).click();
   await page.getByRole("button", { name: "המשך" }).click();
   await expect(page.getByText(/חסר קישור הזמנה תקף/)).toBeVisible();

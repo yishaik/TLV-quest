@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ContentStudio } from "@/components/ContentStudio";
+import { ContentStudioComposer } from "@/components/ContentStudioComposer";
 
 export const metadata: Metadata = {
   title: "Content Operating System",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function ContentStudioPage() {
-  return <ContentStudio />;
+  return <ContentStudioComposer />;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildContentValidationReport,
+  normalizeContentSlug,
   type ContentCheckpoint,
   type ContentHealth
 } from "../lib/content-os";
@@ -23,7 +24,8 @@ const checkpoint = (
     content: {
       he: { title: "האות הראשון", prompt: "מצאו את השנה" },
       en: { title: "The first signal", prompt: "Find the year" }
-    }
+    },
+    validation: { type: "text", accepted: ["1936"] }
   },
   is_optional: false,
   is_active: true,
@@ -73,7 +75,8 @@ describe("content operating system publish gates", () => {
         content: {
           he: { title: "האות הראשון", prompt: "מצאו את השנה" },
           en: { title: "", prompt: "" }
-        }
+        },
+        validation: { type: "text", accepted: ["1936"] }
       },
       accessibility: {}
     });
@@ -87,7 +90,8 @@ describe("content operating system publish gates", () => {
         content: {
           he: { title: "סיום", prompt: "פתחו את הקפסולה" },
           en: { title: "Finale", prompt: "Open the capsule" }
-        }
+        },
+        validation: { type: "text", accepted: ["open"] }
       }
     });
 
@@ -97,7 +101,9 @@ describe("content operating system publish gates", () => {
     });
 
     expect(report.ok).toBe(false);
-    expect(report.errors.some((issue) => issue.code === "missing_bilingual_content")).toBe(true);
+    expect(
+      report.errors.some((issue) => issue.code === "missing_bilingual_content")
+    ).toBe(true);
   });
 
   it("blocks publishing when the finale is not last or field checks are pending", () => {
@@ -115,8 +121,117 @@ describe("content operating system publish gates", () => {
     });
 
     expect(report.ok).toBe(false);
-    expect(report.errors.some((issue) => issue.code === "finale_not_last")).toBe(true);
+    expect(report.errors.some((issue) => issue.code === "finale_not_last")).toBe(
+      true
+    );
     expect(report.unverifiedCount).toBe(2);
     expect(report.warnings).toHaveLength(2);
+  });
+
+  it("validates structured choice and photo checkpoints", () => {
+    const choice = checkpoint({
+      accessibility: {},
+      config: {
+        content: {
+          he: { title: "בחרו", prompt: "איזו תשובה נכונה?" },
+          en: { title: "Choose", prompt: "Which answer is correct?" }
+        },
+        validation: {
+          type: "choice",
+          options: ["A", "B"],
+          acceptedOption: "C"
+        }
+      },
+      kind: "choice"
+    });
+    const photo = checkpoint({
+      id: "checkpoint-2",
+      slug: "photo",
+      sequence_no: 2,
+      accessibility: {},
+      config: {
+        content: {
+          he: { title: "צלמו", prompt: "צלמו את הסמל" },
+          en: { title: "Photo", prompt: "Photograph the symbol" }
+        },
+        validation: { type: "photo", criteria: "" }
+      },
+      kind: "photo"
+    });
+    const finale = checkpoint({
+      id: "checkpoint-3",
+      slug: "finale",
+      sequence_no: 3,
+      kind: "finale",
+      accessibility: {},
+      config: {
+        content: {
+          he: { title: "סיום", prompt: "הקלידו סוף" },
+          en: { title: "Finale", prompt: "Type finish" }
+        },
+        validation: { type: "text", accepted: ["finish"] }
+      }
+    });
+
+    const report = buildContentValidationReport({
+      checkpoints: [choice, photo, finale],
+      healthByCheckpoint: new Map()
+    });
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.errors.some((issue) => issue.code === "invalid_choice_validation")
+    ).toBe(true);
+    expect(
+      report.errors.some((issue) => issue.code === "missing_photo_criteria")
+    ).toBe(true);
+  });
+
+  it("requires accepted answers for location and finale checkpoints", () => {
+    const location = checkpoint({
+      kind: "location",
+      config: {
+        field_verification_required: false,
+        content: {
+          he: { title: "מיקום", prompt: "מה כתוב כאן?" },
+          en: { title: "Location", prompt: "What is written here?" }
+        },
+        validation: { type: "text", accepted: [] }
+      },
+      accessibility: {}
+    });
+    const finale = checkpoint({
+      id: "checkpoint-2",
+      slug: "finale",
+      sequence_no: 2,
+      kind: "finale",
+      config: {
+        field_verification_required: false,
+        content: {
+          he: { title: "סיום", prompt: "מה המפתח?" },
+          en: { title: "Finale", prompt: "What is the key?" }
+        },
+        validation: { type: "text", accepted: [] }
+      },
+      accessibility: {}
+    });
+
+    const report = buildContentValidationReport({
+      checkpoints: [location, finale],
+      healthByCheckpoint: new Map()
+    });
+
+    expect(
+      report.errors.filter((issue) => issue.code === "missing_accepted_answers")
+    ).toHaveLength(2);
+  });
+});
+
+describe("content authoring helpers", () => {
+  it("normalizes route and checkpoint slugs", () => {
+    expect(normalizeContentSlug("  Jaffa Night / Mystery 2026  ")).toBe(
+      "jaffa-night-mystery-2026"
+    );
+    expect(normalizeContentSlug("---")).toBe("");
   });
 });

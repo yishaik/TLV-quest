@@ -1,4 +1,4 @@
-import { createRun } from "@/lib/repository";
+import { createRouteRun } from "@/lib/run-creation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashSecret } from "@/lib/crypto";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
@@ -12,6 +12,10 @@ export async function POST(request: Request) {
     const inviteToken =
       typeof body.inviteToken === "string" ? body.inviteToken : "";
     if (!inviteToken) throw new Error("A valid organizer invite is required");
+
+    const templateSlug =
+      typeof body.templateSlug === "string" ? body.templateSlug.trim() : "";
+    if (!templateSlug) throw new Error("A published route must be selected");
 
     const supabase = createAdminClient();
     const now = new Date().toISOString();
@@ -37,7 +41,8 @@ export async function POST(request: Request) {
     if (!reserved) throw new Error("Organizer invite has already been used");
     reservedInviteId = reserved.id;
 
-    const run = await createRun({
+    const run = await createRouteRun({
+      templateSlug,
       scheduledAt:
         typeof body.scheduledAt === "string" ? body.scheduledAt : null,
       routeMode:

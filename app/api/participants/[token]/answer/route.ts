@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { deliverCheckpointToTeam } from "@/lib/checkpoint-delivery";
-import { getParticipantState, submitTextAnswer } from "@/lib/repository";
+import { submitCheckpointAnswer } from "@/lib/answer-submission";
+import { getParticipantState } from "@/lib/repository";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -17,7 +18,7 @@ export async function POST(
 
     const idempotencyKey =
       request.headers.get("idempotency-key") ?? `web-answer:${randomUUID()}`;
-    const result = await submitTextAnswer({ token, answer, idempotencyKey });
+    const result = await submitCheckpointAnswer({ token, answer, idempotencyKey });
 
     if (result.evaluation.correct) {
       const state = await getParticipantState(token);

@@ -9,7 +9,8 @@ export default defineConfig([
     files: [
       "components/QuestPlayer.tsx",
       "components/PremiumQuestPlayer.tsx",
-      "components/PremiumLiveLeaderboard.tsx"
+      "components/PremiumLiveLeaderboard.tsx",
+      "components/ContentStudioComposer.tsx"
     ],
     rules: {
       "react-hooks/preserve-manual-memoization": "off",
