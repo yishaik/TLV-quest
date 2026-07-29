@@ -1,225 +1,264 @@
 import Link from "next/link";
-import { heroImage, phoneImage, storyImage } from "@/lib/marketing-assets";
+import { LeadCaptureForm } from "@/components/LeadCaptureForm";
 
 type Locale = "he" | "en";
 
 type Copy = {
-  nav: string[];
-  cta: string;
-  heroEyebrow: string;
-  heroTitle: React.ReactNode;
-  heroText: string;
-  heroSecondary: string;
+  nav: Array<[string, string]>;
+  eyebrow: string;
+  title: React.ReactNode;
+  intro: string;
+  primary: string;
+  secondary: string;
+  access: string;
   facts: string[];
-  transitionTitle: string;
-  transitionText: string;
-  whyTitle: string;
-  why: Array<[string, string, string]>;
+  manifesto: string;
+  manifestoText: string;
   storyEyebrow: string;
   storyTitle: string;
-  storyParagraphs: string[];
-  storyHighlight: string;
-  howTitle: string;
-  how: Array<[string, string]>;
-  awaitsTitle: string;
-  awaits: Array<[string, string]>;
-  audienceTitle: string;
-  audience: Array<[string, string]>;
-  detailsTitle: string;
-  details: Array<[string, string]>;
-  faqTitle: string;
-  faq: Array<[string, string]>;
+  storyText: string[];
+  storyQuote: string;
+  chaptersTitle: string;
+  chaptersText: string;
+  chapters: Array<[string, string, string]>;
+  momentsTitle: string;
+  moments: Array<[string, string]>;
+  flowTitle: string;
+  flow: Array<[string, string]>;
   privateEyebrow: string;
   privateTitle: string;
   privateText: string;
   privatePoints: string[];
+  faqTitle: string;
+  faq: Array<[string, string]>;
   finalTitle: string;
   finalText: string;
-  contact: string;
+  resume: string;
 };
 
 const copy: Record<Locale, Copy> = {
   he: {
-    nav: ["איך זה עובד", "הסיפור", "מה מחכה לכם", "למי זה מתאים", "שאלות נפוצות"],
-    cta: "צאו למסע",
-    heroEyebrow: "הרפתקה אורבנית חיה בנמל תל אביב",
-    heroTitle: <>הנמל מסתיר סיפור.<br />אתם צריכים לפתוח אותו.</>,
-    heroText: "אספו את האנשים שלכם וצאו למסע בין הרציפים, המנוף והמגדלור. חפשו רמזים בעולם האמיתי, פענחו קודים, השלימו משימות וגלו מה מסתתר בתוך קפסולת הזמן של הנמל.",
-    heroSecondary: "גלו איך זה עובד",
-    facts: ["60–90 דקות", "בנמל תל אביב", "לזוגות ולקבוצות", "בלי להוריד אפליקציה"],
-    transitionTitle: "לא עוד סיור. לא עוד חדר בריחה.",
-    transitionText: "זה הנמל שאתם מכירים — רק שהפעם כל שלט, מבנה ופרט קטן עשויים להיות חלק מהמשחק.",
-    whyTitle: "העולם האמיתי הוא לוח המשחק שלכם",
-    why: [
-      ["◎", "רמזים בעולם האמיתי", "תצטרכו להרים את הראש, למצוא פרטים נסתרים ולהשתמש בנמל עצמו כדי להתקדם."],
-      ["⌁", "חידות שלא עוצרות את הקצב", "קודים, תצפיות, צילום ופענוח שנועדו לגרום לכם לחשוב — בלי להרוס את האנרגיה."],
-      ["✦", "סיפור שמתגלה בדרך", "כל תחנה חושפת עוד חלק מהתעלומה. רק כשתחברו הכול תוכלו לפתוח את קפסולת הזמן."],
-      ["↗", "חוויה שעושים יחד", "תתווכחו, תפספסו משהו ברור, תמצאו אותו ברגע האחרון ותחגגו כאילו הצלתם את העיר."],
+    nav: [["הסיפור", "#story"], ["המסע", "#chapters"], ["איך זה עובד", "#flow"], ["אירוע פרטי", "#private"]],
+    eyebrow: "מסע אורבני פרטי · נמל תל אביב",
+    title: <>הנמל זוכר.<br /><em>אתם באים לגלות?</em></>,
+    intro: "ערב אחד. קפסולת זמן שננעלה ב־1936. סדרת רמזים שהתעוררה מחדש בין הרציפים, המנוף והמגדלור. TLV Quest הופך את הנמל לסיפור חי שהקבוצה שלכם היא הדמות הראשית בו.",
+    primary: "בקשת הזמנה",
+    secondary: "הצצה למסע",
+    access: "כבר קיבלתם קישור?",
+    facts: ["60–90 דקות", "2–30 משתתפים", "עברית / English", "ללא הורדת אפליקציה"],
+    manifesto: "זה לא סיור. זה לא חדר בריחה.",
+    manifestoText: "הרחובות הם התפאורה, הפרטים הם המנגנון, והטלפון רק פותח דלתות. רוב הזמן תסתכלו החוצה — לא למסך.",
+    storyEyebrow: "תיק 1936",
+    storyTitle: "המסר שהיה אמור להיפתח בעתיד נעלם.",
+    storyText: [
+      "בימי הקמת הנמל הוטמנה קפסולה ובה עדויות, צילומים ומפתח לסיפור שלא הושלם. השנים עברו, המבנים השתנו, והמסלול אליה נשכח.",
+      "כעת אות מסתורי מחזיר את הסימנים לחיים. כדי לפתוח את הקפסולה תצטרכו לחבר בין הנמל שהיה, הנמל של היום והפרטים שאף אחד אחר לא שם לב אליהם."
     ],
-    storyEyebrow: "המשימה שלכם",
-    storyTitle: "קפסולת הזמן של נמל תל אביב",
-    storyParagraphs: [
-      "לפני עשרות שנים הושאר בנמל מסר שנועד להיפתח בעתיד. הזמן עבר, הנמל השתנה — והמפתח לקפסולה התפזר בין המבנים, הסיפורים והסמלים שנותרו מאחור.",
-      "עכשיו הרמזים התעוררו מחדש. כדי להשלים את המסע תצטרכו לעקוב אחרי הסימנים, לחשוף את הקודים ולחבר בין הנמל שהיה, הנמל של היום והסיפור שמחכה להתגלות.",
+    storyQuote: "הנמל הוא המפה. האור הוא המצפן. הזמן הוא היריב.",
+    chaptersTitle: "שלושה פרקים. סיפור אחד שנפתח בתנועה.",
+    chaptersText: "כל תחנה משנה את הקצב: תצפית, פעולה בעולם האמיתי, רגע קבוצתי ופיסת סיפור שנשארת איתכם גם אחרי המשחק.",
+    chapters: [
+      ["01", "האות הראשון", "התחילו במקום שבו הים הפך לעיר. מצאו את השנה שממנה הכול יצא לדרך."],
+      ["02", "צל המנוף", "סרקו, התמקמו וצרו יחד תמונה שאפשר לראות נכון רק מזווית אחת."],
+      ["03", "האור האחרון", "עקבו אחרי קו האור אל המגדלור וחברו את המפתחות לפני שהחלון נסגר."]
     ],
-    storyHighlight: "הנמל הוא המפה. הפרטים הם הרמזים. אתם החוקרים.",
-    howTitle: "פותחים קישור. מרימים את הראש. יוצאים לדרך.",
-    how: [
-      ["01", "אוספים את הקבוצה — מגיעים לנמל עם האנשים שאיתם תרצו לפתור, להתחרות ולצחוק."],
-      ["02", "נכנסים למשחק — פותחים קישור בנייד. אין הורדה ואין הרשמה מסובכת."],
-      ["03", "מקבלים משימה — סיפור קצר, רמז למיקום ואתגר בעולם האמיתי."],
-      ["04", "פותרים ומתקדמים — חידות, צילום, מיקום וקודים פותחים את התחנה הבאה."],
-      ["05", "פותחים את הקפסולה — מחברים את כל הרמזים ומגלים אם פיצחתם את הסיפור."],
+    momentsTitle: "בנוי לרגעים שאי אפשר לייצר סביב שולחן",
+    moments: [
+      ["רמזים פיזיים", "שלטים, מבנים, קווי ראייה וסמלים שהופכים לחלק מממשק המשחק."],
+      ["משימות צוות", "לא רק לענות נכון — לזוז, לצלם, להתווכח ולבחור יחד."],
+      ["שכבת WhatsApp", "הודעות סיפור, רמזים ועדכונים מגיעים בדיוק ברגע הנכון."],
+      ["מרוץ חי", "התקדמות וניקוד בזמן אמת בלי לחשוף פתרונות או מיקומים מדויקים."],
+      ["מסלול דו־לשוני", "כל משתתף מקבל את החוויה בעברית או באנגלית."],
+      ["ללא מפעיל", "ההרשמה, חלוקת הקבוצות, התחנות, הרמזים והסיום עובדים אוטומטית."]
     ],
-    awaitsTitle: "רק כדי שתבינו לאן אתם נכנסים",
-    awaits: [
-      ["חידות תצפית", "הפתרון נמצא מולכם — אם תסתכלו על הדבר הנכון."],
-      ["קודים נסתרים", "מספרים, סמלים ומסרים שמתחבאים בסביבה."],
-      ["משימות צילום", "לפעמים תצטרכו להוכיח שמצאתם את המקום הנכון."],
-      ["אימותי מיקום", "אי אפשר לפתור את כל המסלול מהספה."],
-      ["רמזים חכמים", "אפשר לקבל עזרה, אבל היא עשויה לעלות בנקודות."],
-      ["ניקוד חי", "עקבו אחרי ההתקדמות ונסו לסיים מעל כולם."],
+    flowTitle: "מהזמנה אחת לערב שמתנהל מעצמו",
+    flow: [
+      ["01", "פותחים הרצה פרטית ומקבלים קישור אישי למארגן."],
+      ["02", "משתפים קישור. כל משתתף נרשם ומקבל כניסה אישית למסע."],
+      ["03", "המערכת מחלקת לקבוצות, מחברת WhatsApp ומכינה את כולם לזינוק."],
+      ["04", "המשחק מתקדם אוטומטית; המארגן רואה חדר בקרה ולוח חי."],
+      ["05", "בסיום נפתחים התוצאות, הסיפור והגלריה לזמן מוגבל."]
     ],
-    audienceTitle: "בילוי למי שמחפש משהו קצת אחר",
-    audience: [
-      ["חברים", "במקום עוד ישיבה בבית קפה — תנועה, תחרות ורגעים שתדברו עליהם אחר כך."],
-      ["זוגות", "דייט עם משימה. פחות 'מה עושים עכשיו?', יותר סיפור, תנועה וצחוק."],
-      ["משפחות", "הליכה, חשיבה ושיתוף פעולה שמתאימים במיוחד לילדים גדולים ולבני נוער."],
-      ["אירועים וקבוצות", "ימי הולדת, קבוצות נוער וצוותים שרוצים פעילות עם מטרה ואנרגיה."],
-    ],
-    detailsTitle: "לפני שיוצאים לדרך",
-    details: [
-      ["משך", "כ־60–90 דקות"], ["מיקום", "נמל תל אביב והסביבה"], ["קבוצה מומלצת", "2–6 משתתפים"],
-      ["מה להביא", "טלפון טעון ונעליים נוחות"], ["קושי", "נגיש למתחילים, מספק גם לפותרי חידות"], ["שפות", "עברית או אנגלית"],
-    ],
-    faqTitle: "שאלות לפני שמתחילים",
+    privateEyebrow: "Invitation only",
+    privateTitle: "הנמל מחכה לקבוצה שלכם.",
+    privateText: "הפיילוט נפתח בהרצות פרטיות נבחרות. ספרו לנו מי מגיע ומתי, ונבנה עבורכם פתיחה מדויקת — מזוג ועד אירוע צוות.",
+    privatePoints: ["הרצה פרטית", "מספר צוותים", "לוח חי", "התאמה לקבוצה", "עברית ואנגלית"],
+    faqTitle: "לפני ששולחים את האות",
     faq: [
-      ["צריך להוריד אפליקציה?", "לא. המשחק נפתח ישירות בדפדפן בנייד, והודעות חשובות מגיעות גם ב־WhatsApp."],
-      ["אפשר לשחק בזוג?", "כן. המשחק מתאים לזוגות, משפחות וקבוצות. קבוצות גדולות יכולות להתחלק לצוותים ולהתחרות."],
-      ["צריך להיות טובים בחידות?", "לא. האתגרים מגוונים, נגישים ומבוססים על שיתוף פעולה ותשומת לב לסביבה."],
-      ["מה קורה אם נתקעים?", "אפשר לבקש רמז בכל תחנה. הוא יעזור להתקדם, אך עשוי להפחית מהניקוד."],
-      ["המשחק מתאים לילדים?", "החוויה מתאימה במיוחד לבני נוער ולמשפחות עם ילדים גדולים."],
-      ["אפשר לשחק באנגלית?", "כן. בוחרים עברית או אנגלית לפני תחילת המשחק."],
+      ["צריך להוריד אפליקציה?", "לא. החוויה נפתחת בדפדפן הנייד ומשתלבת עם WhatsApp."],
+      ["אפשר לשחק בזוג?", "כן. המשחק עובד מצוין לזוג, למשפחה ולקבוצות שמתחרות בכמה צוותים."],
+      ["האם צריך מפעיל?", "לא. המערכת מנהלת הרשמה, חלוקה, התחלה, רמזים, ניקוד וסיום. למארגן נשאר חדר בקרה למקרי חירום."],
+      ["מה קורה אם נתקעים?", "בכל תחנה אפשר לחשוף רמז מדורג. הוא שומר על הקצב ועשוי להפחית מעט מהניקוד."],
+      ["האם זה מתאים לילדים?", "החוויה מתאימה במיוחד לבני נוער, למשפחות עם ילדים גדולים ולקבוצות מבוגרים."],
+      ["מה עושים במזג אוויר בעייתי?", "לפני הרצה פרטית מתאמים חלון זמן ומדיניות דחייה בהתאם לתנאים בנמל."]
     ],
-    privateEyebrow: "רוצים את הנמל לעצמכם?",
-    privateTitle: "אירוע פרטי עם קצת יותר אקשן",
-    privateText: "יום הולדת, פעילות צוות, קבוצה משפחתית או מפגש חברים — פתחו הרצה פרטית, חלקו את המשתתפים לצוותים ועקבו אחרי המרוץ בזמן אמת.",
-    privatePoints: ["הרצה פרטית", "מספר צוותים", "לוח תוצאות חי", "זמן התחלה מתואם"],
-    finalTitle: "מוכנים לראות את נמל תל אביב אחרת?",
-    finalText: "אספו את הקבוצה, טענו את הטלפון וצאו למצוא את הסיפור שמסתתר בין הרציפים.",
-    contact: "משחק פרטי",
+    finalTitle: "הסיפור כבר התחיל.",
+    finalText: "השאירו פרטים וקבלו הזמנה להרצה פרטית של TLV Quest.",
+    resume: "חזרה למסע"
   },
   en: {
-    nav: ["How it works", "The story", "What awaits", "Who it’s for", "FAQ"],
-    cta: "Start the quest",
-    heroEyebrow: "A live urban adventure at Tel Aviv Port",
-    heroTitle: <>The port is hiding a story.<br />You have to unlock it.</>,
-    heroText: "Gather your people and set out across the boardwalk, the historic crane and the lighthouse. Find real-world clues, crack hidden codes, complete missions and uncover the secret inside the port’s lost time capsule.",
-    heroSecondary: "See how it works",
-    facts: ["60–90 minutes", "Tel Aviv Port", "For pairs and groups", "No app download"],
-    transitionTitle: "Not another tour. Not another escape room.",
-    transitionText: "It is the port you already know — except this time, every sign, structure and overlooked detail could be part of the game.",
-    whyTitle: "The real world is your game board",
-    why: [
-      ["◎", "Real-world clues", "Look up, notice hidden details and use the port itself to move forward."],
-      ["⌁", "Puzzles that keep moving", "Codes, observations, photography and decoding designed to challenge without killing the pace."],
-      ["✦", "A story that unfolds", "Every checkpoint reveals another piece. Connect them all to unlock the time capsule."],
-      ["↗", "Built to be shared", "Debate, miss something obvious, find it at the last second and celebrate like you saved the city."],
+    nav: [["The story", "#story"], ["The quest", "#chapters"], ["How it works", "#flow"], ["Private event", "#private"]],
+    eyebrow: "A private urban quest · Tel Aviv Port",
+    title: <>The port remembers.<br /><em>Will you uncover it?</em></>,
+    intro: "One evening. A time capsule sealed in 1936. A trail of signals resurfacing between the docks, the crane and the lighthouse. TLV Quest turns the port into a living story with your team at its center.",
+    primary: "Request an invitation",
+    secondary: "Enter the story",
+    access: "Already received a link?",
+    facts: ["60–90 minutes", "2–30 participants", "Hebrew / English", "No app download"],
+    manifesto: "Not a tour. Not an escape room.",
+    manifestoText: "The waterfront is the set, overlooked details are the mechanism, and your phone only opens doors. Most of the time, you will be looking up — not down.",
+    storyEyebrow: "Case 1936",
+    storyTitle: "The message meant for the future disappeared.",
+    storyText: [
+      "When the port was founded, a capsule was sealed with evidence, photographs and the key to an unfinished story. The waterfront changed and the route was forgotten.",
+      "Now a mysterious signal has brought the clues back. Connect the port that was, the port you see today and the details everyone else walks past."
     ],
-    storyEyebrow: "Your mission",
-    storyTitle: "The Tel Aviv Port Time Capsule",
-    storyParagraphs: [
-      "Decades ago, a message was left at the port to be opened in the future. Time passed, the waterfront changed, and the key was scattered among the structures, stories and symbols left behind.",
-      "Now the clues have resurfaced. Follow the signs, uncover the codes and connect the port that once was, the port you see today and the story still waiting to be discovered.",
+    storyQuote: "The port is the map. Light is the compass. Time is the rival.",
+    chaptersTitle: "Three chapters. One story unlocked in motion.",
+    chaptersText: "Each checkpoint changes the rhythm: observation, a physical action, a team moment and another fragment of the mystery.",
+    chapters: [
+      ["01", "The first signal", "Begin where the sea became a city. Find the year that started everything."],
+      ["02", "The crane’s shadow", "Scan, position yourselves and create an image that only works from one angle."],
+      ["03", "The final light", "Follow the beam to the lighthouse and assemble the keys before the window closes."]
     ],
-    storyHighlight: "The port is your map. The details are your clues. You are the investigators.",
-    howTitle: "Open the link. Look up. Start exploring.",
-    how: [
-      ["01", "Gather your team — meet at the port with the people you want beside you."],
-      ["02", "Enter the game — open a mobile link. No download and no complicated account."],
-      ["03", "Receive a mission — a short story, a location hint and a real-world challenge."],
-      ["04", "Solve and progress — puzzles, photos, location and codes unlock the next stop."],
-      ["05", "Open the capsule — connect every clue and discover whether you cracked the story."],
+    momentsTitle: "Designed for moments a table cannot create",
+    moments: [
+      ["Physical clues", "Signs, structures, sight lines and symbols become part of the interface."],
+      ["Team missions", "Move, photograph, debate and decide together — not merely submit answers."],
+      ["WhatsApp layer", "Story beats, hints and updates arrive at exactly the right moment."],
+      ["Live race", "Realtime progress without revealing solutions or precise locations."],
+      ["Bilingual route", "Each participant experiences the quest in Hebrew or English."],
+      ["Autonomous operation", "Registration, teams, checkpoints, hints and finishing run automatically."]
     ],
-    awaitsTitle: "Just so you know what you’re getting into",
-    awaits: [
-      ["Observation puzzles", "The answer is in front of you — if you look at the right thing."],
-      ["Hidden codes", "Numbers, symbols and messages embedded in the environment."],
-      ["Photo missions", "Sometimes you need to prove that you found the right place."],
-      ["Location challenges", "There is no solving the entire route from your sofa."],
-      ["Smart hints", "Ask for help when stuck, but be ready to sacrifice points."],
-      ["Live scoring", "Track progress and try to reach the finish above everyone else."],
+    flowTitle: "From one invitation to a self-running night",
+    flow: [
+      ["01", "Open a private session and receive a secure organizer link."],
+      ["02", "Share one invitation. Every participant gets a personal entry to the quest."],
+      ["03", "The system balances teams, connects WhatsApp and prepares the start."],
+      ["04", "The quest advances automatically while the organizer sees a live control room."],
+      ["05", "Results, story and gallery unlock for a limited time after the finale."]
     ],
-    audienceTitle: "For anyone looking for something different",
-    audience: [
-      ["Friends", "Swap another café meetup for movement, competition and stories worth retelling."],
-      ["Couples", "A date with a mission. Less 'what now?', more story, movement and laughter."],
-      ["Families", "Walking, puzzles and teamwork, especially suited to older children and teenagers."],
-      ["Groups and events", "Birthdays, youth groups and teams looking for an activity with purpose and energy."],
-    ],
-    detailsTitle: "Before you set out",
-    details: [
-      ["Duration", "About 60–90 minutes"], ["Location", "Tel Aviv Port and waterfront"], ["Recommended team", "2–6 participants"],
-      ["Bring", "A charged phone and comfortable shoes"], ["Difficulty", "Approachable, with enough challenge for puzzle fans"], ["Languages", "Hebrew or English"],
-    ],
-    faqTitle: "Questions before you start",
+    privateEyebrow: "Invitation only",
+    privateTitle: "The port is waiting for your team.",
+    privateText: "The pilot is opening through selected private sessions. Tell us who is coming and when; we will shape the right opening for a couple, family or company team.",
+    privatePoints: ["Private session", "Multiple teams", "Live board", "Group adaptation", "Hebrew and English"],
+    faqTitle: "Before you send the signal",
     faq: [
-      ["Do I need to download an app?", "No. The quest runs directly in your mobile browser, with important updates also available through WhatsApp."],
-      ["Can two people play?", "Yes. It works for couples, families and groups. Larger groups can split into competing teams."],
-      ["Do I need to be good at puzzles?", "No. The challenges are varied, approachable and built around teamwork and awareness."],
-      ["What if we get stuck?", "Request a hint at any checkpoint. It will help, although it may reduce your score."],
-      ["Is it suitable for children?", "The experience is especially suitable for teenagers and families with older children."],
-      ["Can we play in English?", "Yes. Select Hebrew or English before the quest begins."],
+      ["Do I need an app?", "No. The experience opens in the mobile browser and connects with WhatsApp."],
+      ["Can two people play?", "Yes. It works for a couple, a family or a larger group split into competing teams."],
+      ["Does it require an operator?", "No. Registration, team balancing, start, hints, scoring and finish are automated, with emergency controls for the organizer."],
+      ["What if we get stuck?", "Every checkpoint offers progressive hints that preserve the pace and may reduce the score slightly."],
+      ["Is it suitable for children?", "It is best for teenagers, families with older children and adult groups."],
+      ["What about bad weather?", "Private sessions include a coordinated time window and postponement policy based on port conditions."]
     ],
-    privateEyebrow: "Want the port to yourselves?",
-    privateTitle: "A private event with more action",
-    privateText: "Plan a birthday, team activity, family gathering or private group quest. Split into teams and follow the race through a live leaderboard.",
-    privatePoints: ["Private session", "Multiple teams", "Live leaderboard", "Coordinated start"],
-    finalTitle: "Ready to see Tel Aviv Port differently?",
-    finalText: "Gather your team, charge your phone and uncover the story hidden along the waterfront.",
-    contact: "Private quest",
-  },
+    finalTitle: "The story has already begun.",
+    finalText: "Leave your details to receive an invitation for a private TLV Quest session.",
+    resume: "Resume quest"
+  }
 };
 
 export function MarketingHome({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const rtl = locale === "he";
+
   return (
     <main className="marketing-page" dir={rtl ? "rtl" : "ltr"}>
       <header className="marketing-nav">
-        <Link className="marketing-logo" href={locale === "he" ? "/" : "/?lang=en"}><span>Q</span> TLV QUEST</Link>
-        <nav>{c.nav.map((item, index) => <a key={item} href={["#how", "#story", "#awaits", "#audience", "#faq"][index]}>{item}</a>)}</nav>
+        <Link className="marketing-logo" href={rtl ? "/" : "/?lang=en"}>
+          <img src="/visuals/quest-mark.svg" alt="" width="42" height="42" />
+          <span><b>TLV QUEST</b><small>THE PORT REMEMBERS</small></span>
+        </Link>
+        <nav>{c.nav.map(([label, href]) => <a key={href} href={href}>{label}</a>)}</nav>
         <div className="marketing-nav-actions">
-          <Link className="language-switch" href={locale === "he" ? "/?lang=en" : "/"}>{locale === "he" ? "EN" : "עברית"}</Link>
-          <Link className="button marketing-button" href="/create">{c.cta}</Link>
+          <Link className="language-switch" href={rtl ? "/?lang=en" : "/"}>{rtl ? "EN" : "עברית"}</Link>
+          <a className="button marketing-button" href="#private">{c.primary}</a>
         </div>
       </header>
 
-      <section className="marketing-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(247,240,230,.98) 0%, rgba(247,240,230,.87) 39%, rgba(19,41,75,.08) 66%), url(${heroImage})` }}>
+      <section className="marketing-hero">
+        <div className="marketing-hero-visual" aria-hidden="true"><img src="/visuals/harbor-hero.svg" alt="" /></div>
+        <div className="marketing-hero-vignette" />
         <div className="marketing-hero-copy">
-          <span className="marketing-eyebrow">{c.heroEyebrow}</span>
-          <h1>{c.heroTitle}</h1>
-          <p>{c.heroText}</p>
+          <span className="marketing-eyebrow"><i />{c.eyebrow}</span>
+          <h1>{c.title}</h1>
+          <p>{c.intro}</p>
           <div className="marketing-actions">
-            <Link className="button marketing-button" href="/create">{c.cta}</Link>
-            <a className="button marketing-button-secondary" href="#how">{c.heroSecondary}</a>
+            <a className="button marketing-button" href="#private">{c.primary}</a>
+            <a className="button marketing-button-secondary" href="#story">{c.secondary}</a>
           </div>
-          <div className="marketing-facts">{c.facts.map((fact) => <span key={fact}>✓ {fact}</span>)}</div>
+          <Link className="marketing-access-link" href="/resume">{c.access} <strong>{c.resume} ↗</strong></Link>
+          <div className="marketing-facts">{c.facts.map((fact) => <span key={fact}>{fact}</span>)}</div>
+        </div>
+        <div className="hero-coordinate" aria-hidden="true"><span>32.0969° N</span><span>34.7748° E</span></div>
+      </section>
+
+      <section className="marketing-manifesto">
+        <span>TLV / 1936 / NOW</span>
+        <h2>{c.manifesto}</h2>
+        <p>{c.manifestoText}</p>
+      </section>
+
+      <section className="marketing-story" id="story">
+        <div className="marketing-story-art"><img src="/visuals/capsule-1936.svg" alt={rtl ? "קפסולת הזמן 1936" : "The 1936 time capsule"} /><span>ARCHIVE OBJECT / 01</span></div>
+        <div className="marketing-story-copy">
+          <span className="marketing-eyebrow"><i />{c.storyEyebrow}</span>
+          <h2>{c.storyTitle}</h2>
+          {c.storyText.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+          <blockquote>{c.storyQuote}</blockquote>
         </div>
       </section>
 
-      <section className="marketing-transition"><h2>{c.transitionTitle}</h2><p>{c.transitionText}</p></section>
-      <section className="marketing-section"><div className="marketing-heading"><span>TLV QUEST</span><h2>{c.whyTitle}</h2></div><div className="marketing-feature-grid">{c.why.map(([icon,title,text]) => <article key={title}><b>{icon}</b><h3>{title}</h3><p>{text}</p></article>)}</div></section>
-      <section className="marketing-story" id="story"><div className="marketing-story-image"><img src={storyImage} alt="TLV Quest players uncovering a clue at Tel Aviv Port" /></div><div className="marketing-story-copy"><span className="marketing-eyebrow">{c.storyEyebrow}</span><h2>{c.storyTitle}</h2>{c.storyParagraphs.map((p) => <p key={p}>{p}</p>)}<blockquote>{c.storyHighlight}</blockquote><Link className="button marketing-button" href="/create">{c.cta}</Link></div></section>
-      <section className="marketing-how" id="how"><div className="marketing-how-copy"><span className="marketing-eyebrow">TLV QUEST</span><h2>{c.howTitle}</h2><div className="marketing-steps">{c.how.map(([n,t]) => <div key={n}><strong>{n}</strong><p>{t}</p></div>)}</div></div><div className="marketing-phone"><img src={phoneImage} alt="TLV Quest mobile game interface at Tel Aviv Port" /></div></section>
-      <section className="marketing-section marketing-dark" id="awaits"><div className="marketing-heading"><span>THE EXPERIENCE</span><h2>{c.awaitsTitle}</h2></div><div className="marketing-awaits-grid">{c.awaits.map(([title,text],i) => <article key={title}><span>{String(i+1).padStart(2,"0")}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
-      <section className="marketing-section" id="audience"><div className="marketing-heading"><span>FOR YOUR PEOPLE</span><h2>{c.audienceTitle}</h2></div><div className="marketing-audience-grid">{c.audience.map(([title,text]) => <article key={title}><h3>{title}</h3><p>{text}</p></article>)}</div></section>
-      <section className="marketing-details"><h2>{c.detailsTitle}</h2><div>{c.details.map(([label,value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div></section>
-      <section className="marketing-private"><div><span className="marketing-eyebrow">{c.privateEyebrow}</span><h2>{c.privateTitle}</h2><p>{c.privateText}</p><div className="marketing-private-points">{c.privatePoints.map((point) => <span key={point}>✓ {point}</span>)}</div></div><Link className="button marketing-light-button" href="/create">{c.contact}</Link></section>
-      <section className="marketing-section marketing-faq" id="faq"><div className="marketing-heading"><span>FAQ</span><h2>{c.faqTitle}</h2></div><div>{c.faq.map(([q,a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}</div></section>
-      <section className="marketing-final"><h2>{c.finalTitle}</h2><p>{c.finalText}</p><div className="marketing-actions"><Link className="button marketing-button" href="/create">{c.cta}</Link><Link className="button marketing-button-secondary" href="/create">{c.contact}</Link></div></section>
-      <footer className="marketing-footer"><div className="marketing-logo"><span>Q</span> TLV QUEST</div><p>{rtl ? "הרפתקת חידות חיה שהופכת מקומות אמיתיים לסיפורים שאפשר לשחק." : "A live urban adventure that turns real places into stories you can play."}</p><small>© TLV Quest · {rtl ? "נוצר בתל אביב. משוחק בעולם האמיתי." : "Created in Tel Aviv. Played in the real world."}</small></footer>
-      <Link className="marketing-sticky-cta" href="/create">{c.cta}</Link>
+      <section className="marketing-chapters" id="chapters">
+        <div className="marketing-heading"><span>THE ROUTE</span><h2>{c.chaptersTitle}</h2><p>{c.chaptersText}</p></div>
+        <div className="chapter-track">
+          {c.chapters.map(([number, title, text], index) => (
+            <article key={number}>
+              <div className="chapter-number">{number}</div>
+              <div className={`chapter-icon chapter-icon-${index + 1}`} aria-hidden="true" />
+              <h3>{title}</h3><p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="marketing-moments">
+        <div className="marketing-heading"><span>THE EXPERIENCE</span><h2>{c.momentsTitle}</h2></div>
+        <div className="moment-grid">{c.moments.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
+      </section>
+
+      <section className="marketing-flow" id="flow">
+        <div className="marketing-flow-copy"><span className="marketing-eyebrow"><i />SYSTEM FLOW</span><h2>{c.flowTitle}</h2></div>
+        <div className="marketing-flow-steps">{c.flow.map(([number, text]) => <div key={number}><strong>{number}</strong><p>{text}</p></div>)}</div>
+      </section>
+
+      <section className="marketing-private" id="private">
+        <div className="marketing-private-copy">
+          <span className="marketing-eyebrow"><i />{c.privateEyebrow}</span>
+          <h2>{c.privateTitle}</h2>
+          <p>{c.privateText}</p>
+          <div className="marketing-private-points">{c.privatePoints.map((point) => <span key={point}>{point}</span>)}</div>
+          <div className="private-seal" aria-hidden="true"><img src="/visuals/quest-mark.svg" alt="" /><span>PRIVATE<br />SESSION</span></div>
+        </div>
+        <LeadCaptureForm locale={locale} />
+      </section>
+
+      <section className="marketing-faq">
+        <div className="marketing-heading"><span>FIELD NOTES</span><h2>{c.faqTitle}</h2></div>
+        <div>{c.faq.map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
+      </section>
+
+      <section className="marketing-final">
+        <img src="/visuals/quest-mark.svg" alt="" width="70" height="70" />
+        <h2>{c.finalTitle}</h2><p>{c.finalText}</p>
+        <a className="button marketing-button" href="#private">{c.primary}</a>
+      </section>
+
+      <footer className="marketing-footer">
+        <div className="marketing-logo"><img src="/visuals/quest-mark.svg" alt="" width="38" height="38" /><span><b>TLV QUEST</b><small>THE PORT REMEMBERS</small></span></div>
+        <p>{rtl ? "נוצר בתל אביב. משוחק בעולם האמיתי." : "Created in Tel Aviv. Played in the real world."}</p>
+        <small>© 2026 TLV Quest · Private pilot</small>
+      </footer>
+      <a className="marketing-sticky-cta" href="#private">{c.primary}</a>
     </main>
   );
 }
