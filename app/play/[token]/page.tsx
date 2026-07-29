@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { QuestPlayer } from "@/components/QuestPlayer";
+import { PremiumQuestPlayer } from "@/components/PremiumQuestPlayer";
 
 export const metadata: Metadata = { title: "המסע" };
 
@@ -9,5 +9,5 @@ export default async function PlayPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  return <QuestPlayer token={token} />;
+  return <PremiumQuestPlayer token={token} />;
 }
