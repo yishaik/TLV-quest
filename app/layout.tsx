@@ -5,6 +5,14 @@ import "./marketing.css";
 import "./experience.css";
 import "./flows.css";
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_APP_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+
 export const metadata: Metadata = {
   title: {
     default: "TLV Quest | הרפתקה אורבנית בנמל תל אביב",
@@ -12,7 +20,7 @@ export const metadata: Metadata = {
   },
   description:
     "מסע מסתורין קולנועי בנמל תל אביב: רמזים בעולם האמיתי, חידות, צילום, מיקום ותחרות חיה — ישירות מהטלפון.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(siteUrl),
   applicationName: "TLV Quest",
   category: "entertainment",
   keywords: ["Tel Aviv", "urban quest", "escape game", "נמל תל אביב", "משחק עירוני"],
