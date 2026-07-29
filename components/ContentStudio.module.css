@@ -1,0 +1,536 @@
+.shell {
+  min-height: 100vh;
+  padding: 34px 24px 90px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(214, 163, 75, 0.13), transparent 32rem),
+    linear-gradient(180deg, #08131f 0%, #0d1d2d 54%, #f4efe5 54%, #f4efe5 100%);
+  color: #f8f2e7;
+}
+
+.frame {
+  width: min(1480px, 100%);
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #d6a34b;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.eyebrow::before {
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+  content: "";
+}
+
+.header h1 {
+  margin: 12px 0 10px;
+  font-size: clamp(2.5rem, 5vw, 5.2rem);
+  line-height: 0.96;
+  letter-spacing: -0.055em;
+}
+
+.header p {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(248, 242, 231, 0.68);
+  font-size: 1.02rem;
+  line-height: 1.75;
+}
+
+.headerActions,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.button {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid rgba(214, 163, 75, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  font-weight: 850;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: #d6a34b;
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.buttonPrimary {
+  border-color: #d6a34b;
+  background: #d6a34b;
+  color: #08131f;
+}
+
+.buttonDanger {
+  border-color: rgba(255, 132, 112, 0.42);
+  color: #ffd0c7;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.sidebar,
+.panel,
+.editor,
+.checkpointCard,
+.emptyState,
+.loginCard {
+  border: 1px solid rgba(18, 35, 53, 0.12);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #172333;
+  box-shadow: 0 24px 70px rgba(3, 13, 24, 0.15);
+}
+
+.sidebar {
+  position: sticky;
+  top: 18px;
+  overflow: hidden;
+}
+
+.sidebarHeader {
+  padding: 22px;
+  border-bottom: 1px solid rgba(18, 35, 53, 0.1);
+  background: #f9f5ed;
+}
+
+.sidebarHeader h2 {
+  margin: 6px 0 0;
+  font-size: 1.3rem;
+}
+
+.templateButton,
+.versionButton,
+.checkpointButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.templateButton {
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(18, 35, 53, 0.08);
+}
+
+.templateButton strong,
+.versionButton strong,
+.checkpointButton strong {
+  display: block;
+}
+
+.templateButton small,
+.versionButton small,
+.checkpointButton small {
+  color: #6d7886;
+}
+
+.templateActive,
+.versionActive,
+.checkpointActive {
+  background: rgba(214, 163, 75, 0.13);
+}
+
+.versionList {
+  padding: 12px;
+}
+
+.versionButton {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 13px 12px;
+  border-radius: 14px;
+}
+
+.status {
+  align-self: start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e9edf1;
+  color: #4e5d6d;
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.statusPublished {
+  background: #dff3e5;
+  color: #1e6f3b;
+}
+
+.statusDraft,
+.statusReview {
+  background: #fff0ca;
+  color: #8c6212;
+}
+
+.main {
+  display: grid;
+  gap: 18px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric {
+  padding: 18px;
+  border: 1px solid rgba(214, 163, 75, 0.24);
+  border-radius: 20px;
+  background: rgba(8, 19, 31, 0.9);
+  color: #fff8ea;
+}
+
+.metric span {
+  display: block;
+  color: rgba(255, 248, 234, 0.58);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 8px;
+  color: #d6a34b;
+  font-size: 2rem;
+}
+
+.panel,
+.editor {
+  padding: 24px;
+}
+
+.panelHeader,
+.editorHeader,
+.checkpointTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.panelHeader h2,
+.editorHeader h2 {
+  margin: 4px 0 0;
+  font-size: 1.55rem;
+}
+
+.muted {
+  color: #697686;
+  line-height: 1.65;
+}
+
+.formGrid,
+.locationGrid,
+.contentGrid,
+.healthGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.formGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 20px;
+}
+
+.locationGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.contentGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.healthGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field,
+.textAreaField,
+.selectField {
+  display: grid;
+  gap: 7px;
+}
+
+.field span,
+.textAreaField span,
+.selectField span {
+  color: #536172;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+}
+
+.field input,
+.textAreaField textarea,
+.selectField select {
+  width: 100%;
+  border: 1px solid #d7dee5;
+  border-radius: 13px;
+  background: #fff;
+  color: #172333;
+  font: inherit;
+}
+
+.field input,
+.selectField select {
+  min-height: 44px;
+  padding: 9px 12px;
+}
+
+.textAreaField textarea {
+  min-height: 110px;
+  padding: 12px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.codeArea textarea {
+  min-height: 180px;
+  direction: ltr;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.checkpointLayout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.checkpointList {
+  overflow: hidden;
+  border: 1px solid #dde3e8;
+  border-radius: 18px;
+  background: #f7f9fa;
+}
+
+.checkpointButton {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  border-bottom: 1px solid #e4e8ec;
+}
+
+.sequence {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #172333;
+  color: #d6a34b;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.healthDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c7ced5;
+}
+
+.healthVerified {
+  background: #44a86c;
+}
+
+.healthPending {
+  background: #d6a34b;
+}
+
+.healthAttention {
+  background: #e46d58;
+}
+
+.checkpointCard {
+  padding: 22px;
+  box-shadow: none;
+}
+
+.section {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid #e2e7eb;
+}
+
+.section h3 {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+}
+
+.switchRow,
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+}
+
+.switchRow input,
+.checkRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: #b8862f;
+}
+
+.report {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.issue,
+.success,
+.error,
+.notice {
+  padding: 12px 14px;
+  border-radius: 13px;
+  line-height: 1.5;
+}
+
+.issue,
+.notice {
+  background: #fff5d9;
+  color: #795415;
+}
+
+.error {
+  background: #ffe6e1;
+  color: #8b2e22;
+}
+
+.success {
+  background: #e2f5e8;
+  color: #216b3a;
+}
+
+.audit {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.auditItem {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e9ed;
+  font-size: 0.88rem;
+}
+
+.auditItem time {
+  color: #778390;
+}
+
+.emptyState,
+.loginCard {
+  max-width: 760px;
+  margin: 90px auto 0;
+  padding: 34px;
+  text-align: center;
+}
+
+.loading {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+@media (max-width: 1100px) {
+  .workspace,
+  .checkpointLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: 22px 12px 70px;
+    background: linear-gradient(180deg, #08131f 0%, #0d1d2d 38%, #f4efe5 38%, #f4efe5 100%);
+  }
+
+  .header,
+  .panelHeader,
+  .editorHeader,
+  .checkpointTop {
+    flex-direction: column;
+  }
+
+  .formGrid,
+  .locationGrid,
+  .contentGrid,
+  .healthGrid,
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel,
+  .editor,
+  .checkpointCard {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .auditItem {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}

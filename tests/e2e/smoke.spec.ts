@@ -31,3 +31,9 @@ test("create page requires a single-use invitation", async ({ page }) => {
   await expect(page.getByText(/חסר קישור הזמנה תקף/)).toBeVisible();
   await expect(page.getByRole("button", { name: "יצירת ההרצה" })).toBeDisabled();
 });
+
+test("content operating system requires an authenticated admin session", async ({ page }) => {
+  await page.goto("/admin/content");
+  await expect(page.getByRole("heading", { name: "נדרשת כניסת מנהל" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "מעבר לכניסה" })).toHaveAttribute("href", "/admin");
+});
