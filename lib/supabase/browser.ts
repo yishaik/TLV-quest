@@ -1,6 +1,10 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
+import {
+  createClient,
+  type AuthChangeEvent,
+  type Session
+} from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
 
 type RawBrowserClient = ReturnType<typeof createClient>;
@@ -10,7 +14,7 @@ type RawSubscription = RawAuthStateResult["data"]["subscription"];
 type BrowserClient = Omit<RawBrowserClient, "auth"> & {
   auth: Omit<RawAuth, "onAuthStateChange"> & {
     onAuthStateChange: (
-      ...args: Parameters<RawAuth["onAuthStateChange"]>
+      callback: (event: AuthChangeEvent, session: Session | null) => void | Promise<void>
     ) => Omit<RawAuthStateResult, "data"> & {
       data: Omit<RawAuthStateResult["data"], "subscription"> & {
         subscription: Omit<RawSubscription, "unsubscribe"> & {
