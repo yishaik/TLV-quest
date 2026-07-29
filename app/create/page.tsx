@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { CreateRunForm } from "@/components/CreateRunForm";
+import { PremiumCreateRunForm } from "@/components/PremiumCreateRunForm";
 
-export const metadata: Metadata = { title: "יצירת משחק" };
+export const metadata: Metadata = { title: "יצירת הרצה פרטית" };
 
 export default async function CreatePage({
   searchParams
@@ -11,15 +11,15 @@ export default async function CreatePage({
   const { invite = "" } = await searchParams;
 
   return (
-    <main className="site-shell page">
-      <span className="badge">אשף מארגן</span>
-      <h1 className="page-title">משחק חדש בנמל</h1>
-      <p className="lead">
-        ברירות המחדל מתאימות לפיילוט של בני נוער במסלול קפסולת הזמן. אפשר
-        לשנות את מבנה הקבוצות, ההתחלה, הניקוד והחשיפה בלוח.
-      </p>
-      <div style={{ marginTop: 32 }}>
-        <CreateRunForm inviteToken={invite} />
+    <main className="flow-page create-page">
+      <div className="flow-visual" aria-hidden="true"><img src="/visuals/harbor-hero.svg" alt="" /></div>
+      <div className="flow-overlay" />
+      <header className="flow-page-header">
+        <div className="flow-brand"><img src="/visuals/quest-mark.svg" alt="" /><span><b>TLV QUEST</b><small>ORGANIZER ACCESS</small></span></div>
+        <span className="flow-code">PRIVATE RUN</span>
+      </header>
+      <div className="flow-page-content">
+        <PremiumCreateRunForm inviteToken={invite} />
       </div>
     </main>
   );
