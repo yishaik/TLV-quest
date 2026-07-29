@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="TLV Quest social cover">
+  <defs><linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#06111c"/><stop offset=".58" stop-color="#123348"/><stop offset="1" stop-color="#b87536"/></linearGradient><linearGradient id="g"><stop stop-color="#fff1b7"/><stop offset="1" stop-color="#bd7b2f"/></linearGradient><filter id="x"><feGaussianBlur stdDeviation="12" result="a"/><feMerge><feMergeNode in="a"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <rect width="1200" height="630" fill="url(#b)"/>
+  <g opacity=".28" stroke="#e4b45d"><path d="M0 470C250 400 380 510 620 430S940 410 1200 350"/><path d="M0 520C230 460 430 560 700 480S1000 450 1200 420"/></g>
+  <g fill="none" stroke="#050b10" stroke-width="15"><path d="M915 420V115h24v305M927 125L790 270h278zM810 267h245"/><path d="M1080 420V205h18v215M1089 215l-96 95h190z"/></g>
+  <g transform="translate(1035 95)"><rect x="20" y="45" width="40" height="245" fill="#eee4cf"/><rect x="15" y="26" width="50" height="42" rx="7" fill="#f2c86e" filter="url(#x)"/><path d="M0 310h80l-12-26H12z" fill="#07111b"/></g>
+  <path d="M610 540C720 450 810 465 900 365" fill="none" stroke="#e6b55e" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 22" filter="url(#x)"/>
+  <circle cx="86" cy="80" r="30" fill="none" stroke="url(#g)" stroke-width="4"/><path d="M86 55l6 19 19 6-19 6-6 19-6-19-19-6 19-6z" fill="url(#g)"/>
+  <text x="70" y="185" fill="#f7f1e7" font-family="Arial,sans-serif" font-size="88" font-weight="800" letter-spacing="3">TLV QUEST</text>
+  <text x="73" y="245" fill="#e5b45d" font-family="Arial,sans-serif" font-size="28" letter-spacing="5">THE PORT REMEMBERS</text>
+  <text x="73" y="345" fill="#fff" font-family="Arial,sans-serif" font-size="50" font-weight="700">הנמל זוכר.</text>
+  <text x="73" y="405" fill="#fff" font-family="Arial,sans-serif" font-size="50" font-weight="700">אתם באים לגלות?</text>
+</svg>
