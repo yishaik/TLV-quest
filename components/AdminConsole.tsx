@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/browser";
 
@@ -224,7 +225,28 @@ export function AdminConsole() {
         שנכשלו ומחיקות שלא הושלמו.
       </p>
 
-      <section className="card" style={{ marginTop: 32 }}>
+      <section
+        className="card"
+        style={{
+          marginTop: 32,
+          background: "linear-gradient(135deg, #102b49, #081725)",
+          color: "white"
+        }}
+      >
+        <span className="badge">Content Operating System</span>
+        <h2>ניהול מסלולים כגרסאות מוצר</h2>
+        <p style={{ color: "rgba(255,255,255,.72)", maxWidth: 760 }}>
+          עריכת תוכן דו־לשוני, בדיקות תקינות, אימות תחנות בשטח, Audit trail ופרסום
+          אטומי בלי לשנות הרצות שכבר התחילו.
+        </p>
+        <div className="actions">
+          <Link className="button button-primary" href="/admin/content">
+            פתיחת Content Studio
+          </Link>
+        </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 20 }}>
         <span className="badge">הרצה חדשה</span>
         <h2>יצירת קישור חד־פעמי למארגן</h2>
         <p className="muted">
