@@ -1,4 +1,4 @@
-import { getParticipantState } from "@/lib/repository";
+import { getParticipantExperienceState } from "@/lib/experience-meta";
 import { handleRouteError, jsonOk } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { token } = await context.params;
-    return jsonOk(await getParticipantState(token));
+    return jsonOk(await getParticipantExperienceState(token));
   } catch (error) {
     return handleRouteError(error);
   }
