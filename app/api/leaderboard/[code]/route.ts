@@ -1,4 +1,4 @@
-import { getLeaderboardExperience } from "@/lib/experience-meta";
+import { getLeaderboard } from "@/lib/repository";
 import { handleRouteError, jsonOk } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { code } = await context.params;
-    return jsonOk(await getLeaderboardExperience(code));
+    return jsonOk(await getLeaderboard(code));
   } catch (error) {
     return handleRouteError(error);
   }
