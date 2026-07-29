@@ -3,9 +3,27 @@
 import { createClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
 
-let browserClient: ReturnType<typeof createClient> | undefined;
+type RawBrowserClient = ReturnType<typeof createClient>;
+type RawAuth = RawBrowserClient["auth"];
+type RawAuthStateResult = ReturnType<RawAuth["onAuthStateChange"]>;
+type RawSubscription = RawAuthStateResult["data"]["subscription"];
+type BrowserClient = Omit<RawBrowserClient, "auth"> & {
+  auth: Omit<RawAuth, "onAuthStateChange"> & {
+    onAuthStateChange: (
+      ...args: Parameters<RawAuth["onAuthStateChange"]>
+    ) => Omit<RawAuthStateResult, "data"> & {
+      data: Omit<RawAuthStateResult["data"], "subscription"> & {
+        subscription: Omit<RawSubscription, "unsubscribe"> & {
+          unsubscribe: () => undefined;
+        };
+      };
+    };
+  };
+};
 
-export const getBrowserClient = () => {
+let browserClient: RawBrowserClient | undefined;
+
+export const getBrowserClient = (): BrowserClient => {
   if (!publicEnv.supabasePublishableKey) {
     throw new Error("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not configured");
   }
@@ -15,5 +33,5 @@ export const getBrowserClient = () => {
     publicEnv.supabasePublishableKey
   );
 
-  return browserClient;
+  return browserClient as BrowserClient;
 };
