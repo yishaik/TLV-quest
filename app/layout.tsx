@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AppChrome } from "@/components/AppChrome";
 import "./globals.css";
 import "./marketing.css";
+import "./experience.css";
 
 export const metadata: Metadata = {
   title: {
