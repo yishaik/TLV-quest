@@ -64,14 +64,28 @@ export const objectValue = (value: unknown): Record<string, unknown> =>
 export const arrayValue = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
 
-export const textValue = (value: unknown): string =>
-  typeof value === "string" ? value : "";
+export const textValue = (value: unknown, fallback = ""): string =>
+  typeof value === "string" ? value : fallback;
+
+export const numberValue = (value: unknown, fallback = 0): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+export const booleanValue = (value: unknown, fallback = false): boolean =>
+  typeof value === "boolean" ? value : fallback;
 
 export const numberOrNull = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
+
+export const normalizeContentSlug = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
 
 export const checkpointNeedsFieldVerification = (checkpoint: ContentCheckpoint) =>
   checkpoint.config.field_verification_required === true ||
@@ -121,6 +135,44 @@ export const buildContentValidationReport = ({
         checkpointId: checkpoint.id,
         checkpointSlug: checkpoint.slug
       });
+    }
+
+    const validation = objectValue(checkpoint.config.validation);
+    if (["text", "finale", "hybrid"].includes(checkpoint.kind)) {
+      const accepted = arrayValue(validation.accepted).filter(
+        (value) => typeof value === "string" && value.trim()
+      );
+      if (!accepted.length) {
+        errors.push({
+          code: "missing_accepted_answers",
+          message: "Text-based checkpoints require at least one accepted answer.",
+          checkpointId: checkpoint.id,
+          checkpointSlug: checkpoint.slug
+        });
+      }
+    }
+
+    if (checkpoint.kind === "photo" && !textValue(validation.criteria).trim()) {
+      errors.push({
+        code: "missing_photo_criteria",
+        message: "Photo checkpoints require clear AI validation criteria.",
+        checkpointId: checkpoint.id,
+        checkpointSlug: checkpoint.slug
+      });
+    }
+
+    if (checkpoint.kind === "choice") {
+      const options = arrayValue(validation.options).filter(
+        (value) => typeof value === "string" && value.trim()
+      );
+      if (options.length < 2 || !textValue(validation.acceptedOption).trim()) {
+        errors.push({
+          code: "invalid_choice_validation",
+          message: "Choice checkpoints require at least two options and one accepted option.",
+          checkpointId: checkpoint.id,
+          checkpointSlug: checkpoint.slug
+        });
+      }
     }
 
     const locationSensitive =
