@@ -19,7 +19,7 @@ test("join page exposes guided bilingual registration and privacy consent", asyn
   await page.goto("/join/ABC123");
   await expect(page.getByRole("heading", { name: "לפני שהאות נפתח" })).toBeVisible();
   await expect(page.getByLabel(/שם פרטי/)).toBeVisible();
-  await page.getByRole("button", { name: "EN" }).click();
+  await page.locator(".language-segment").getByRole("button", { name: "EN", exact: true }).click();
   await expect(page.getByLabel(/First name/)).toBeVisible();
   await expect(page.getByText(/encrypted storage/i)).toBeVisible();
 });
