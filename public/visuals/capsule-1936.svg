@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1100" role="img" aria-label="The 1936 time capsule">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#07121e"/><stop offset="1" stop-color="#102c3e"/></linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6e4315"/><stop offset=".2" stop-color="#f6d68b"/><stop offset=".48" stop-color="#a66a25"/><stop offset=".72" stop-color="#f0c66e"/><stop offset="1" stop-color="#5c3510"/></linearGradient>
+    <radialGradient id="light"><stop stop-color="#fff3c2" stop-opacity=".98"/><stop offset=".45" stop-color="#e5b055" stop-opacity=".55"/><stop offset="1" stop-color="#d9902d" stop-opacity="0"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="16" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="900" height="1100" fill="url(#bg)"/>
+  <circle cx="450" cy="310" r="360" fill="url(#light)"/>
+  <g opacity=".28" stroke="#d5ac62" stroke-width="2"><path d="M450 30v470M120 115l300 360M780 115L480 475M30 310h840M110 530l310-190M790 530L480 340"/></g>
+  <ellipse cx="450" cy="530" rx="255" ry="88" fill="#0a1117" opacity=".6"/>
+  <path d="M215 500h470v490q0 55-55 55H270q-55 0-55-55z" fill="url(#brass)" stroke="#f3cf7d" stroke-opacity=".55" stroke-width="5"/>
+  <ellipse cx="450" cy="505" rx="255" ry="85" fill="url(#brass)" stroke="#f7d98d" stroke-width="7"/>
+  <ellipse cx="450" cy="482" rx="220" ry="60" fill="#ffe9aa" opacity=".92" filter="url(#glow)"/>
+  <g fill="#f8efce" stroke="#6e4a24" stroke-width="2">
+    <path d="M290 390l125-35 23 82-125 35z"/><path d="M475 355l138 15-10 88-138-15z"/><path d="M360 430l155 22-14 96-155-22z"/>
+  </g>
+  <g stroke="#86613a" stroke-width="3" opacity=".7"><path d="M310 408l92-26M318 424l92-26M495 382l92 10M493 399l92 10M388 466l95 14M384 486l95 14"/></g>
+  <text x="450" y="705" text-anchor="middle" fill="#2c1909" font-family="Georgia,serif" font-size="112" letter-spacing="12">1936</text>
+  <path d="M300 795h300M335 840c70-55 160-55 230 0M350 895c62-35 138-35 200 0" fill="none" stroke="#44260d" stroke-width="10" stroke-linecap="round"/>
+  <path d="M450 790v125M400 835h100M430 790l20-30 20 30" fill="none" stroke="#44260d" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="450" cy="945" r="22" fill="none" stroke="#44260d" stroke-width="8"/>
+</svg>
