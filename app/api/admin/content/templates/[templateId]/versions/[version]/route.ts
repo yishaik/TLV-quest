@@ -1,6 +1,8 @@
 import { requireAdmin } from "@/lib/admin-auth";
 import {
   buildContentValidationReport,
+  checkpointNeedsFieldVerification,
+  normalizeContentSlug,
   numberOrNull,
   objectValue,
   type ContentCheckpoint,
@@ -68,7 +70,7 @@ async function getVersionDetail({
         .eq("template_id", templateId)
         .eq("version", version)
         .order("created_at", { ascending: false })
-        .limit(40)
+        .limit(60)
     ]);
 
   if (templateResult.error) throw templateResult.error;
@@ -194,6 +196,11 @@ export async function PATCH(
       if (!checkpointId) throw new Error("Checkpoint id is required");
 
       const checkpointUpdates: Record<string, unknown> = {};
+      if (checkpoint.slug !== undefined) {
+        const slug = normalizeContentSlug(String(checkpoint.slug));
+        if (!slug) throw new Error("Checkpoint slug is required and must use Latin letters or numbers");
+        checkpointUpdates.slug = slug;
+      }
       if (typeof checkpoint.kind === "string") {
         if (!checkpointKinds.has(checkpoint.kind)) {
           throw new Error("Unsupported checkpoint kind");
@@ -232,10 +239,51 @@ export async function PATCH(
         .eq("id", checkpointId)
         .eq("template_id", templateId)
         .eq("version", version)
-        .select("id,slug")
+        .select("id,slug,kind,latitude,longitude,radius_meters,accessibility,config,is_optional,is_active")
         .single();
       if (error || !updated) {
         throw error ?? new Error("Checkpoint was not found");
+      }
+
+      const normalizedCheckpoint = {
+        ...updated,
+        template_id: templateId,
+        version,
+        sequence_no: 0,
+        accessibility: objectValue(updated.accessibility),
+        config: objectValue(updated.config)
+      } as ContentCheckpoint;
+      const verificationSensitiveFields = [
+        "slug",
+        "kind",
+        "latitude",
+        "longitude",
+        "radius_meters",
+        "accessibility",
+        "config"
+      ];
+      if (
+        verificationSensitiveFields.some((field) => field in checkpointUpdates) &&
+        checkpointNeedsFieldVerification(normalizedCheckpoint)
+      ) {
+        const now = new Date().toISOString();
+        const { error: healthError } = await supabase.from("checkpoint_health").upsert(
+          {
+            checkpoint_id: checkpointId,
+            template_id: templateId,
+            version,
+            status: "pending",
+            checklist: {},
+            notes: "Content, validation or location changed; field verification was reset.",
+            last_checked_at: null,
+            verified_at: null,
+            verified_by: null,
+            updated_at: now,
+            updated_by: email
+          },
+          { onConflict: "checkpoint_id" }
+        );
+        if (healthError) throw healthError;
       }
 
       const now = new Date().toISOString();
@@ -263,6 +311,26 @@ export async function PATCH(
     return jsonOk(
       await getVersionDetail({ supabase, templateId, version })
     );
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ templateId: string; version: string }> }
+) {
+  try {
+    const { supabase, email } = await requireAdmin(request);
+    const { templateId, version: rawVersion } = await context.params;
+    const version = parseVersion(rawVersion);
+    const { data, error } = await supabase.rpc("content_delete_version", {
+      p_template_id: templateId,
+      p_version: version,
+      p_actor: email
+    });
+    if (error) throw error;
+    return jsonOk(data);
   } catch (error) {
     return handleRouteError(error);
   }
