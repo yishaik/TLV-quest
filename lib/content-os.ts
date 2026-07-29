@@ -138,7 +138,7 @@ export const buildContentValidationReport = ({
     }
 
     const validation = objectValue(checkpoint.config.validation);
-    if (["text", "finale", "hybrid"].includes(checkpoint.kind)) {
+    if (["text", "location", "finale", "hybrid"].includes(checkpoint.kind)) {
       const accepted = arrayValue(validation.accepted).filter(
         (value) => typeof value === "string" && value.trim()
       );
@@ -163,12 +163,18 @@ export const buildContentValidationReport = ({
 
     if (checkpoint.kind === "choice") {
       const options = arrayValue(validation.options).filter(
-        (value) => typeof value === "string" && value.trim()
+        (value): value is string => typeof value === "string" && Boolean(value.trim())
       );
-      if (options.length < 2 || !textValue(validation.acceptedOption).trim()) {
+      const acceptedOption = textValue(validation.acceptedOption).trim();
+      if (
+        options.length < 2 ||
+        !acceptedOption ||
+        !options.includes(acceptedOption)
+      ) {
         errors.push({
           code: "invalid_choice_validation",
-          message: "Choice checkpoints require at least two options and one accepted option.",
+          message:
+            "Choice checkpoints require at least two options and an accepted option from that list.",
           checkpointId: checkpoint.id,
           checkpointSlug: checkpoint.slug
         });
