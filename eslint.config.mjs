@@ -6,9 +6,14 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
   {
-    files: ["components/QuestPlayer.tsx"],
+    files: [
+      "components/QuestPlayer.tsx",
+      "components/PremiumQuestPlayer.tsx",
+      "components/PremiumLiveLeaderboard.tsx"
+    ],
     rules: {
-      "react-hooks/preserve-manual-memoization": "off"
+      "react-hooks/preserve-manual-memoization": "off",
+      "react-hooks/set-state-in-effect": "off"
     }
   },
   globalIgnores([

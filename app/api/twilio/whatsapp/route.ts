@@ -21,19 +21,26 @@ const twiml = (message?: string) => {
   });
 };
 
+const errorMessage = (error: unknown) =>
+  error instanceof Error
+    ? error.message
+    : typeof error === "object" && error && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : "";
+
+const isExpectedGameState = (error: unknown) =>
+  /location_verification_required|team_not_active|no active checkpoint|checkpoint_locked/i.test(
+    errorMessage(error)
+  );
+
 const whatsappErrorMessage = (error: unknown) => {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "object" && error && "message" in error
-        ? String((error as { message?: unknown }).message ?? "")
-        : "";
+  const message = errorMessage(error);
 
   if (/location_verification_required/i.test(message)) {
     return `לפני שליחת תשובה, פתחו את אתר המשחק ולחצו על ‘אימות מיקום’. לאחר שהמיקום יאושר, שלחו את התשובה שוב.\n${publicEnv.appUrl}/resume\n\nBefore answering, open the game site and verify your location, then send the answer again.`;
   }
 
-  if (/team_not_active|no active checkpoint/i.test(message)) {
+  if (/team_not_active|no active checkpoint|checkpoint_locked/i.test(message)) {
     return `המשחק או התחנה אינם פעילים כרגע. פתחו את אתר המשחק כדי לבדוק את הסטטוס.\n${publicEnv.appUrl}/resume\n\nThe game or checkpoint is not active right now. Check the game site for status.`;
   }
 
@@ -95,7 +102,11 @@ export async function POST(request: Request) {
     const reply = await handleWhatsappGameMessage({ from, body, messageSid });
     return twiml(reply);
   } catch (error) {
-    console.error("Twilio webhook failed", error);
+    if (isExpectedGameState(error)) {
+      console.info("WhatsApp guided game state", { code: errorMessage(error), messageSid });
+    } else {
+      console.error("Twilio webhook failed", error);
+    }
     return twiml(whatsappErrorMessage(error));
   }
 }

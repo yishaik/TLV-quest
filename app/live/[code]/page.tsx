@@ -1,13 +1,9 @@
 import type { Metadata } from "next";
-import { LiveLeaderboard } from "@/components/LiveLeaderboard";
+import { PremiumLiveLeaderboard } from "@/components/PremiumLiveLeaderboard";
 
-export const metadata: Metadata = { title: "לוח חי" };
+export const metadata: Metadata = { title: "המרוץ החי" };
 
-export default async function LivePage({
-  params
-}: {
-  params: Promise<{ code: string }>;
-}) {
+export default async function LivePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  return <LiveLeaderboard code={code.toUpperCase()} />;
+  return <PremiumLiveLeaderboard code={code.toUpperCase()} />;
 }

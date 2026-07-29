@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Cinematic Tel Aviv harbor at night">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#07111c"/><stop offset=".55" stop-color="#102a3c"/><stop offset="1" stop-color="#d08b47"/></linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#07131e"/><stop offset=".55" stop-color="#143447"/><stop offset="1" stop-color="#0a1b28"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0bd"/><stop offset=".45" stop-color="#e4b45f"/><stop offset="1" stop-color="#9b5e1d"/></linearGradient>
+    <radialGradient id="sun"><stop stop-color="#ffd991" stop-opacity=".9"/><stop offset="1" stop-color="#d58742" stop-opacity="0"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="26"/></filter>
+    <pattern id="grain" width="120" height="120" patternUnits="userSpaceOnUse"><circle cx="9" cy="15" r="1" fill="#fff" opacity=".12"/><circle cx="78" cy="48" r=".7" fill="#fff" opacity=".1"/><circle cx="35" cy="101" r=".8" fill="#fff" opacity=".08"/></pattern>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <circle cx="1230" cy="320" r="330" fill="url(#sun)" filter="url(#soft)"/>
+  <rect width="1600" height="620" fill="url(#grain)"/>
+  <path d="M0 610C250 570 420 630 640 590S1080 515 1600 560V1000H0Z" fill="url(#sea)"/>
+  <path d="M0 660C300 610 460 690 760 635S1220 570 1600 610" fill="none" stroke="#d9a45e" stroke-opacity=".22" stroke-width="5"/>
+  <path d="M0 740C280 700 520 790 820 720S1280 680 1600 710" fill="none" stroke="#9cc5d3" stroke-opacity=".18" stroke-width="3"/>
+  <g fill="#050c12" opacity=".96">
+    <rect x="0" y="530" width="250" height="140"/><rect x="34" y="465" width="55" height="70"/><rect x="112" y="490" width="80" height="45"/>
+    <rect x="1030" y="500" width="570" height="115"/><rect x="1110" y="450" width="95" height="55"/><rect x="1370" y="430" width="120" height="72"/>
+  </g>
+  <g fill="none" stroke="#040a0f" stroke-width="18" stroke-linejoin="round">
+    <path d="M950 560V180h28v380M963 190l-180 170h344zM792 356h312M880 260l-20 300"/>
+    <path d="M1205 525V265h22v260M1216 275l-135 125h260zM1090 397h240M1165 335l-15 190"/>
+  </g>
+  <g stroke="#192b35" stroke-width="5" opacity=".85"><path d="M0 570H1600"/><path d="M250 540v160M1030 520v150"/></g>
+  <g transform="translate(1390 210)">
+    <path d="M0 330h120l-18-44H18z" fill="#07101a"/><path d="M38 286h44V70H38z" fill="#e8e0cf"/><path d="M28 70h64L80 38H40z" fill="#e8e0cf"/><rect x="35" y="82" width="50" height="28" rx="5" fill="#e6b55e" filter="url(#glow)"/><path d="M49 120h22M49 160h22M49 200h22M49 240h22" stroke="#8d7559" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <path d="M290 875C430 760 520 800 650 700S890 700 1030 570" fill="none" stroke="#e9b55f" stroke-width="9" stroke-linecap="round" stroke-dasharray="2 27" filter="url(#glow)"/>
+  <g fill="url(#gold)" filter="url(#glow)"><circle cx="290" cy="875" r="10"/><circle cx="650" cy="700" r="13"/><circle cx="1030" cy="570" r="15"/></g>
+  <g transform="translate(250 635)"><ellipse cx="0" cy="0" rx="115" ry="38" fill="#080f15"/><path d="M-88 0l24 55h128L92 0" fill="#111d25"/><rect x="-4" y="-80" width="8" height="83" fill="#0a1117"/><path d="M0-75l78 62H0z" fill="#d7af69" opacity=".62"/></g>
+  <g opacity=".85" fill="#e9ba67" filter="url(#glow)"><circle cx="82" cy="514" r="4"/><circle cx="155" cy="530" r="4"/><circle cx="1100" cy="488" r="4"/><circle cx="1180" cy="475" r="4"/><circle cx="1320" cy="468" r="4"/></g>
+  <rect width="1600" height="1000" fill="none" stroke="#d7a95c" stroke-opacity=".2" stroke-width="2"/>
+</svg>

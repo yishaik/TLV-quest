@@ -1,0 +1,221 @@
+:root {
+  --xp-night: #07111c;
+  --xp-deep: #0c2030;
+  --xp-blue: #14364a;
+  --xp-ivory: #f3eee3;
+  --xp-paper: #e8dfcf;
+  --xp-gold: #d9aa58;
+  --xp-gold-light: #f4d68d;
+  --xp-copper: #9c632b;
+}
+
+.app-chrome .topbar {
+  min-height: 78px;
+  border-bottom: 1px solid rgba(12,32,48,.1);
+}
+.app-chrome .brand { color: var(--xp-deep); letter-spacing: .02em; }
+.app-chrome .brand-mark { border-radius: 50%; background: var(--xp-night); box-shadow: inset 0 0 0 2px var(--xp-gold); }
+
+/* Shared operational surfaces */
+body:has(.page), body:has(.quest-shell) {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(217,170,88,.16), transparent 33rem),
+    linear-gradient(180deg, #f7f3eb, #ece5d9);
+}
+.page .page-title { color: var(--xp-deep); font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+.page > .badge:first-child { color: var(--xp-copper); background: rgba(217,170,88,.15); }
+.card {
+  border-color: rgba(12,32,48,.11);
+  border-radius: 4px;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 20px 65px rgba(12,32,48,.08);
+}
+.field input, .field select, .field textarea {
+  border-radius: 3px;
+  border-color: rgba(12,32,48,.2);
+  background: rgba(255,255,255,.92);
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--xp-copper);
+  box-shadow: 0 0 0 3px rgba(156,99,43,.1);
+}
+.button-primary { color: #16120b; background: linear-gradient(135deg, var(--xp-gold-light), var(--xp-gold)); box-shadow: 0 12px 30px rgba(156,99,43,.2); }
+.button-primary:hover { background: linear-gradient(135deg, #ffe4a0, #d9aa58); }
+.button-dark { background: var(--xp-night); }
+.badge { border-radius: 999px; color: var(--xp-copper); background: rgba(217,170,88,.15); }
+.code { border-color: rgba(156,99,43,.35); border-radius: 3px; background: #f8f4eb; }
+
+/* Participant experience */
+.quest-experience {
+  position: relative;
+  min-height: 100svh;
+  padding: 26px max(16px, env(safe-area-inset-left)) calc(105px + env(safe-area-inset-bottom));
+  overflow: hidden;
+  color: #f7f2e8;
+  background: var(--xp-night);
+  isolation: isolate;
+}
+.quest-experience::before {
+  content: "";
+  position: fixed;
+  z-index: -3;
+  inset: 0;
+  background:
+    linear-gradient(rgba(7,17,28,.9), rgba(7,17,28,.98)),
+    url("/visuals/harbor-hero.svg") center/cover;
+}
+.quest-ambient {
+  position: fixed;
+  z-index: -2;
+  width: 620px;
+  height: 620px;
+  inset: -320px -260px auto auto;
+  border: 1px solid rgba(217,170,88,.18);
+  border-radius: 50%;
+  box-shadow: 0 0 0 80px rgba(217,170,88,.025), 0 0 0 160px rgba(217,170,88,.018);
+  pointer-events: none;
+}
+.quest-experience-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(820px, 100%);
+  margin: 0 auto 20px;
+}
+.quest-team { display: flex; align-items: center; gap: 12px; }
+.quest-team img { width: 42px; height: 42px; }
+.quest-team > div { display: grid; gap: 2px; }
+.quest-team strong { font-size: .92rem; }
+.quest-team span { color: rgba(255,255,255,.5); font-size: .72rem; }
+.quest-stage { color: var(--xp-gold-light); font-family: Georgia, serif; font-size: 2.2rem; }
+.quest-stage small { color: rgba(255,255,255,.36); font-size: .82rem; }
+.quest-progress { width: min(820px, 100%); height: 2px; margin: 0 auto 24px; overflow: hidden; background: rgba(255,255,255,.14); }
+.quest-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--xp-copper), var(--xp-gold-light)); box-shadow: 0 0 16px var(--xp-gold); transition: width .5s ease; }
+
+.mission-panel {
+  display: grid;
+  grid-template-columns: 105px 1fr;
+  gap: 34px;
+  width: min(820px, 100%);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 54px);
+  border: 1px solid rgba(255,255,255,.13);
+  background: linear-gradient(145deg, rgba(13,34,49,.94), rgba(7,17,28,.96));
+  box-shadow: 0 32px 100px rgba(0,0,0,.38);
+  backdrop-filter: blur(20px);
+}
+.mission-index { display: grid; align-content: start; gap: 8px; padding-inline-end: 22px; border-inline-end: 1px solid rgba(255,255,255,.12); }
+.mission-index span { color: rgba(255,255,255,.42); font-size: .65rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.mission-index strong { color: var(--xp-gold-light); font-family: Georgia, serif; font-size: 4.2rem; font-weight: 400; line-height: 1; }
+.quest-kicker { color: var(--xp-gold); font-size: .66rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; }
+.mission-copy h1 { margin: 14px 0 20px; font-family: Georgia, serif; font-size: clamp(2.8rem, 7vw, 5.7rem); font-weight: 500; line-height: .92; letter-spacing: -.045em; }
+.mission-story { color: rgba(255,255,255,.65); font-size: 1rem; }
+.mission-location { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; margin-top: 22px; padding: 16px; border-inline-start: 2px solid var(--xp-gold); background: rgba(217,170,88,.09); }
+.mission-location > span { color: var(--xp-gold-light); font-size: 1.3rem; }
+.mission-location p { margin: 0; color: rgba(255,255,255,.76); font-size: .9rem; }
+.mission-divider { height: 1px; margin: 30px 0; background: linear-gradient(90deg, rgba(217,170,88,.55), transparent); }
+.mission-copy h2 { margin: 0 0 22px; font-family: Georgia, serif; font-size: clamp(1.6rem, 4vw, 2.45rem); font-weight: 500; line-height: 1.25; }
+
+.location-signal {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  margin: 18px 0;
+  padding: 18px 18px 18px 72px;
+  overflow: hidden;
+  color: #fff;
+  border: 1px solid rgba(217,170,88,.35);
+  border-radius: 3px;
+  background: rgba(217,170,88,.08);
+  text-align: start;
+  cursor: pointer;
+}
+[dir="rtl"] .location-signal { padding: 18px 72px 18px 18px; }
+.location-signal strong { font-size: .88rem; }
+.location-signal small { color: rgba(255,255,255,.48); }
+.signal-rings { position: absolute; inset: 50% auto auto 28px; width: 20px; height: 20px; transform: translateY(-50%); border: 2px solid var(--xp-gold-light); border-radius: 50%; }
+[dir="rtl"] .signal-rings { inset-inline: 28px auto; }
+.signal-rings::before, .signal-rings::after { content: ""; position: absolute; inset: -9px; border: 1px solid rgba(244,214,141,.45); border-radius: 50%; }
+.signal-rings::after { inset: -17px; opacity: .45; }
+.location-signal.verified { border-color: rgba(95,197,144,.45); background: rgba(95,197,144,.1); }
+.location-signal.verified .signal-rings { border-color: #7ed5a5; }
+
+.mission-form { display: grid; gap: 14px; margin-top: 20px; }
+.mission-form label { display: grid; gap: 8px; }
+.mission-form label > span { color: rgba(255,255,255,.48); font-size: .7rem; font-weight: 800; }
+.mission-form input:not([type="file"]) { width: 100%; min-height: 58px; padding: 13px 16px; color: #fff; border: 1px solid rgba(255,255,255,.19); border-radius: 3px; outline: none; background: rgba(255,255,255,.06); font-size: 1.05rem; }
+.mission-form input:focus { border-color: var(--xp-gold); box-shadow: 0 0 0 3px rgba(217,170,88,.1); }
+.quest-gold-button { color: #17120a !important; border-radius: 3px !important; background: linear-gradient(135deg, var(--xp-gold-light), var(--xp-gold)) !important; box-shadow: 0 12px 34px rgba(0,0,0,.22) !important; }
+.photo-drop { position: relative; place-items: center; min-height: 145px; padding: 20px; border: 1px dashed rgba(217,170,88,.48); background: rgba(217,170,88,.06); text-align: center; cursor: pointer; }
+.photo-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.photo-drop > span { color: var(--xp-gold-light); font-size: 2.2rem; font-weight: 300; }
+.photo-drop > strong { color: rgba(255,255,255,.75); font-size: .86rem; }
+.quest-feedback { margin-top: 16px; padding: 15px 17px; border-radius: 3px; font-size: .9rem; line-height: 1.55; }
+.quest-feedback.success { color: #c8f0d8; border: 1px solid rgba(100,202,147,.28); background: rgba(55,141,95,.15); }
+.quest-feedback.error { color: #ffd3cc; border: 1px solid rgba(237,123,101,.28); background: rgba(176,71,54,.14); }
+
+.quest-dock {
+  position: fixed;
+  z-index: 40;
+  inset: auto 50% calc(14px + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(65px, 95px));
+  width: max-content;
+  padding: 7px;
+  transform: translateX(50%);
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(7,17,28,.88);
+  box-shadow: 0 18px 55px rgba(0,0,0,.48);
+  backdrop-filter: blur(22px);
+}
+.quest-dock button { display: grid; place-items: center; gap: 4px; min-height: 60px; color: rgba(255,255,255,.62); border: 0; border-inline-end: 1px solid rgba(255,255,255,.09); background: transparent; font-size: .65rem; cursor: pointer; }
+.quest-dock button:last-child { border: 0; }
+.quest-dock button > span { color: var(--xp-gold-light); font-size: 1.2rem; }
+.quest-dock .hint-button { color: #1b150b; background: linear-gradient(135deg, var(--xp-gold-light), var(--xp-gold)); }
+.quest-dock .hint-button > span { color: #1b150b; }
+
+.quest-drawer-backdrop { position: fixed; z-index: 70; inset: 0; display: grid; align-items: end; background: rgba(2,7,12,.76); backdrop-filter: blur(6px); }
+.quest-drawer { width: min(760px, 100%); max-height: 82svh; margin: 0 auto; padding: 30px max(20px, env(safe-area-inset-left)) calc(32px + env(safe-area-inset-bottom)); overflow-y: auto; color: #fff; border: 1px solid rgba(255,255,255,.12); border-bottom: 0; background: linear-gradient(160deg, #102c3e, #07111c 72%); box-shadow: 0 -30px 100px rgba(0,0,0,.5); }
+.quest-drawer > header { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.quest-drawer h2 { margin: 8px 0 0; font-family: Georgia, serif; font-size: 2.2rem; font-weight: 500; }
+.quest-drawer > header button { width: 42px; height: 42px; color: #fff; border: 1px solid rgba(255,255,255,.18); background: transparent; font-size: 1.6rem; cursor: pointer; }
+.team-list, .race-list { display: grid; }
+.team-list > div, .race-list > div { display: grid; align-items: center; gap: 14px; min-height: 58px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.team-list > div { grid-template-columns: 44px 1fr; }
+.team-list span, .race-list > div > span { color: var(--xp-gold); font-family: Georgia, serif; }
+.race-list > div { grid-template-columns: 46px 1fr 60px 70px; }
+.race-list small { color: rgba(255,255,255,.45); }
+.race-list b { color: var(--xp-gold-light); text-align: end; }
+.race-list .current { margin-inline: -12px; padding-inline: 12px; background: rgba(217,170,88,.1); }
+.map-panel { text-align: center; }
+.map-compass { position: relative; width: 150px; height: 150px; margin: 10px auto 25px; border: 1px solid rgba(217,170,88,.45); border-radius: 50%; box-shadow: inset 0 0 0 18px rgba(217,170,88,.03); }
+.map-compass::before { content: ""; position: absolute; inset: 30px; transform: rotate(45deg); border: 1px solid var(--xp-gold); background: radial-gradient(circle, var(--xp-gold-light) 0 7px, transparent 8px); }
+.map-panel p { color: rgba(255,255,255,.66); }
+.map-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+
+.quest-state-card { position: relative; z-index: 2; width: min(680px, 100%); margin: clamp(70px, 15vh, 170px) auto 0; padding: clamp(34px, 7vw, 80px); text-align: center; border: 1px solid rgba(255,255,255,.14); background: rgba(7,17,28,.88); box-shadow: 0 35px 100px rgba(0,0,0,.42); backdrop-filter: blur(18px); }
+.quest-state-mark { width: 74px; height: 74px; margin-bottom: 24px; }
+.quest-state-card h1 { margin: 16px 0 20px; font-family: Georgia, serif; font-size: clamp(3rem, 8vw, 6rem); font-weight: 500; line-height: .92; }
+.quest-state-card p { max-width: 520px; margin: 0 auto 28px; color: rgba(255,255,255,.62); }
+.quest-waiting-meta { display: flex; justify-content: center; gap: 24px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,.1); color: var(--xp-gold-light); font-size: .75rem; letter-spacing: .1em; }
+.quest-loading { display: grid; place-items: center; gap: 15px; min-height: 82svh; color: rgba(255,255,255,.62); }
+.quest-loading img { width: 64px; height: 64px; animation: signal-pulse 1.8s ease-in-out infinite; }
+@keyframes signal-pulse { 50% { transform: scale(1.08); filter: drop-shadow(0 0 18px rgba(217,170,88,.65)); } }
+
+@media (max-width: 680px) {
+  .quest-experience { padding-top: 16px; }
+  .mission-panel { grid-template-columns: 1fr; gap: 18px; padding: 24px 18px 28px; }
+  .mission-index { grid-template-columns: 1fr auto; align-items: center; padding: 0 0 14px; border: 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .mission-index strong { font-size: 2.7rem; }
+  .mission-copy h1 { font-size: 3.25rem; }
+  .quest-dock { width: calc(100% - 20px); grid-template-columns: repeat(4, 1fr); }
+  .quest-dock button { min-width: 0; }
+  .race-list > div { grid-template-columns: 38px 1fr 46px 55px; gap: 8px; font-size: .82rem; }
+  .map-actions { flex-direction: column; }
+  .map-actions .button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quest-loading img { animation: none; }
+}
