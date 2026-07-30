@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useQuestRealtime } from "@/components/QuestRealtimeProvider";
 
 type Locale = "he" | "en";
 type ParticipantState = {
@@ -24,14 +25,6 @@ type ParticipantState = {
     longitude: number | null;
     radiusMeters: number | null;
   };
-};
-
-type LeaderboardEntry = {
-  team_name: string;
-  score: number;
-  completed_count: number;
-  status: string;
-  last_progress_at: string | null;
 };
 
 type Drawer = "team" | "map" | "board" | null;
@@ -77,8 +70,14 @@ const validationOptions = (
     : [];
 
 export function PremiumQuestPlayer({ token }: { token: string }) {
-  const [state, setState] = useState<ParticipantState | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const {
+    state: realtimeState,
+    leaderboard,
+    connected,
+    error: realtimeError,
+    refresh
+  } = useQuestRealtime();
+  const state = realtimeState as ParticipantState | null;
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [answer, setAnswer] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -86,60 +85,6 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [locationVerified, setLocationVerified] = useState(false);
-
-  const loadState = useCallback(async () => {
-    const response = await fetch(
-      `/api/participants/${encodeURIComponent(token)}/state`,
-      { cache: "no-store" }
-    );
-    const payload = await response.json();
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error?.message ?? "Failed to load game");
-    }
-    setState(payload.data);
-    return payload.data as ParticipantState;
-  }, [token]);
-
-  const loadBoard = useCallback(async (code: string) => {
-    const response = await fetch(`/api/leaderboard/${encodeURIComponent(code)}`, {
-      cache: "no-store"
-    });
-    const payload = await response.json();
-    if (response.ok && payload.ok) setLeaderboard(payload.data);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("tlvQuestParticipantToken", token);
-    let cancelled = false;
-    let timer: number | undefined;
-
-    const refresh = async () => {
-      if (document.visibilityState === "hidden") return;
-      try {
-        const next = await loadState();
-        if (!cancelled) await loadBoard(next.run.publicCode);
-      } catch (cause) {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "Unexpected error");
-        }
-      }
-    };
-    const start = () => {
-      void refresh();
-      window.clearInterval(timer);
-      timer = window.setInterval(refresh, 7000);
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") start();
-    };
-    start();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [loadBoard, loadState, token]);
 
   useEffect(() => {
     setLocationVerified(false);
@@ -189,7 +134,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
               : "Key found. Unlocking the next checkpoint…")
         );
         setAnswer("");
-        window.setTimeout(() => void loadState(), 850);
+        window.setTimeout(() => void refresh(), 850);
       } else {
         setError(
           isHebrew
@@ -228,7 +173,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
       setMessage(
         `${isHebrew ? "רמז שנחשף" : "Revealed hint"}: ${payload.data.hint}`
       );
-      await loadState();
+      await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unexpected error");
     } finally {
@@ -328,7 +273,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
               : "Photo approved. The story continues…")
         );
         setPhoto(null);
-        window.setTimeout(() => void loadState(), 850);
+        window.setTimeout(() => void refresh(), 850);
       } else {
         const fallback = payload.data.fallback;
         const fallbackText =
@@ -351,7 +296,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
       <main className="quest-experience">
         <div className="quest-loading">
           <img src="/visuals/quest-mark.svg" alt="" />
-          <span>{error || (isHebrew ? "מאתר את האות…" : "Locating the signal…")}</span>
+          <span>{error || realtimeError || (isHebrew ? "מאתר את האות…" : "Locating the signal…")}</span>
         </div>
       </main>
     );
@@ -432,6 +377,9 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
             <span>
               {state.team.score} {isHebrew ? "נקודות" : "points"}
             </span>
+            <small title={connected ? "Supabase Realtime connected" : "Realtime reconnecting"}>
+              {connected ? (isHebrew ? "מחובר בזמן אמת" : "Live") : isHebrew ? "מתחבר מחדש…" : "Reconnecting…"}
+            </small>
           </div>
         </div>
         <div className="quest-stage">
@@ -562,9 +510,9 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
               ✦ {message}
             </div>
           )}
-          {error && (
+          {(error || realtimeError) && (
             <div className="quest-feedback error" role="alert">
-              {error}
+              {error || realtimeError}
             </div>
           )}
         </div>

@@ -36,44 +36,57 @@ export function PremiumLiveLeaderboard({ code }: { code: string }) {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const response = await fetch(`/api/leaderboard/${encodeURIComponent(code)}/experience`, { cache: "no-store" });
+    const response = await fetch(
+      `/api/leaderboard/${encodeURIComponent(code)}/experience`,
+      { cache: "no-store" }
+    );
     const payload = await response.json();
-    if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "Failed to load leaderboard");
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error?.message ?? "Failed to load leaderboard");
+    }
     setExperience(payload.data);
+    setError("");
   }, [code]);
 
   useEffect(() => {
     let active = true;
     void load().catch((errorValue) => {
-      if (active) setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
+      if (active) {
+        setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
+      }
     });
 
-    let client: ReturnType<typeof getBrowserClient> | null = null;
-    try {
-      client = getBrowserClient();
-    } catch {
-      const interval = window.setInterval(() => void load(), 5000);
-      return () => { active = false; window.clearInterval(interval); };
-    }
-
+    const client = getBrowserClient();
     const channel = client
       .channel(`premium-leaderboard:${code}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "leaderboard_entries",
-        filter: `run_public_code=eq.${code}`
-      }, () => void load())
-      .subscribe((status) => { if (active) setConnected(status === "SUBSCRIBED"); });
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "leaderboard_entries",
+          filter: `run_public_code=eq.${code}`
+        },
+        () => void load()
+      )
+      .subscribe((status) => {
+        if (!active) return;
+        setConnected(status === "SUBSCRIBED");
+        if (status === "SUBSCRIBED") void load();
+      });
 
-    const fallback = window.setInterval(() => {
+    const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void load();
-    }, 15000);
+    };
+    const refreshWhenOnline = () => void load();
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", refreshWhenOnline);
 
     return () => {
       active = false;
-      window.clearInterval(fallback);
-      void client?.removeChannel(channel);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", refreshWhenOnline);
+      void client.removeChannel(channel);
     };
   }, [code, load]);
 
@@ -89,10 +102,17 @@ export function PremiumLiveLeaderboard({ code }: { code: string }) {
             <span className="flow-kicker">TLV QUEST · {code}</span>
             <h1>המרוץ החי</h1>
           </div>
-          <div className="race-live"><i />{connected ? "REALTIME CONNECTED" : "AUTO REFRESH"}</div>
+          <div className="race-live">
+            <i />
+            {connected ? "REALTIME CONNECTED" : "RECONNECTING"}
+          </div>
         </header>
 
-        {error && <div className="quest-feedback error" style={{ marginTop: 20 }}>{error}</div>}
+        {error && (
+          <div className="quest-feedback error" style={{ marginTop: 20 }}>
+            {error}
+          </div>
+        )}
 
         <section className="podium" aria-label="Leading teams">
           {podium.map((entry, index) => (
@@ -100,7 +120,9 @@ export function PremiumLiveLeaderboard({ code }: { code: string }) {
               <span className="podium-rank">{index + 1}</span>
               <h2>{entry.team_name}</h2>
               <div className="podium-meta">
-                <span>{entry.completed_count}/{total} תחנות</span>
+                <span>
+                  {entry.completed_count}/{total} תחנות
+                </span>
                 <strong className="podium-score">{entry.score} נק׳</strong>
               </div>
             </article>
@@ -109,7 +131,9 @@ export function PremiumLiveLeaderboard({ code }: { code: string }) {
             <article className="podium-card">
               <span className="podium-rank">•</span>
               <h2>המרוץ יתחיל בקרוב</h2>
-              <div className="podium-meta"><span>הצוותים יופיעו לאחר ההרשמה</span></div>
+              <div className="podium-meta">
+                <span>הצוותים יופיעו לאחר ההרשמה</span>
+              </div>
             </article>
           )}
         </section>
@@ -121,15 +145,31 @@ export function PremiumLiveLeaderboard({ code }: { code: string }) {
               <div className="race-row" key={entry.team_name}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <strong>{entry.team_name}</strong>
-                <div><div className="race-progress-track"><i style={{ width: `${progress}%` }} /></div></div>
-                <span>{entry.completed_count}/{total} · {teamStatus[entry.status] ?? entry.status}</span>
+                <div>
+                  <div className="race-progress-track">
+                    <i style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+                <span>
+                  {entry.completed_count}/{total} · {teamStatus[entry.status] ?? entry.status}
+                </span>
                 <b>{entry.score} נק׳</b>
               </div>
             );
           })}
         </section>
 
-        <footer style={{ display: "flex", justifyContent: "space-between", gap: 20, marginTop: 24, color: "rgba(255,255,255,.38)", fontSize: ".68rem", letterSpacing: ".12em" }}>
+        <footer
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 20,
+            marginTop: 24,
+            color: "rgba(255,255,255,.38)",
+            fontSize: ".68rem",
+            letterSpacing: ".12em"
+          }}
+        >
           <span>PRECISE LOCATIONS AND SOLUTIONS ARE HIDDEN</span>
           <span>{experience?.run.status?.toUpperCase() ?? "WAITING"}</span>
         </footer>

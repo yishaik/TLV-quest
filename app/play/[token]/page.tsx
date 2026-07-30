@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PremiumQuestPlayer } from "@/components/PremiumQuestPlayer";
+import { QuestRealtimeProvider } from "@/components/QuestRealtimeProvider";
 import { QuestRuntimeSafetyNet } from "@/components/QuestRuntimeSafetyNet";
 import { QuestStationVisual } from "@/components/QuestStationVisual";
 
@@ -12,10 +13,10 @@ export default async function PlayPage({
 }) {
   const { token } = await params;
   return (
-    <>
-      <QuestStationVisual token={token} />
+    <QuestRealtimeProvider token={token}>
+      <QuestStationVisual />
       <PremiumQuestPlayer token={token} />
       <QuestRuntimeSafetyNet token={token} />
-    </>
+    </QuestRealtimeProvider>
   );
 }
