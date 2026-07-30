@@ -16,3 +16,14 @@ updates:
         update-types:
           - minor
           - patch
+    # Majors whose ecosystem has not caught up yet. Both crash `npm run lint`
+    # outright rather than adding fixable violations, so there is nothing to
+    # migrate on our side — see docs/dependency-security.md for the evidence
+    # and the removal condition for each.
+    ignore:
+      - dependency-name: eslint
+        versions:
+          - ">=10"
+      - dependency-name: typescript
+        versions:
+          - ">=7"
