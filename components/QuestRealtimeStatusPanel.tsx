@@ -37,6 +37,10 @@ const eventCopy = (
       `${actor} דילג על תחנה אופציונלית`,
       `${actor} skipped an optional checkpoint`
     ],
+    ORGANIZER_CHECKPOINT_SKIPPED: [
+      "המארגן דילג על התחנה עבור הקבוצה",
+      "The organizer skipped the checkpoint for the team"
+    ],
     PHOTO_APPROVED: [`התמונה של ${actor} אושרה`, `${actor}'s photo was approved`],
     PHOTO_REJECTED: [
       `התמונה של ${actor} לא אושרה`,

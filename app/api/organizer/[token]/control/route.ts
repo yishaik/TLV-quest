@@ -1,11 +1,32 @@
 import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashSecret } from "@/lib/crypto";
+import { skipCheckpointForTeam } from "@/lib/checkpoint-skip";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
 import { processOutbox } from "@/lib/providers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+const CHECKPOINT_SKIP_ERRORS = new Set([
+  "checkpoint_changed",
+  "checkpoint_not_found",
+  "game_not_active",
+  "team_not_active",
+  "team_not_found"
+]);
+
+const checkpointSkipErrorCode = (error: unknown): string => {
+  const message =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : "";
+  return (
+    [...CHECKPOINT_SKIP_ERRORS].find((candidate) =>
+      message.includes(candidate)
+    ) ?? "checkpoint_skip_failed"
+  );
+};
 
 export async function POST(
   request: Request,
@@ -30,6 +51,16 @@ export async function POST(
           sent: number;
           delivered: number;
           failed: number;
+        }
+      | undefined;
+    let skip:
+      | {
+          attempted: number;
+          advanced: number;
+          finished: number;
+          duplicates: number;
+          queued: number;
+          failures: Array<{ teamId: string; errorCode: string }>;
         }
       | undefined;
 
@@ -64,38 +95,100 @@ export async function POST(
         .eq("run_id", run.id)
         .neq("status", "disqualified");
     } else if (action === "skip") {
-      const { data: checkpoints, error: checkpointError } = await supabase
-        .from("run_checkpoints")
-        .select("slug,sequence_no")
-        .eq("run_id", run.id)
-        .eq("is_disabled", false)
-        .order("sequence_no");
-      if (checkpointError) throw checkpointError;
-
       const { data: teams, error: teamError } = await supabase
         .from("teams")
-        .select("id,current_checkpoint_slug,completed_count")
+        .select("id")
         .eq("run_id", run.id)
         .in("status", ["travelling", "solving"]);
       if (teamError) throw teamError;
 
-      for (const team of teams ?? []) {
-        const currentIndex = (checkpoints ?? []).findIndex(
-          (checkpoint) => checkpoint.slug === team.current_checkpoint_slug
-        );
-        const next = currentIndex >= 0 ? checkpoints?.[currentIndex + 1] : null;
-        await supabase
-          .from("teams")
-          .update({
-            current_checkpoint_slug: next?.slug ?? null,
-            completed_count: team.completed_count + 1,
-            status: next ? "travelling" : "finished",
-            wrong_attempts: 0,
-            last_wrong_attempt_at: null,
-            last_progress_at: new Date().toISOString(),
-            finished_at: next ? null : new Date().toISOString()
-          })
-          .eq("id", team.id);
+      const suppliedKey = request.headers.get("idempotency-key")?.trim();
+      const requestKey =
+        suppliedKey && suppliedKey.length <= 240
+          ? suppliedKey
+          : crypto.randomUUID();
+      const outcomes = await Promise.all(
+        (teams ?? []).map(async (team) => {
+          try {
+            const result = await skipCheckpointForTeam({
+              teamId: team.id,
+              actor: { type: "organizer" },
+              reason: "organizer_override",
+              requireOptional: false,
+              idempotencyKey: `organizer-skip:${hashSecret(
+                `${run.id}:${team.id}:${requestKey}`
+              )}`
+            });
+            return { teamId: team.id, result };
+          } catch (error) {
+            return {
+              teamId: team.id,
+              errorCode: checkpointSkipErrorCode(error)
+            };
+          }
+        })
+      );
+      const successes = outcomes.filter(
+        (
+          outcome
+        ): outcome is Extract<(typeof outcomes)[number], { result: unknown }> =>
+          "result" in outcome
+      );
+      const failures = outcomes
+        .filter(
+          (
+            outcome
+          ): outcome is Extract<
+            (typeof outcomes)[number],
+            { errorCode: string }
+          > => "errorCode" in outcome
+        )
+        .map((outcome) => ({
+          teamId: outcome.teamId,
+          errorCode: outcome.errorCode
+        }));
+      const outboxIds = [
+        ...new Set(
+          successes.flatMap((outcome) => outcome.result.outboxIds)
+        )
+      ];
+      skip = {
+        attempted: outcomes.length,
+        advanced: successes.filter(
+          (outcome) =>
+            !outcome.result.duplicate &&
+            outcome.result.outcome === "advanced"
+        ).length,
+        finished: successes.filter(
+          (outcome) =>
+            !outcome.result.duplicate &&
+            outcome.result.outcome === "finished"
+        ).length,
+        duplicates: successes.filter((outcome) => outcome.result.duplicate)
+          .length,
+        queued: outboxIds.length,
+        failures
+      };
+      delivery = {
+        queued: outboxIds.length,
+        processing: 0,
+        sent: 0,
+        delivered: 0,
+        failed: 0
+      };
+      if (outboxIds.length) {
+        after(async () => {
+          try {
+            await processOutbox(outboxIds.length, { outboxIds });
+          } catch {
+            console.error("checkpoint_skip.low_latency_kick_failed", {
+              runId: run.id,
+              actorType: "organizer",
+              queued: outboxIds.length,
+              errorCode: "outbox_kick_failed"
+            });
+          }
+        });
       }
     } else if (action === "broadcast") {
       const message = typeof body.message === "string" ? body.message.trim() : "";
@@ -170,18 +263,28 @@ export async function POST(
       throw new Error("Unsupported organizer action");
     }
 
-    const { error: eventError } = await supabase.from("game_events").insert({
-      run_id: run.id,
-      event_type: "ORGANIZER_ACTION",
-      idempotency_key: `organizer:${action}:${crypto.randomUUID()}`,
-      payload: {
-        action,
-        ...(delivery ? { queuedCount: delivery.queued } : {})
-      }
-    });
-    if (eventError) throw eventError;
+    if (action !== "skip") {
+      const { error: eventError } = await supabase.from("game_events").insert({
+        run_id: run.id,
+        event_type: "ORGANIZER_ACTION",
+        idempotency_key: `organizer:${action}:${crypto.randomUUID()}`,
+        payload: {
+          action,
+          ...(delivery ? { queuedCount: delivery.queued } : {})
+        }
+      });
+      if (eventError) throw eventError;
+    }
 
-    return jsonOk({ action, status: "accepted", ...(delivery ? { delivery } : {}) });
+    return jsonOk(
+      {
+        action,
+        status: skip?.failures.length ? "partial" : "accepted",
+        ...(delivery ? { delivery } : {}),
+        ...(skip ? { skip } : {})
+      },
+      { status: skip?.failures.length ? 207 : 200 }
+    );
   } catch (error) {
     return handleRouteError(error);
   }

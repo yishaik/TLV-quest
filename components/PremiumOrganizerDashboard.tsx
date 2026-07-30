@@ -60,7 +60,12 @@ export function PremiumOrganizerDashboard({ token }: { token: string }) {
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(`/api/organizer/${encodeURIComponent(token)}/control`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...extra })
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `web-organizer-${action}:${crypto.randomUUID()}`
+        },
+        body: JSON.stringify({ action, ...extra })
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "Action failed");
@@ -71,11 +76,27 @@ export function PremiumOrganizerDashboard({ token }: { token: string }) {
         !Array.isArray(result.delivery)
           ? (result.delivery as Record<string, unknown>)
           : null;
+      const skip =
+        result.skip &&
+        typeof result.skip === "object" &&
+        !Array.isArray(result.skip)
+          ? (result.skip as Record<string, unknown>)
+          : null;
+      const skipFailures = Array.isArray(skip?.failures)
+        ? skip.failures
+        : [];
       setNotice(
         action === "broadcast" && delivery
           ? `ההודעה נכנסה לתור עבור ${Number(delivery.queued ?? 0)} משתתפים. סטטוס המסירה יתעדכן אוטומטית.`
-          : "הפעולה בוצעה והמערכת התעדכנה."
+          : action === "skip" && skip
+            ? `הדילוג הושלם עבור ${Number(skip.advanced ?? 0) + Number(skip.finished ?? 0)} צוותים, ו־${Number(skip.queued ?? 0)} הודעות נכנסו לתור.`
+            : "הפעולה בוצעה והמערכת התעדכנה."
       );
+      if (action === "skip" && skipFailures.length) {
+        setError(
+          `הדילוג הושלם חלקית. ${skipFailures.length} צוותים לא עודכנו וניתן לנסות שוב בבטחה.`
+        );
+      }
       await refresh();
       return result;
     } catch (errorValue) {
