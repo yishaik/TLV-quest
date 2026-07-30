@@ -3,31 +3,61 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParticipantState } from "@/lib/repository";
 
+const ACTIVITY_EVENT_TYPES = [
+  "PLAYER_JOINED",
+  "PLAYER_CONFIRMED_WHATSAPP",
+  "RUN_STARTED",
+  "HINT_REQUESTED",
+  "LOCATION_VERIFIED",
+  "STATION_SCANNED",
+  "ANSWER_ACCEPTED",
+  "ANSWER_REJECTED",
+  "OPTIONAL_CHECKPOINT_SKIPPED",
+  "PHOTO_APPROVED",
+  "PHOTO_REJECTED"
+];
+
 const objectValue = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 
+const checkpointSlugFromPayload = (value: unknown) => {
+  const payload = objectValue(value);
+  const candidate = payload.checkpoint_slug ?? payload.checkpointSlug;
+  return typeof candidate === "string" && candidate.trim()
+    ? candidate.trim()
+    : null;
+};
+
 export async function getParticipantExperienceState(token: string) {
   const state = await getParticipantState(token);
   const supabase = createAdminClient();
-  const [checkpointCount, teamRealtime, runRealtime] = await Promise.all([
-    supabase
-      .from("run_checkpoints")
-      .select("id", { count: "exact", head: true })
-      .eq("run_id", state.run.id)
-      .eq("is_disabled", false),
-    supabase
-      .from("teams")
-      .select("realtime_topic")
-      .eq("id", state.team.id)
-      .single(),
-    supabase
-      .from("game_runs")
-      .select("realtime_topic")
-      .eq("id", state.run.id)
-      .single()
-  ]);
+  const [checkpointCount, teamRealtime, runRealtime, activityResult] =
+    await Promise.all([
+      supabase
+        .from("run_checkpoints")
+        .select("id", { count: "exact", head: true })
+        .eq("run_id", state.run.id)
+        .eq("is_disabled", false),
+      supabase
+        .from("teams")
+        .select("realtime_topic")
+        .eq("id", state.team.id)
+        .single(),
+      supabase
+        .from("game_runs")
+        .select("realtime_topic")
+        .eq("id", state.run.id)
+        .single(),
+      supabase
+        .from("game_events")
+        .select("id,event_type,participant_id,payload,created_at")
+        .eq("team_id", state.team.id)
+        .in("event_type", ACTIVITY_EVENT_TYPES)
+        .order("created_at", { ascending: false })
+        .limit(20)
+    ]);
   if (checkpointCount.error) throw checkpointCount.error;
   if (teamRealtime.error || !teamRealtime.data?.realtime_topic) {
     throw teamRealtime.error ?? new Error("Team realtime topic is unavailable");
@@ -35,6 +65,21 @@ export async function getParticipantExperienceState(token: string) {
   if (runRealtime.error || !runRealtime.data?.realtime_topic) {
     throw runRealtime.error ?? new Error("Run realtime topic is unavailable");
   }
+  if (activityResult.error) throw activityResult.error;
+
+  const memberNames = new Map(
+    state.members.map((member) => [member.id, member.firstName])
+  );
+  const activity = (activityResult.data ?? []).map((event) => ({
+    id: String(event.id),
+    eventType: event.event_type,
+    actorId: event.participant_id,
+    actorName: event.participant_id
+      ? memberNames.get(event.participant_id) ?? null
+      : null,
+    checkpointSlug: checkpointSlugFromPayload(event.payload),
+    createdAt: event.created_at
+  }));
 
   let checkpoint = state.checkpoint
     ? {
@@ -102,6 +147,7 @@ export async function getParticipantExperienceState(token: string) {
 
   return {
     ...state,
+    activity,
     checkpoint,
     run: {
       ...state.run,
@@ -124,19 +170,20 @@ export async function getLeaderboardExperience(publicCode: string) {
     .single();
   if (runError || !run) throw new Error("Game was not found");
 
-  const [{ data: entries, error: entriesError }, { count, error: countError }] = await Promise.all([
-    supabase
-      .from("leaderboard_entries")
-      .select("team_name,score,completed_count,status,last_progress_at,updated_at")
-      .eq("run_public_code", normalizedCode)
-      .order("score", { ascending: false })
-      .order("completed_count", { ascending: false }),
-    supabase
-      .from("run_checkpoints")
-      .select("id", { count: "exact", head: true })
-      .eq("run_id", run.id)
-      .eq("is_disabled", false)
-  ]);
+  const [{ data: entries, error: entriesError }, { count, error: countError }] =
+    await Promise.all([
+      supabase
+        .from("leaderboard_entries")
+        .select("team_name,score,completed_count,status,last_progress_at,updated_at")
+        .eq("run_public_code", normalizedCode)
+        .order("score", { ascending: false })
+        .order("completed_count", { ascending: false }),
+      supabase
+        .from("run_checkpoints")
+        .select("id", { count: "exact", head: true })
+        .eq("run_id", run.id)
+        .eq("is_disabled", false)
+    ]);
   if (entriesError) throw entriesError;
   if (countError) throw countError;
 
