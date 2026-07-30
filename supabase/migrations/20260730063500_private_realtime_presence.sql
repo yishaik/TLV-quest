@@ -25,80 +25,192 @@ revoke all on table public.realtime_participant_authorizations
   from public, anon, authenticated;
 grant all on table public.realtime_participant_authorizations to service_role;
 
-create or replace function public.quest_realtime_topic_allowed(p_topic text)
+create table if not exists public.quest_realtime_events (
+  id bigint generated always as identity primary key,
+  run_id uuid not null references public.game_runs(id) on delete cascade,
+  team_id uuid references public.teams(id) on delete cascade,
+  event_type text not null default 'state_changed',
+  source text not null,
+  operation text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists quest_realtime_events_run_id_id_idx
+  on public.quest_realtime_events(run_id, id desc);
+create index if not exists quest_realtime_events_team_id_id_idx
+  on public.quest_realtime_events(team_id, id desc);
+create index if not exists quest_realtime_events_created_at_idx
+  on public.quest_realtime_events(created_at);
+
+alter table public.quest_realtime_events enable row level security;
+revoke all on table public.quest_realtime_events from public, anon, authenticated;
+grant select on table public.quest_realtime_events to authenticated;
+grant all on table public.quest_realtime_events to service_role;
+
+create table if not exists public.quest_presence (
+  participant_id uuid not null references public.participants(id) on delete cascade,
+  device_id uuid not null,
+  team_id uuid not null references public.teams(id) on delete cascade,
+  run_id uuid not null references public.game_runs(id) on delete cascade,
+  visible boolean not null default true,
+  online_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  primary key (participant_id, device_id)
+);
+
+create index if not exists quest_presence_team_expires_idx
+  on public.quest_presence(team_id, expires_at desc);
+create index if not exists quest_presence_run_expires_idx
+  on public.quest_presence(run_id, expires_at desc);
+
+alter table public.quest_presence enable row level security;
+revoke all on table public.quest_presence from public, anon, authenticated;
+grant select, insert, update, delete on table public.quest_presence to authenticated;
+grant all on table public.quest_presence to service_role;
+
+create or replace function public.quest_realtime_binding_allowed(
+  p_run_id uuid,
+  p_team_id uuid default null,
+  p_participant_id uuid default null
+)
 returns boolean
 language sql
 stable
 security definer
-set search_path = public, auth, realtime, pg_temp
+set search_path = public, auth, pg_temp
 as $$
   select exists (
     select 1
     from public.realtime_participant_authorizations binding
-    join public.teams team
-      on team.id = binding.team_id
-     and team.run_id = binding.run_id
-    join public.game_runs run
-      on run.id = binding.run_id
     where binding.user_id = auth.uid()
       and binding.expires_at > now()
-      and run.status <> 'cancelled'::public.game_status
-      and p_topic in (
-        'team:' || team.realtime_topic,
-        'run:' || run.realtime_topic
-      )
+      and binding.run_id = p_run_id
+      and (p_team_id is null or binding.team_id = p_team_id)
+      and (p_participant_id is null or binding.participant_id = p_participant_id)
   );
 $$;
 
-revoke all on function public.quest_realtime_topic_allowed(text)
+revoke all on function public.quest_realtime_binding_allowed(uuid, uuid, uuid)
   from public, anon;
-grant execute on function public.quest_realtime_topic_allowed(text)
+grant execute on function public.quest_realtime_binding_allowed(uuid, uuid, uuid)
   to authenticated;
 
-alter table realtime.messages enable row level security;
-
-drop policy if exists quest_participant_receive_realtime on realtime.messages;
-create policy quest_participant_receive_realtime
-on realtime.messages
+create policy quest_realtime_events_participant_read
+on public.quest_realtime_events
 for select
 to authenticated
 using (
-  realtime.messages.extension in ('broadcast', 'presence')
-  and public.quest_realtime_topic_allowed((select realtime.topic()))
+  public.quest_realtime_binding_allowed(run_id, team_id, null)
 );
 
-drop policy if exists quest_participant_publish_presence on realtime.messages;
-create policy quest_participant_publish_presence
-on realtime.messages
+create policy quest_presence_team_read
+on public.quest_presence
+for select
+to authenticated
+using (
+  public.quest_realtime_binding_allowed(run_id, team_id, null)
+);
+
+create policy quest_presence_own_insert
+on public.quest_presence
 for insert
 to authenticated
 with check (
-  realtime.messages.extension = 'presence'
-  and public.quest_realtime_topic_allowed((select realtime.topic()))
+  public.quest_realtime_binding_allowed(run_id, team_id, participant_id)
+  and expires_at <= now() + interval '2 minutes'
 );
+
+create policy quest_presence_own_update
+on public.quest_presence
+for update
+to authenticated
+using (
+  public.quest_realtime_binding_allowed(run_id, team_id, participant_id)
+)
+with check (
+  public.quest_realtime_binding_allowed(run_id, team_id, participant_id)
+  and expires_at <= now() + interval '2 minutes'
+);
+
+create policy quest_presence_own_delete
+on public.quest_presence
+for delete
+to authenticated
+using (
+  public.quest_realtime_binding_allowed(run_id, team_id, participant_id)
+);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'quest_realtime_events'
+  ) then
+    alter publication supabase_realtime add table public.quest_realtime_events;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'quest_presence'
+  ) then
+    alter publication supabase_realtime add table public.quest_presence;
+  end if;
+end;
+$$;
+
+create or replace function public.quest_emit_realtime_event(
+  p_run_id uuid,
+  p_team_id uuid,
+  p_source text,
+  p_operation text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_id bigint;
+begin
+  insert into public.quest_realtime_events(
+    run_id,
+    team_id,
+    source,
+    operation
+  ) values (
+    p_run_id,
+    p_team_id,
+    left(coalesce(p_source, 'unknown'), 80),
+    left(coalesce(p_operation, 'UNKNOWN'), 20)
+  ) returning id into v_id;
+
+  if mod(v_id, 100) = 0 then
+    delete from public.quest_realtime_events
+    where created_at < now() - interval '3 days';
+  end if;
+end;
+$$;
+
+revoke all on function public.quest_emit_realtime_event(uuid, uuid, text, text)
+  from public, anon, authenticated;
 
 create or replace function public.quest_broadcast_team_state()
 returns trigger
 language plpgsql
 security definer
-set search_path = public, realtime, pg_temp
+set search_path = public, pg_temp
 as $$
 declare
-  v_topic text;
+  v_run_id uuid;
+  v_team_id uuid;
 begin
-  v_topic := case when tg_op = 'DELETE' then old.realtime_topic else new.realtime_topic end;
-
-  perform realtime.send(
-    jsonb_build_object(
-      'source', tg_table_name,
-      'operation', tg_op,
-      'at', clock_timestamp()
-    ),
-    'state_changed',
-    'team:' || v_topic,
-    true
-  );
-
+  v_run_id := case when tg_op = 'DELETE' then old.run_id else new.run_id end;
+  v_team_id := case when tg_op = 'DELETE' then old.id else new.id end;
+  perform public.quest_emit_realtime_event(v_run_id, v_team_id, tg_table_name, tg_op);
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
@@ -108,12 +220,13 @@ create or replace function public.quest_broadcast_related_team_state()
 returns trigger
 language plpgsql
 security definer
-set search_path = public, realtime, pg_temp
+set search_path = public, pg_temp
 as $$
 declare
   v_old_team_id uuid;
   v_new_team_id uuid;
-  v_topic text;
+  v_team_id uuid;
+  v_run_id uuid;
 begin
   if tg_op <> 'INSERT' then
     v_old_team_id := nullif(to_jsonb(old) ->> 'team_id', '')::uuid;
@@ -122,21 +235,23 @@ begin
     v_new_team_id := nullif(to_jsonb(new) ->> 'team_id', '')::uuid;
   end if;
 
-  for v_topic in
-    select distinct team.realtime_topic
-    from public.teams team
-    where team.id in (v_old_team_id, v_new_team_id)
+  for v_team_id in
+    select distinct candidate
+    from unnest(array[v_old_team_id, v_new_team_id]) candidate
+    where candidate is not null
   loop
-    perform realtime.send(
-      jsonb_build_object(
-        'source', tg_table_name,
-        'operation', tg_op,
-        'at', clock_timestamp()
-      ),
-      'state_changed',
-      'team:' || v_topic,
-      true
-    );
+    select team.run_id into v_run_id
+    from public.teams team
+    where team.id = v_team_id;
+
+    if v_run_id is not null then
+      perform public.quest_emit_realtime_event(
+        v_run_id,
+        v_team_id,
+        tg_table_name,
+        tg_op
+      );
+    end if;
   end loop;
 
   if tg_op = 'DELETE' then return old; end if;
@@ -148,24 +263,13 @@ create or replace function public.quest_broadcast_run_state()
 returns trigger
 language plpgsql
 security definer
-set search_path = public, realtime, pg_temp
+set search_path = public, pg_temp
 as $$
 declare
-  v_topic text;
+  v_run_id uuid;
 begin
-  v_topic := case when tg_op = 'DELETE' then old.realtime_topic else new.realtime_topic end;
-
-  perform realtime.send(
-    jsonb_build_object(
-      'source', tg_table_name,
-      'operation', tg_op,
-      'at', clock_timestamp()
-    ),
-    'state_changed',
-    'run:' || v_topic,
-    true
-  );
-
+  v_run_id := case when tg_op = 'DELETE' then old.id else new.id end;
+  perform public.quest_emit_realtime_event(v_run_id, null, tg_table_name, tg_op);
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
