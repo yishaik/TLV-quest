@@ -19,7 +19,7 @@ declare
   v_checkpoint public.run_checkpoints%rowtype;
   v_next_checkpoint public.run_checkpoints%rowtype;
   v_submission_id uuid;
-  v_run_status public.run_status;
+  v_run_status public.game_status;
 begin
   select * into v_team
   from public.teams
@@ -32,7 +32,7 @@ begin
   from public.game_runs
   where id = v_team.run_id;
 
-  if v_run_status is distinct from 'active'::public.run_status then
+  if v_run_status is distinct from 'active'::public.game_status then
     raise exception 'game_not_active';
   end if;
 
