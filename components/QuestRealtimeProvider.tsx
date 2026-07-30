@@ -10,16 +10,37 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { getBrowserClient } from "@/lib/supabase/browser";
+import { getQuestRealtimeClient } from "@/lib/supabase/quest-realtime-browser";
 import type {
+  QuestConnectionState,
   QuestLeaderboardEntry,
-  QuestParticipantState
+  QuestParticipantState,
+  QuestPresenceMember
 } from "@/lib/quest-realtime-types";
+
+const AUTH_RENEWAL_MARGIN_MS = 5 * 60 * 1000;
+const STALE_AFTER_MS = 30 * 1000;
+
+type RealtimeAccess = {
+  accessToken: string;
+  expiresAt: number;
+  participantId: string;
+};
+
+type PresencePayload = {
+  participantId?: string;
+  firstName?: string;
+  deviceId?: string;
+  visible?: boolean;
+  onlineAt?: string;
+};
 
 type QuestRealtimeContextValue = {
   state: QuestParticipantState | null;
   leaderboard: QuestLeaderboardEntry[];
+  presence: QuestPresenceMember[];
   connected: boolean;
+  connectionState: QuestConnectionState;
   loading: boolean;
   error: string;
   lastSyncedAt: number | null;
@@ -27,6 +48,43 @@ type QuestRealtimeContextValue = {
 };
 
 const QuestRealtimeContext = createContext<QuestRealtimeContextValue | null>(null);
+
+const getDeviceId = () => {
+  const key = "tlvQuestRealtimeDeviceId";
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+  const created = crypto.randomUUID();
+  localStorage.setItem(key, created);
+  return created;
+};
+
+const normalizePresence = (
+  rawState: Record<string, PresencePayload[]>
+): QuestPresenceMember[] => {
+  const participants = new Map<string, QuestPresenceMember>();
+
+  for (const entries of Object.values(rawState)) {
+    for (const entry of entries) {
+      if (!entry.participantId || !entry.firstName) continue;
+      const current = participants.get(entry.participantId);
+      const onlineAt = entry.onlineAt ?? null;
+      participants.set(entry.participantId, {
+        participantId: entry.participantId,
+        firstName: entry.firstName,
+        deviceCount: (current?.deviceCount ?? 0) + 1,
+        visible: Boolean(current?.visible || entry.visible),
+        onlineAt:
+          !current?.onlineAt || (onlineAt && onlineAt > current.onlineAt)
+            ? onlineAt
+            : current.onlineAt
+      });
+    }
+  }
+
+  return [...participants.values()].sort((a, b) =>
+    a.firstName.localeCompare(b.firstName, "he")
+  );
+};
 
 export function QuestRealtimeProvider({
   token,
@@ -37,14 +95,22 @@ export function QuestRealtimeProvider({
 }) {
   const [state, setState] = useState<QuestParticipantState | null>(null);
   const [leaderboard, setLeaderboard] = useState<QuestLeaderboardEntry[]>([]);
+  const [presence, setPresence] = useState<QuestPresenceMember[]>([]);
   const [connected, setConnected] = useState(false);
+  const [connectionState, setConnectionState] =
+    useState<QuestConnectionState>("connecting");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const stateRefreshTimer = useRef<number | undefined>(undefined);
   const boardRefreshTimer = useRef<number | undefined>(undefined);
+  const staleTimer = useRef<number | undefined>(undefined);
+  const authRenewalTimer = useRef<number | undefined>(undefined);
   const stateRequest = useRef<Promise<QuestParticipantState> | null>(null);
   const boardRequest = useRef<Promise<void> | null>(null);
+  const authRequest = useRef<Promise<RealtimeAccess> | null>(null);
+  const accessRef = useRef<RealtimeAccess | null>(null);
+  const connectedRef = useRef(false);
 
   const loadState = useCallback(async () => {
     if (stateRequest.current) return stateRequest.current;
@@ -125,6 +191,66 @@ export function QuestRealtimeProvider({
     [loadBoard]
   );
 
+  const scheduleStaleState = useCallback(() => {
+    window.clearTimeout(staleTimer.current);
+    staleTimer.current = window.setTimeout(() => {
+      if (!connectedRef.current && navigator.onLine) setConnectionState("stale");
+    }, STALE_AFTER_MS);
+  }, []);
+
+  const issueRealtimeAccess = useCallback(
+    async (force = false): Promise<RealtimeAccess> => {
+      const current = accessRef.current;
+      if (
+        !force &&
+        current &&
+        current.expiresAt - Date.now() > AUTH_RENEWAL_MARGIN_MS
+      ) {
+        return current;
+      }
+      if (authRequest.current) return authRequest.current;
+
+      const request = (async () => {
+        const response = await fetch(
+          `/api/participants/${encodeURIComponent(token)}/realtime-auth`,
+          { method: "POST", cache: "no-store" }
+        );
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error?.message ?? "Realtime authentication failed");
+        }
+
+        const access = payload.data as RealtimeAccess;
+        const client = getQuestRealtimeClient();
+        await client.realtime.setAuth(access.accessToken);
+        accessRef.current = access;
+
+        window.clearTimeout(authRenewalTimer.current);
+        const renewalDelay = Math.max(
+          10_000,
+          access.expiresAt - Date.now() - AUTH_RENEWAL_MARGIN_MS
+        );
+        authRenewalTimer.current = window.setTimeout(() => {
+          void issueRealtimeAccess(true).catch((cause) => {
+            setError(
+              cause instanceof Error ? cause.message : "Realtime authentication failed"
+            );
+          });
+        }, renewalDelay);
+
+        return access;
+      })();
+
+      authRequest.current = request;
+      try {
+        return await request;
+      } finally {
+        authRequest.current = null;
+      }
+    },
+    [token]
+  );
+
   useEffect(() => {
     localStorage.setItem("tlvQuestParticipantToken", token);
     const initialRefresh = window.setTimeout(() => void refresh(), 0);
@@ -132,16 +258,28 @@ export function QuestRealtimeProvider({
     const onVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
     };
-    const onOnline = () => void refresh();
+    const onOnline = () => {
+      setConnectionState("reconnecting");
+      void refresh();
+    };
+    const onOffline = () => {
+      connectedRef.current = false;
+      setConnected(false);
+      setConnectionState("offline");
+    };
 
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
     return () => {
       window.clearTimeout(initialRefresh);
       window.clearTimeout(stateRefreshTimer.current);
       window.clearTimeout(boardRefreshTimer.current);
+      window.clearTimeout(staleTimer.current);
+      window.clearTimeout(authRenewalTimer.current);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
     };
   }, [refresh, token]);
 
@@ -149,53 +287,121 @@ export function QuestRealtimeProvider({
     const teamTopic = state?.realtime.teamTopic;
     const runTopic = state?.realtime.runTopic;
     const code = state?.run.publicCode;
-    if (!teamTopic || !runTopic || !code) return;
+    const participant = state?.participant;
+    if (!teamTopic || !runTopic || !code || !participant) return;
 
-    const client = getBrowserClient();
-
+    let active = true;
+    const client = getQuestRealtimeClient();
+    const deviceId = getDeviceId();
     const statuses = new Map<string, boolean>();
+    let teamChannel: ReturnType<typeof client.channel> | null = null;
+    let runChannel: ReturnType<typeof client.channel> | null = null;
+    let boardChannel: ReturnType<typeof client.channel> | null = null;
+
     const updateStatus = (name: string, status: string) => {
+      if (!active) return;
       statuses.set(name, status === "SUBSCRIBED");
-      setConnected(
+      const allConnected =
         statuses.get("team") === true &&
-          statuses.get("run") === true &&
-          statuses.get("board") === true
-      );
+        statuses.get("run") === true &&
+        statuses.get("board") === true;
+      connectedRef.current = allConnected;
+      setConnected(allConnected);
+
+      if (allConnected) {
+        window.clearTimeout(staleTimer.current);
+        setConnectionState("live");
+      } else if (!navigator.onLine) {
+        setConnectionState("offline");
+      } else {
+        setConnectionState("reconnecting");
+        scheduleStaleState();
+      }
+
       if (status === "SUBSCRIBED") scheduleStateRefresh();
     };
 
-    const teamChannel = client
-      .channel(teamTopic)
-      .on("broadcast", { event: "state_changed" }, scheduleStateRefresh)
-      .subscribe((status) => updateStatus("team", status));
+    const trackPresence = () => {
+      if (!teamChannel) return;
+      void teamChannel.track({
+        participantId: participant.id,
+        firstName: participant.firstName,
+        deviceId,
+        visible: document.visibilityState === "visible",
+        onlineAt: new Date().toISOString()
+      });
+    };
 
-    const runChannel = client
-      .channel(runTopic)
-      .on("broadcast", { event: "state_changed" }, scheduleStateRefresh)
-      .subscribe((status) => updateStatus("run", status));
+    const onVisibility = () => trackPresence();
 
-    const boardChannel = client
-      .channel(`quest-board:${code}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "leaderboard_entries",
-          filter: `run_public_code=eq.${code}`
-        },
-        () => scheduleBoardRefresh(code)
-      )
-      .subscribe((status) => updateStatus("board", status));
+    const connect = async () => {
+      await issueRealtimeAccess();
+      if (!active) return;
+
+      teamChannel = client
+        .channel(teamTopic, {
+          config: {
+            private: true,
+            presence: { key: deviceId }
+          }
+        })
+        .on("broadcast", { event: "state_changed" }, scheduleStateRefresh)
+        .on("presence", { event: "sync" }, () => {
+          if (!teamChannel || !active) return;
+          const raw = teamChannel.presenceState() as Record<
+            string,
+            PresencePayload[]
+          >;
+          setPresence(normalizePresence(raw));
+        })
+        .subscribe((status) => {
+          updateStatus("team", status);
+          if (status === "SUBSCRIBED") trackPresence();
+        });
+
+      runChannel = client
+        .channel(runTopic, { config: { private: true } })
+        .on("broadcast", { event: "state_changed" }, scheduleStateRefresh)
+        .subscribe((status) => updateStatus("run", status));
+
+      boardChannel = client
+        .channel(`quest-board:${code}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "leaderboard_entries",
+            filter: `run_public_code=eq.${code}`
+          },
+          () => scheduleBoardRefresh(code)
+        )
+        .subscribe((status) => updateStatus("board", status));
+
+      document.addEventListener("visibilitychange", onVisibility);
+    };
+
+    void connect().catch((cause) => {
+      if (!active) return;
+      setError(cause instanceof Error ? cause.message : "Realtime connection failed");
+      setConnectionState(navigator.onLine ? "reconnecting" : "offline");
+      scheduleStaleState();
+    });
 
     return () => {
-      void client.removeChannel(teamChannel);
-      void client.removeChannel(runChannel);
-      void client.removeChannel(boardChannel);
+      active = false;
+      document.removeEventListener("visibilitychange", onVisibility);
+      setPresence([]);
+      if (teamChannel) void client.removeChannel(teamChannel);
+      if (runChannel) void client.removeChannel(runChannel);
+      if (boardChannel) void client.removeChannel(boardChannel);
     };
   }, [
+    issueRealtimeAccess,
     scheduleBoardRefresh,
     scheduleStateRefresh,
+    scheduleStaleState,
+    state?.participant,
     state?.realtime.runTopic,
     state?.realtime.teamTopic,
     state?.run.publicCode
@@ -205,13 +411,25 @@ export function QuestRealtimeProvider({
     () => ({
       state,
       leaderboard,
+      presence,
       connected,
+      connectionState,
       loading,
       error,
       lastSyncedAt,
       refresh
     }),
-    [connected, error, lastSyncedAt, leaderboard, loading, refresh, state]
+    [
+      connected,
+      connectionState,
+      error,
+      lastSyncedAt,
+      leaderboard,
+      loading,
+      presence,
+      refresh,
+      state
+    ]
   );
 
   return (
