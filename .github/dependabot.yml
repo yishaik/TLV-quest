@@ -27,3 +27,10 @@ updates:
       - dependency-name: typescript
         versions:
           - ">=7"
+      # @types/node must track the RUNTIME major, not npm latest. engines is
+      # node 22.x and CI runs 22; typings from a newer major would let tsc
+      # accept APIs that do not exist at runtime — a green build that throws
+      # in production. Raise this in step with engines, never ahead of it.
+      - dependency-name: "@types/node"
+        versions:
+          - ">=23"
