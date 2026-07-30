@@ -74,6 +74,14 @@ export const enforceOrganizerRateLimit = (
   token: string
 ) => enforceRateLimit({ policyName, subject: `organizer:${token}` });
 
+// Admin authoring routes key off the authenticated admin email rather than the
+// IP: admins share office/mobile NATs, and an IP subject would let one editor's
+// bulk import lock out everyone else on the same network.
+export const enforceAdminRateLimit = (
+  policyName: "contentImport" | "contentTranslate",
+  email: string
+) => enforceRateLimit({ policyName, subject: `admin:${email}` });
+
 export const enforceIpRateLimit = (
   policyName: "join" | "leads" | "worker",
   request: Request

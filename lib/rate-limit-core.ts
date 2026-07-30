@@ -20,7 +20,16 @@ export const RATE_LIMIT_POLICIES = {
   },
   join: { scope: "join", limit: 5, windowSeconds: 60 },
   leads: { scope: "leads", limit: 3, windowSeconds: 60 * 60 },
-  worker: { scope: "worker", limit: 10, windowSeconds: 60 }
+  worker: { scope: "worker", limit: 10, windowSeconds: 60 },
+  // Authoring routes are admin-only and already behind requireAdmin, so these
+  // bound cost and accidental loops rather than abuse. Translation is the
+  // tighter of the two because each call reaches a paid upstream model.
+  contentImport: { scope: "content-import", limit: 10, windowSeconds: 60 },
+  contentTranslate: {
+    scope: "content-translate",
+    limit: 20,
+    windowSeconds: 60
+  }
 } as const;
 
 export type RateLimitPolicyName = keyof typeof RATE_LIMIT_POLICIES;

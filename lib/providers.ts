@@ -182,6 +182,76 @@ export const validatePhotoWithGemini = async ({
   };
 };
 
+export type TranslationSuggestion = {
+  text: string;
+  provider: "gemini" | "deterministic";
+  model: string | null;
+};
+
+/**
+ * Draft a he<->en translation of player-facing copy.
+ *
+ * Never throws and never fails the caller: an unconfigured key, an upstream
+ * error or an empty candidate all fall back to echoing the source text with
+ * `provider: "deterministic"`. Translations are drafts pending human approval
+ * (CNT-07), so a silent echo is a visible no-op in the review UI, whereas a
+ * thrown error would take the whole authoring screen down.
+ */
+export const suggestTranslation = async ({
+  sourceText,
+  sourceLocale,
+  targetLocale,
+  context
+}: {
+  sourceText: string;
+  sourceLocale: "he" | "en";
+  targetLocale: "he" | "en";
+  context?: string;
+}): Promise<TranslationSuggestion> => {
+  const echo: TranslationSuggestion = {
+    text: sourceText,
+    provider: "deterministic",
+    model: null
+  };
+  const env = getServerEnv();
+  if (!env.geminiApiKey) return echo;
+
+  const prompt = [
+    "Translate urban quest player copy.",
+    `Source language: ${sourceLocale}. Target language: ${targetLocale}.`,
+    "Preserve tone, clues, line breaks, place names and numbers.",
+    "Do not add answers, explanations or facts not present in the source.",
+    "Return only the translated copy.",
+    context ? `Context: ${context.slice(0, 500)}` : "",
+    `Source:\n${sourceText.slice(0, 4000)}`
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.geminiVisionModel)}:generateContent?key=${encodeURIComponent(env.geminiApiKey)}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1 }
+        })
+      }
+    );
+    if (!response.ok) return echo;
+    const payload = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!text) return echo;
+    return { text, provider: "gemini", model: env.geminiVisionModel };
+  } catch {
+    return echo;
+  }
+};
+
 const objectPayload = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
