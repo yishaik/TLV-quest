@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParticipantState } from "@/lib/repository";
+import { toPublicCheckpoint } from "@/lib/public-checkpoint";
 
 const ACTIVITY_EVENT_TYPES = [
   "PLAYER_JOINED",
@@ -100,12 +101,12 @@ export async function getParticipantExperienceState(token: string) {
   }));
 
   let checkpoint = state.checkpoint
-    ? {
-        ...state.checkpoint,
+    ? toPublicCheckpoint(state.checkpoint, {
+        locale: state.participant.language,
         isOptional: false,
         scanVerified: false,
         photoFallbackAvailable: false
-      }
+      })
     : null;
 
   if (state.checkpoint) {
@@ -155,12 +156,12 @@ export async function getParticipantExperienceState(token: string) {
       });
     }
 
-    checkpoint = {
-      ...currentCheckpoint,
+    checkpoint = toPublicCheckpoint(currentCheckpoint, {
+      locale: state.participant.language,
       isOptional: checkpointMeta.is_optional === true,
       scanVerified,
       photoFallbackAvailable
-    };
+    });
   }
 
   return {

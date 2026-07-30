@@ -70,10 +70,10 @@ export type QuestParticipantState = {
     sequenceNo: number;
     kind: string;
     content: Record<string, unknown>;
-    validation: Record<string, unknown>;
-    hints?: unknown[];
-    scoring?: Record<string, unknown>;
-    fallback: Record<string, unknown> | null;
+    validationType: string;
+    choiceOptions: string[];
+    hasFallback: boolean;
+    fallbackPrompt: string | null;
     latitude: number | null;
     longitude: number | null;
     radiusMeters: number | null;

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParticipantState } from "@/lib/repository";
+import { publicFallbackSummary } from "@/lib/public-checkpoint";
 import {
   calculateScoreDelta,
   distanceMeters,
@@ -239,11 +240,16 @@ export const submitPhoto = async ({
   if (mediaError || !media) throw mediaError ?? new Error("Failed to save photo");
 
   if (!assessment.approved || assessment.confidence < threshold) {
+    const fallback = publicFallbackSummary(
+      state.checkpoint.fallback,
+      state.participant.language
+    );
     return {
       approved: false,
       confidence: assessment.confidence,
       reason: assessment.reason,
-      fallback: state.checkpoint.fallback
+      hasFallback: fallback.hasFallback,
+      fallbackPrompt: fallback.hasFallback ? fallback.fallbackPrompt : null
     };
   }
 

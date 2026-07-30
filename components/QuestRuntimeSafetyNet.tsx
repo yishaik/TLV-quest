@@ -12,30 +12,13 @@ type RuntimeState = {
   checkpoint: null | {
     slug: string;
     kind: string;
-    fallback: Record<string, unknown> | null;
+    hasFallback: boolean;
+    fallbackPrompt: string | null;
     isOptional: boolean;
     scanVerified: boolean;
     photoFallbackAvailable: boolean;
   };
 };
-
-const localizedFallback = (
-  fallback: Record<string, unknown> | null,
-  language: Locale
-) => {
-  if (!fallback) return "";
-  const value = fallback[language];
-  return typeof value === "string" ? value.trim() : "";
-};
-
-const hasFallbackAnswers = (fallback: Record<string, unknown> | null) =>
-  Boolean(
-    fallback &&
-      Array.isArray(fallback.accepted) &&
-      fallback.accepted.some(
-        (answer) => typeof answer === "string" && Boolean(answer.trim())
-      )
-  );
 
 export function QuestRuntimeSafetyNet({ token }: { token: string }) {
   const { state: realtimeState, refresh } = useQuestRealtime();
@@ -49,14 +32,14 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
   const language = state?.participant.language ?? "he";
   const isHebrew = language === "he";
   const fallbackPrompt = useMemo(
-    () => localizedFallback(checkpoint?.fallback ?? null, language),
-    [checkpoint?.fallback, language]
+    () => checkpoint?.fallbackPrompt?.trim() ?? "",
+    [checkpoint?.fallbackPrompt]
   );
   const fallbackReady = Boolean(
     checkpoint?.kind === "photo" &&
       checkpoint.photoFallbackAvailable &&
       fallbackPrompt &&
-      hasFallbackAnswers(checkpoint.fallback)
+      checkpoint.hasFallback
   );
   const relevant = Boolean(
     state?.run.status === "active" &&
