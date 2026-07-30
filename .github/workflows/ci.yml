@@ -39,6 +39,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund 2>&1 | tee install.log
 
+      - name: Audit production dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run audit:prod 2>&1 | tee audit.log
+
       - name: Lint
         shell: bash
         run: |
@@ -73,6 +79,7 @@ jobs:
           name: ci-logs-${{ github.run_id }}
           path: |
             install.log
+            audit.log
             lint.log
             test.log
             build.log

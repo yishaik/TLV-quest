@@ -1,10 +1,11 @@
 import "server-only";
 
-import twilio, { validateRequest } from "twilio";
+import twilio from "twilio";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptPii, normalizePhone } from "@/lib/crypto";
 import { getServerEnv, isProduction, publicEnv } from "@/lib/env";
+import { verifyTwilioRequestSignature } from "@/lib/twilio-signature";
 import {
   runOutboxBatch,
   type OutboxMessage,
@@ -39,8 +40,12 @@ export const verifyTwilioWebhook = ({
 }): boolean => {
   const env = getServerEnv();
   if (!env.validateTwilioSignatures) return true;
-  if (!env.twilioAuthToken || !signature) return false;
-  return validateRequest(env.twilioAuthToken, signature, url, params);
+  return verifyTwilioRequestSignature({
+    authToken: env.twilioAuthToken,
+    signature,
+    url,
+    params
+  });
 };
 
 export const sendWhatsapp = async ({
