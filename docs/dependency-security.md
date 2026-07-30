@@ -59,6 +59,15 @@ Because both ignores are open-ended (`>=10`, `>=7`), Dependabot will stay quiet
 on these two packages entirely — including for a later major that *does* fix
 the incompatibility. Re-check them when Next.js publishes a new major.
 
+**`@types/node` held below `23`** (attempted by #55, `@types/node` `26.1.2`).
+This one is not an upstream defect — the bump is simply wrong for this project.
+`engines` requires node `22.x`, CI runs Node 22, and Vercel builds on 22, so
+typings from a newer major would let `tsc` accept APIs that do not exist at
+runtime. That failure mode is worse than a red build: everything passes
+locally and in CI, then throws in production the first time such an API is
+called. `@types/node` must track the **runtime** major, so raise this ignore in
+step with `engines` — never ahead of it.
+
 ## Pinned versions
 
 Twilio is pinned to `6.0.2`, which is the current npm `latest` release as of
