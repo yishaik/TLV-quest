@@ -1,8 +1,11 @@
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashSecret } from "@/lib/crypto";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import { processOutbox } from "@/lib/providers";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(
   request: Request,
@@ -19,6 +22,16 @@ export async function POST(
       .eq("organizer_token_hash", hashSecret(token))
       .single();
     if (runError || !run) throw new Error("Organizer link is invalid or expired");
+
+    let delivery:
+      | {
+          queued: number;
+          processing: number;
+          sent: number;
+          delivered: number;
+          failed: number;
+        }
+      | undefined;
 
     if (action === "pause") {
       const { error } = await supabase
@@ -92,15 +105,49 @@ export async function POST(
         .not("phone_ciphertext", "is", null);
       if (error) throw error;
       if (participants?.length) {
-        await supabase.from("message_outbox").insert(
-          participants.map((participant) => ({
-            run_id: run.id,
-            participant_id: participant.id,
-            channel: "whatsapp",
-            recipient_ciphertext: participant.phone_ciphertext,
-            payload: { body: message }
-          }))
-        );
+        const { data: queuedRows, error: insertError } = await supabase
+          .from("message_outbox")
+          .insert(
+            participants.map((participant) => ({
+              run_id: run.id,
+              participant_id: participant.id,
+              channel: "whatsapp",
+              recipient_ciphertext: participant.phone_ciphertext,
+              payload: { body: message }
+            }))
+          )
+          .select("id");
+        if (insertError) throw insertError;
+
+        const outboxIds = (queuedRows ?? []).map((row) => row.id);
+        delivery = {
+          queued: outboxIds.length,
+          processing: 0,
+          sent: 0,
+          delivered: 0,
+          failed: 0
+        };
+        if (outboxIds.length) {
+          after(async () => {
+            try {
+              await processOutbox(outboxIds.length, { outboxIds });
+            } catch {
+              console.error("outbox.low_latency_kick_failed", {
+                runId: run.id,
+                queued: outboxIds.length,
+                errorCode: "outbox_kick_failed"
+              });
+            }
+          });
+        }
+      } else {
+        delivery = {
+          queued: 0,
+          processing: 0,
+          sent: 0,
+          delivered: 0,
+          failed: 0
+        };
       }
     } else if (action === "score") {
       const teamId = typeof body.teamId === "string" ? body.teamId : "";
@@ -121,14 +168,18 @@ export async function POST(
       throw new Error("Unsupported organizer action");
     }
 
-    await supabase.from("game_events").insert({
+    const { error: eventError } = await supabase.from("game_events").insert({
       run_id: run.id,
       event_type: "ORGANIZER_ACTION",
       idempotency_key: `organizer:${action}:${crypto.randomUUID()}`,
-      payload: { action }
+      payload: {
+        action,
+        ...(delivery ? { queuedCount: delivery.queued } : {})
+      }
     });
+    if (eventError) throw eventError;
 
-    return jsonOk({ action, status: "accepted" });
+    return jsonOk({ action, status: "accepted", ...(delivery ? { delivery } : {}) });
   } catch (error) {
     return handleRouteError(error);
   }

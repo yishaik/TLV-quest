@@ -7,6 +7,7 @@ type OrganizerData = {
   teams: Array<{ id: string; public_name: string; status: string; score: number; completed_count: number; last_progress_at: string | null }>;
   participants: Array<{ id: string; team_id: string | null; public_alias: string | null; language: string; whatsapp_connected_at: string | null }>;
   checkpoints: Array<{ slug: string; sequence_no: number; kind: string; is_disabled: boolean }>;
+  delivery: { queued: number; processing: number; sent: number; delivered: number; failed: number };
   joinUrl: string;
   liveUrl: string;
 };
@@ -52,7 +53,10 @@ export function PremiumOrganizerDashboard({ token }: { token: string }) {
     return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [refresh]);
 
-  async function control(action: string, extra: Record<string, unknown> = {}) {
+  async function control(
+    action: string,
+    extra: Record<string, unknown> = {}
+  ): Promise<Record<string, unknown> | null> {
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(`/api/organizer/${encodeURIComponent(token)}/control`, {
@@ -60,9 +64,24 @@ export function PremiumOrganizerDashboard({ token }: { token: string }) {
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "Action failed");
-      setNotice("הפעולה בוצעה והמערכת התעדכנה.");
+      const result = payload.data as Record<string, unknown>;
+      const delivery =
+        result.delivery &&
+        typeof result.delivery === "object" &&
+        !Array.isArray(result.delivery)
+          ? (result.delivery as Record<string, unknown>)
+          : null;
+      setNotice(
+        action === "broadcast" && delivery
+          ? `ההודעה נכנסה לתור עבור ${Number(delivery.queued ?? 0)} משתתפים. סטטוס המסירה יתעדכן אוטומטית.`
+          : "הפעולה בוצעה והמערכת התעדכנה."
+      );
       await refresh();
-    } catch (errorValue) { setError(errorValue instanceof Error ? errorValue.message : "Unexpected error"); }
+      return result;
+    } catch (errorValue) {
+      setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
+      return null;
+    }
     finally { setBusy(false); }
   }
 
@@ -80,11 +99,12 @@ export function PremiumOrganizerDashboard({ token }: { token: string }) {
 
   async function broadcast(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const message = String(form.get("message") ?? "").trim();
     if (!message) return;
-    await control("broadcast", { message });
-    event.currentTarget.reset();
+    const result = await control("broadcast", { message });
+    if (result) formElement.reset();
   }
 
   async function copy(name: string, value: string) {
@@ -153,6 +173,13 @@ export function PremiumOrganizerDashboard({ token }: { token: string }) {
               <textarea name="message" maxLength={800} placeholder="כתבו הודעה קצרה וברורה…" />
               <button className="button button-primary" disabled={busy}>שליחה דרך ערוץ ההודעות</button>
             </form>
+            <div className="wizard-summary delivery-summary" aria-label="סטטוס משלוחי הודעות">
+              <div><span>בתור</span><strong>{data.delivery.queued}</strong></div>
+              <div><span>בעיבוד</span><strong>{data.delivery.processing}</strong></div>
+              <div><span>נשלחו</span><strong>{data.delivery.sent}</strong></div>
+              <div><span>נמסרו</span><strong>{data.delivery.delivered}</strong></div>
+              <div><span>נכשלו</span><strong>{data.delivery.failed}</strong></div>
+            </div>
           </article>
           <article className="control-panel">
             <span className="flow-kicker">ROUTE STATUS</span><h2>מצב המסלול</h2>

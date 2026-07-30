@@ -4,7 +4,12 @@ import twilio, { validateRequest } from "twilio";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptPii, normalizePhone } from "@/lib/crypto";
-import { getServerEnv, isProduction } from "@/lib/env";
+import { getServerEnv, isProduction, publicEnv } from "@/lib/env";
+import {
+  runOutboxBatch,
+  type OutboxMessage,
+  type OutboxStore
+} from "@/lib/outbox-core";
 
 export type SendResult = {
   providerMessageId: string;
@@ -40,17 +45,19 @@ export const verifyTwilioWebhook = ({
 
 export const sendWhatsapp = async ({
   to,
-  body
+  body,
+  statusCallback
 }: {
   to: string;
   body: string;
+  statusCallback?: string;
 }): Promise<SendResult> => {
   const normalized = normalizePhone(to);
   const env = getServerEnv();
 
   if (!externalDeliveryAllowed(normalized)) {
-    console.info("[mock-whatsapp]", { to: normalized, body });
-    return { providerMessageId: `mock-wa-${Date.now()}`, status: "mocked" };
+    console.info("provider.whatsapp_mocked", { channel: "whatsapp" });
+    return { providerMessageId: `mock-wa-${crypto.randomUUID()}`, status: "mocked" };
   }
 
   if (!env.twilioAccountSid || !env.twilioAuthToken) {
@@ -61,7 +68,8 @@ export const sendWhatsapp = async ({
   const message = await client.messages.create({
     from: env.twilioWhatsappFrom,
     to: `whatsapp:${normalized}`,
-    body
+    body,
+    ...(statusCallback ? { statusCallback } : {})
   });
 
   return { providerMessageId: message.sid, status: "sent" };
@@ -78,8 +86,11 @@ export const sendEmail = async ({
 }): Promise<SendResult> => {
   const env = getServerEnv();
   if (!env.enableExternalMessages) {
-    console.info("[mock-email]", { to, subject });
-    return { providerMessageId: `mock-email-${Date.now()}`, status: "mocked" };
+    console.info("provider.email_mocked", { channel: "email" });
+    return {
+      providerMessageId: `mock-email-${crypto.randomUUID()}`,
+      status: "mocked"
+    };
   }
   if (!env.resendApiKey) throw new Error("RESEND_API_KEY is not configured");
 
@@ -165,62 +176,103 @@ export const validatePhotoWithGemini = async ({
   };
 };
 
-export const processOutbox = async (limit = 20) => {
+const objectPayload = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const createOutboxStore = (
+  supabase: ReturnType<typeof createAdminClient>
+): OutboxStore => ({
+  claimBatch: async ({ limit, outboxIds }) => {
+    const { data, error } = await supabase.rpc("claim_outbox_batch", {
+      batch_size: limit,
+      outbox_ids: outboxIds?.length ? outboxIds : null
+    });
+    if (error) throw error;
+
+    return (data ?? []).map(
+      (row: Record<string, unknown>): OutboxMessage => ({
+        id: String(row.id),
+        runId: typeof row.run_id === "string" ? row.run_id : null,
+        participantId:
+          typeof row.participant_id === "string" ? row.participant_id : null,
+        channel: row.channel === "email" ? "email" : "whatsapp",
+        recipientCiphertext: String(row.recipient_ciphertext),
+        payload: objectPayload(row.payload),
+        attempts:
+          typeof row.attempts === "number" && Number.isFinite(row.attempts)
+            ? row.attempts
+            : 1,
+        leaseToken: String(row.lease_token)
+      })
+    );
+  },
+  completeAttempt: async ({
+    id,
+    leaseToken,
+    providerMessageId,
+    providerStatus
+  }) => {
+    const { data, error } = await supabase.rpc("complete_outbox_attempt", {
+      p_outbox_id: id,
+      p_lease_token: leaseToken,
+      p_provider_message_id: providerMessageId,
+      p_provider_status: providerStatus
+    });
+    if (error) throw error;
+    return data === true;
+  },
+  failAttempt: async ({
+    id,
+    leaseToken,
+    errorCode,
+    retryAt,
+    terminal
+  }) => {
+    const { data, error } = await supabase.rpc("fail_outbox_attempt", {
+      p_outbox_id: id,
+      p_lease_token: leaseToken,
+      p_error_code: errorCode,
+      p_retry_at: retryAt.toISOString(),
+      p_terminal: terminal
+    });
+    if (error) throw error;
+    return data === true;
+  }
+});
+
+export const processOutbox = async (
+  limit = 20,
+  options: { outboxIds?: string[] } = {}
+) => {
   const supabase = createAdminClient();
-  const { data: rows, error } = await supabase.rpc("claim_outbox_batch", {
-    batch_size: Math.max(1, Math.min(limit, 100))
-  });
-  if (error) throw error;
-
-  const results: Array<{ id: string; status: string; error?: string }> = [];
-  for (const row of rows ?? []) {
-    try {
-      const recipient = decryptPii(row.recipient_ciphertext);
-      const payload =
-        row.payload && typeof row.payload === "object" && !Array.isArray(row.payload)
-          ? (row.payload as Record<string, unknown>)
-          : {};
-
+  return runOutboxBatch({
+    store: createOutboxStore(supabase),
+    limit,
+    outboxIds: options.outboxIds,
+    deliver: async (row) => {
+      const recipient = decryptPii(row.recipientCiphertext);
       const delivery =
         row.channel === "whatsapp"
           ? await sendWhatsapp({
               to: recipient,
-              body: typeof payload.body === "string" ? payload.body : ""
+              body: typeof row.payload.body === "string" ? row.payload.body : "",
+              statusCallback: `${publicEnv.appUrl}/api/twilio/status?outbox=${encodeURIComponent(row.id)}`
             })
           : await sendEmail({
               to: recipient,
               subject:
-                typeof payload.subject === "string" ? payload.subject : "TLV Quest",
-              html: typeof payload.html === "string" ? payload.html : ""
+                typeof row.payload.subject === "string"
+                  ? row.payload.subject
+                  : "TLV Quest",
+              html: typeof row.payload.html === "string" ? row.payload.html : ""
             });
 
-      await supabase
-        .from("message_outbox")
-        .update({
-          status: "sent",
-          provider_message_id: delivery.providerMessageId,
-          sent_at: new Date().toISOString(),
-          locked_at: null,
-          last_error: null
-        })
-        .eq("id", row.id);
-      results.push({ id: row.id, status: delivery.status });
-    } catch (errorValue) {
-      const message =
-        errorValue instanceof Error ? errorValue.message : "Unknown delivery error";
-      const delayMinutes = Math.min(60, 2 ** Math.max(0, row.attempts));
-      await supabase
-        .from("message_outbox")
-        .update({
-          status: row.attempts >= 5 ? "failed" : "pending",
-          last_error: message.slice(0, 500),
-          locked_at: null,
-          send_after: new Date(Date.now() + delayMinutes * 60_000).toISOString()
-        })
-        .eq("id", row.id);
-      results.push({ id: row.id, status: "failed", error: message });
+      return {
+        providerMessageId: delivery.providerMessageId,
+        providerStatus: delivery.status
+      };
     }
-  }
-
-  return results;
+  });
 };
