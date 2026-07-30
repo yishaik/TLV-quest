@@ -9,7 +9,10 @@ import {
 } from "../lib/http";
 
 vi.mock("@sentry/nextjs", () => ({
-  captureException: vi.fn()
+  captureException: vi.fn(),
+  metrics: {
+    count: vi.fn()
+  }
 }));
 
 const httpSource = readFileSync("lib/http.ts", "utf8");
@@ -17,6 +20,7 @@ const httpSource = readFileSync("lib/http.ts", "utf8");
 afterEach(() => {
   vi.restoreAllMocks();
   vi.mocked(Sentry.captureException).mockClear();
+  vi.mocked(Sentry.metrics.count).mockClear();
 });
 
 describe("HTTP error boundary", () => {
@@ -56,6 +60,38 @@ describe("HTTP error boundary", () => {
         tags: expect.objectContaining({
           correlation_id: correlationId,
           error_code: "internal_error"
+        })
+      })
+    );
+    expect(Sentry.metrics.count).toHaveBeenCalledWith(
+      "tlv_quest.api.errors",
+      1,
+      expect.objectContaining({
+        attributes: expect.objectContaining({
+          error_code: "internal_error",
+          status_code: 500
+        })
+      })
+    );
+  });
+
+  it("tags unexpected live-run failures for the rate alert", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const error = new Error("provider unavailable");
+
+    const response = handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "participant.answer"
+    });
+
+    expect(response.status).toBe(500);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          operational_scope: "live_run",
+          route: "participant.answer",
+          status_code: "500"
         })
       })
     );

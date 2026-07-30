@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
-import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
+import {
+  reportOperationalError,
+  type OperationalErrorContext
+} from "./observability";
 import { RateLimitExceededError } from "./rate-limit-core";
 
 type ErrorDetails = Record<string, unknown>;
@@ -388,7 +391,10 @@ const intentionalError = (error: unknown): AppError | null => {
     : null;
 };
 
-export const handleRouteError = (error: unknown) => {
+export const handleRouteError = (
+  error: unknown,
+  context: Pick<OperationalErrorContext, "operationalScope" | "route"> = {}
+) => {
   const correlationId = randomUUID();
   const mapped = intentionalError(error);
   const safeError =
@@ -414,11 +420,11 @@ export const handleRouteError = (error: unknown) => {
   }
 
   if (!mapped || safeError.status >= 500) {
-    Sentry.captureException(error, {
-      tags: {
-        correlation_id: correlationId,
-        error_code: safeError.code
-      }
+    reportOperationalError(error, {
+      correlationId,
+      errorCode: safeError.code,
+      statusCode: safeError.status,
+      ...context
     });
     console.error("api.route_error", {
       correlationId,

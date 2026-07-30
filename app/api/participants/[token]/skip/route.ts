@@ -39,6 +39,9 @@ export async function POST(
       delivery: { queued: result.delivery.queued }
     });
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "participant.skip"
+    });
   }
 }

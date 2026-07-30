@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reportOperationalError } from "@/lib/observability";
 import { verifyTwilioWebhook } from "@/lib/providers";
 
 export const runtime = "nodejs";
@@ -39,6 +40,11 @@ export async function POST(request: Request) {
     p_error_code: providerErrorCode
   });
   if (error) {
+    reportOperationalError(error, {
+      errorCode: "provider_status_persistence_failed",
+      operationalScope: "live_run",
+      route: "twilio.status"
+    });
     console.error("outbox.provider_status_failed", {
       outboxId,
       providerMessageId: messageSid,

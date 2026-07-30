@@ -18,6 +18,9 @@ export async function POST(
     const idempotencyKey = requireIdempotencyKey(request);
     return jsonOk(await requestHint({ token, idempotencyKey }));
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "participant.hint"
+    });
   }
 }
