@@ -19,6 +19,11 @@ import {
   type TextValidation
 } from "@/lib/game-engine";
 import { publicEnv } from "@/lib/env";
+import {
+  resolveWhatsappContextCandidates,
+  type WhatsappContextResolution,
+  type WhatsappGameContext
+} from "@/lib/whatsapp-status";
 
 const TEMPLATE_SLUG = "tel-aviv-port-time-capsule";
 const DEFAULT_TEAM_SIZE = 4;
@@ -887,18 +892,47 @@ export const linkWhatsappParticipant = async ({
   };
 };
 
-export const findParticipantTokenlessByPhone = async (from: string) => {
+export const resolveWhatsappGameContextByPhone = async ({
+  from,
+  requestedRunCode,
+  now
+}: {
+  from: string;
+  requestedRunCode?: string;
+  now?: Date;
+}): Promise<WhatsappContextResolution> => {
   const normalizedPhone = normalizePhone(from.replace(/^whatsapp:/, ""));
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("participants")
-    .select("id,run_id,team_id,language")
-    .eq("phone_hash", hashSecret(normalizedPhone))
-    .order("joined_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_whatsapp_game_contexts", {
+    p_phone_hash: hashSecret(normalizedPhone)
+  });
   if (error) throw error;
-  return data;
+
+  const candidates = Array.isArray(data)
+    ? (data as unknown as WhatsappGameContext[])
+    : [];
+  return resolveWhatsappContextCandidates(candidates, {
+    requestedRunCode,
+    now
+  });
+};
+
+export const findParticipantTokenlessByPhone = async (from: string) => {
+  const resolution = await resolveWhatsappGameContextByPhone({ from });
+  if (resolution.kind === "ambiguous") {
+    throw new Error(
+      `ambiguous_whatsapp_context:${resolution.runCodes.join(",")}`
+    );
+  }
+  if (resolution.kind === "none") return null;
+
+  const { participant, run, team } = resolution.context;
+  return {
+    id: participant.id,
+    run_id: run.id,
+    team_id: team?.id ?? null,
+    language: participant.language
+  };
 };
 
 export const localizedCheckpointPrompt = (

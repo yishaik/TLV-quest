@@ -5,7 +5,7 @@ import {
   formatCheckpointMessage
 } from "@/lib/checkpoint-delivery";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { findParticipantTokenlessByPhone } from "@/lib/repository";
+import { resolveWhatsappGameContextByPhone } from "@/lib/repository";
 import { participantResumeUrl } from "@/lib/participant-resume";
 import {
   calculateScoreDelta,
@@ -15,6 +15,13 @@ import {
   type TextValidation
 } from "@/lib/game-engine";
 import { randomToken } from "@/lib/crypto";
+import {
+  formatWhatsappContextChoice,
+  formatWhatsappContextNotFound,
+  formatWhatsappRunStatus,
+  isWhatsappContextPlayable,
+  parseWhatsappCommand
+} from "@/lib/whatsapp-status";
 
 const asObject = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -33,35 +40,6 @@ const localText = (
   return typeof localized[key] === "string" ? localized[key] : fallback;
 };
 
-const getContext = async (participantId: string) => {
-  const supabase = createAdminClient();
-  const { data: participant, error: participantError } = await supabase
-    .from("participants")
-    .select("*")
-    .eq("id", participantId)
-    .single();
-  if (participantError || !participant?.team_id) throw new Error("Participant not found");
-
-  const [{ data: run }, { data: team }] = await Promise.all([
-    supabase.from("game_runs").select("*").eq("id", participant.run_id).single(),
-    supabase.from("teams").select("*").eq("id", participant.team_id).single()
-  ]);
-  if (!run || !team) throw new Error("Game context not found");
-
-  const checkpoint = team.current_checkpoint_slug
-    ? (
-        await supabase
-          .from("run_checkpoints")
-          .select("*")
-          .eq("run_id", run.id)
-          .eq("slug", team.current_checkpoint_slug)
-          .single()
-      ).data
-    : null;
-
-  return { supabase, participant, run, team, checkpoint };
-};
-
 export const handleWhatsappGameMessage = async ({
   from,
   body,
@@ -71,42 +49,37 @@ export const handleWhatsappGameMessage = async ({
   body: string;
   messageSid: string;
 }): Promise<string> => {
-  const participantRef = await findParticipantTokenlessByPhone(from);
-  if (!participantRef) {
-    return "לא מצאתי הרשמה פעילה למספר הזה. פתחו את קישור ההרשמה ושלחו PLAY עם קוד השחזור.\nNo active registration was found for this number.";
+  const parsedCommand = parseWhatsappCommand(body);
+  const resolution = await resolveWhatsappGameContextByPhone({
+    from,
+    requestedRunCode: parsedCommand.requestedRunCode
+  });
+  if (resolution.kind === "none") {
+    return formatWhatsappContextNotFound({
+      requestedRunCode: resolution.requestedRunCode
+    });
+  }
+  if (resolution.kind === "ambiguous") {
+    return formatWhatsappContextChoice(resolution);
   }
 
-  const { supabase, participant, run, team, checkpoint } = await getContext(
-    participantRef.id
-  );
+  const context = resolution.context;
+  const { participant, run, team, checkpoint } = context;
   const locale = participant.language as Locale;
   const isHebrew = locale === "he";
   const webAppUrl = participantResumeUrl(participant.id);
+  const supabase = createAdminClient();
 
-  if (run.status !== "active") {
-    return isHebrew
-      ? `המשחק עדיין לא פעיל. כשהמארגן יתחיל, המשימה הראשונה תגיע לכאן.\n\nממשק המשחק: ${webAppUrl}`
-      : `The game is not active yet. The first mission will arrive here when the organizer starts it.\n\nWeb game: ${webAppUrl}`;
+  if (parsedCommand.command === "status") {
+    return formatWhatsappRunStatus({ context, resumeLink: webAppUrl });
   }
-  if (!checkpoint) {
-    return isHebrew
-      ? `המסלול הושלם.\n\nלוח התוצאות: ${webAppUrl}`
-      : `The route is complete.\n\nResults: ${webAppUrl}`;
+  if (!isWhatsappContextPlayable(context) || !team || !checkpoint) {
+    return formatWhatsappRunStatus({ context, resumeLink: webAppUrl });
   }
 
-  const normalizedCommand = body.trim().toLocaleLowerCase("he-IL");
   if (
-    [
-      "mission",
-      "/mission",
-      "status",
-      "/status",
-      "start",
-      "/start",
-      "משימה",
-      "סטטוס",
-      "התחל"
-    ].includes(normalizedCommand)
+    parsedCommand.command === "mission" ||
+    parsedCommand.command === "start"
   ) {
     return formatCheckpointMessage({
       contentValue: checkpoint.content,
@@ -116,7 +89,7 @@ export const handleWhatsappGameMessage = async ({
     });
   }
 
-  if (["hint", "/hint", "רמז", "עזרה"].includes(normalizedCommand)) {
+  if (parsedCommand.command === "hint") {
     const hints = asArray(checkpoint.hints);
     const { data: previousHints } = await supabase
       .from("game_events")

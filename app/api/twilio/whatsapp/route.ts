@@ -29,12 +29,21 @@ const errorMessage = (error: unknown) =>
       : "";
 
 const isExpectedGameState = (error: unknown) =>
-  /location_verification_required|team_not_active|no active checkpoint|checkpoint_locked/i.test(
+  /location_verification_required|team_not_active|no active checkpoint|checkpoint_locked|ambiguous_whatsapp_context/i.test(
     errorMessage(error)
   );
 
 const whatsappErrorMessage = (error: unknown) => {
   const message = errorMessage(error);
+  const ambiguity = message.match(
+    /ambiguous_whatsapp_context:([A-Z0-9]+(?:,[A-Z0-9]+)*)/i
+  );
+
+  if (ambiguity) {
+    const codes = ambiguity[1].split(",").join(", ");
+    const example = ambiguity[1].split(",")[0];
+    return `נמצאו כמה משחקים חיים למספר הזה: ${codes}. שלחו “סטטוס קוד” כדי לבחור, למשל: סטטוס ${example}.\n\nMultiple live games were found for this number. Send “status CODE” to choose, for example: status ${example}.`;
+  }
 
   if (/location_verification_required/i.test(message)) {
     return `לפני שליחת תשובה, פתחו את אתר המשחק ולחצו על ‘אימות מיקום’. לאחר שהמיקום יאושר, שלחו את התשובה שוב.\n${publicEnv.appUrl}/resume\n\nBefore answering, open the game site and verify your location, then send the answer again.`;
