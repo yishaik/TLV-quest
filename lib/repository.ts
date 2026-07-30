@@ -770,8 +770,12 @@ export const getOrganizerRun = async (organizerToken: string) => {
     .single();
   if (error || !run) throw new Error("Organizer link is invalid or expired");
 
-  const [{ data: teams }, { data: participants }, { data: checkpoints }] =
-    await Promise.all([
+  const [
+    { data: teams, error: teamsError },
+    { data: participants, error: participantsError },
+    { data: checkpoints, error: checkpointsError },
+    { data: deliveryRows, error: deliveryError }
+  ] = await Promise.all([
       supabase
         .from("teams")
         .select("id,public_name,status,score,completed_count,last_progress_at")
@@ -785,14 +789,29 @@ export const getOrganizerRun = async (organizerToken: string) => {
         .from("run_checkpoints")
         .select("slug,sequence_no,kind,is_disabled")
         .eq("run_id", run.id)
-        .order("sequence_no")
+        .order("sequence_no"),
+      supabase.rpc("get_outbox_status_counts", { p_run_id: run.id })
     ]);
+  if (teamsError) throw teamsError;
+  if (participantsError) throw participantsError;
+  if (checkpointsError) throw checkpointsError;
+  if (deliveryError) throw deliveryError;
+
+  const rawDelivery = Array.isArray(deliveryRows) ? deliveryRows[0] : null;
+  const delivery = {
+    queued: Number(rawDelivery?.queued ?? 0),
+    processing: Number(rawDelivery?.processing ?? 0),
+    sent: Number(rawDelivery?.sent ?? 0),
+    delivered: Number(rawDelivery?.delivered ?? 0),
+    failed: Number(rawDelivery?.failed ?? 0)
+  };
 
   return {
     run,
     teams: teams ?? [],
     participants: participants ?? [],
     checkpoints: checkpoints ?? [],
+    delivery,
     joinUrl: `${publicEnv.appUrl}/join/${run.public_code}`,
     liveUrl: `${publicEnv.appUrl}/live/${run.public_code}`
   };

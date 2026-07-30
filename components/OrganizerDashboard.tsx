@@ -30,6 +30,13 @@ type OrganizerData = {
     kind: string;
     is_disabled: boolean;
   }>;
+  delivery: {
+    queued: number;
+    processing: number;
+    sent: number;
+    delivered: number;
+    failed: number;
+  };
   joinUrl: string;
   liveUrl: string;
 };
@@ -73,7 +80,10 @@ export function OrganizerDashboard({ token }: { token: string }) {
     };
   }, [refresh]);
 
-  async function control(action: string, extra: Record<string, unknown> = {}) {
+  async function control(
+    action: string,
+    extra: Record<string, unknown> = {}
+  ): Promise<Record<string, unknown> | null> {
     setBusy(true);
     setError("");
     setNotice("");
@@ -90,10 +100,25 @@ export function OrganizerDashboard({ token }: { token: string }) {
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Action failed");
       }
-      setNotice("הפעולה בוצעה.");
+      const result = payload.data as Record<string, unknown>;
+      const delivery =
+        result.delivery &&
+        typeof result.delivery === "object" &&
+        !Array.isArray(result.delivery)
+          ? (result.delivery as Record<string, unknown>)
+          : null;
+      if (action === "broadcast" && delivery) {
+        setNotice(
+          `ההודעה נכנסה לתור עבור ${Number(delivery.queued ?? 0)} משתתפים. הסטטוס יתעדכן אוטומטית.`
+        );
+      } else {
+        setNotice("הפעולה בוצעה.");
+      }
       await refresh();
+      return result;
     } catch (errorValue) {
       setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
+      return null;
     } finally {
       setBusy(false);
     }
@@ -121,11 +146,12 @@ export function OrganizerDashboard({ token }: { token: string }) {
 
   async function broadcast(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const message = String(form.get("message") ?? "").trim();
     if (!message) return;
-    await control("broadcast", { message });
-    event.currentTarget.reset();
+    const result = await control("broadcast", { message });
+    if (result) formElement.reset();
   }
 
   if (loading) {
@@ -207,6 +233,28 @@ export function OrganizerDashboard({ token }: { token: string }) {
           </div>
           <button className="button button-dark" disabled={busy}>שליחה דרך ה־outbox</button>
         </form>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+            gap: 10,
+            marginTop: 18
+          }}
+          aria-label="סטטוס משלוחי הודעות"
+        >
+          {[
+            ["בתור", data.delivery.queued],
+            ["בעיבוד", data.delivery.processing],
+            ["נשלחו", data.delivery.sent],
+            ["נמסרו", data.delivery.delivered],
+            ["נכשלו", data.delivery.failed]
+          ].map(([label, value]) => (
+            <div className="metric" key={String(label)}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="card" style={{ marginTop: 20 }}>

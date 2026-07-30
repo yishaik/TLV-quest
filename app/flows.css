@@ -82,6 +82,7 @@
 .preset-card h3, .choice-card h3 { margin: 20px 0 7px; font-family: Georgia, serif; font-size: 1.45rem; font-weight: 500; }
 .preset-card p, .choice-card p { margin: 0; color: rgba(255,255,255,.48); font-size: .8rem; }
 .wizard-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 24px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.12); }
+.wizard-summary.delivery-summary { grid-template-columns: repeat(5, 1fr); }
 .wizard-summary > div { padding: 20px; background: #0a1b29; }
 .wizard-summary span { color: rgba(255,255,255,.42); font-size: .66rem; }
 .wizard-summary strong { display: block; margin-top: 8px; color: #f4d68d; }
@@ -159,6 +160,7 @@
   .preset-grid, .choice-grid { grid-template-columns: 1fr; }
   .link-pack { grid-template-columns: 1fr; }
   .control-metrics { grid-template-columns: repeat(2, 1fr); }
+  .wizard-summary.delivery-summary { grid-template-columns: repeat(2, 1fr); }
   .control-header, .race-header { align-items: start; flex-direction: column; }
   .status-orb { width: 86px; height: 86px; }
   .team-control-row { grid-template-columns: 1fr 1fr; }
@@ -175,6 +177,7 @@
   .join-success-hero { padding: 36px 18px; }
   .join-success-grid article { padding: 24px 18px; }
   .wizard-summary { grid-template-columns: 1fr; }
+  .wizard-summary.delivery-summary { grid-template-columns: 1fr; }
   .wizard-nav { flex-direction: column-reverse; }
   .wizard-nav .button { width: 100%; }
   .control-metrics { grid-template-columns: 1fr 1fr; }
