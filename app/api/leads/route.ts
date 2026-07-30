@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import { AppError, handleRouteError, jsonOk, readJson } from "@/lib/http";
 import { enforceIpRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -11,7 +11,13 @@ export async function POST(request: Request) {
   try {
     await enforceIpRateLimit("leads", request);
     const contentLength = Number(request.headers.get("content-length") ?? "0");
-    if (contentLength > 12_000) throw new Error("Request is too large");
+    if (contentLength > 12_000) {
+      throw new AppError({
+        message: "הבקשה גדולה מדי. / Request is too large.",
+        status: 413,
+        code: "request_too_large"
+      });
+    }
 
     const body = await readJson<Record<string, unknown>>(request);
     if (text(body.website, 200)) return jsonOk({ accepted: true });
@@ -33,9 +39,23 @@ export async function POST(request: Request) {
         ? body.estimatedParticipants
         : null;
 
-    if (name.length < 2) throw new Error(locale === "he" ? "יש להזין שם מלא" : "Please enter your name");
+    if (name.length < 2) {
+      throw new AppError({
+        message:
+          locale === "he" ? "יש להזין שם מלא" : "Please enter your name",
+        status: 400,
+        code: "invalid_name"
+      });
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error(locale === "he" ? "כתובת האימייל אינה תקינה" : "Please enter a valid email address");
+      throw new AppError({
+        message:
+          locale === "he"
+            ? "כתובת האימייל אינה תקינה"
+            : "Please enter a valid email address",
+        status: 400,
+        code: "invalid_email"
+      });
     }
 
     const supabase = createAdminClient();

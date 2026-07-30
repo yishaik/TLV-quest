@@ -15,3 +15,6 @@ read-receipt side effect and the long-running photo strategy, are in
 The Supabase browser-role allowlist, Realtime isolation model, credential
 handling, and production probe are documented in
 `docs/security-access-model.md`.
+
+The public API error contract, safe `AppError` usage, and correlation-ID
+workflow are documented in `docs/error-handling.md`.
