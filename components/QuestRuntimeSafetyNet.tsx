@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { useQuestRealtime } from "@/components/QuestRealtimeProvider";
 import styles from "./QuestRuntimeSafetyNet.module.css";
 
 type Locale = "he" | "en";
@@ -37,62 +38,12 @@ const hasFallbackAnswers = (fallback: Record<string, unknown> | null) =>
   );
 
 export function QuestRuntimeSafetyNet({ token }: { token: string }) {
-  const [state, setState] = useState<RuntimeState | null>(null);
+  const { state: realtimeState, refresh } = useQuestRealtime();
+  const state = realtimeState as RuntimeState | null;
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const checkpointSlugRef = useRef("");
-
-  const refresh = useCallback(async () => {
-    const response = await fetch(
-      `/api/participants/${encodeURIComponent(token)}/state`,
-      { cache: "no-store" }
-    );
-    const payload = await response.json();
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error?.message ?? "Failed to load runtime state");
-    }
-    const next = payload.data as RuntimeState;
-    const nextSlug = next.checkpoint?.slug ?? "";
-    if (checkpointSlugRef.current && checkpointSlugRef.current !== nextSlug) {
-      setAnswer("");
-      setMessage("");
-      setError("");
-    }
-    checkpointSlugRef.current = nextSlug;
-    setState(next);
-  }, [token]);
-
-  useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-    const run = async () => {
-      if (document.visibilityState === "hidden") return;
-      try {
-        await refresh();
-      } catch (cause) {
-        if (active) {
-          setError(cause instanceof Error ? cause.message : "Unexpected error");
-        }
-      }
-    };
-    const start = () => {
-      void run();
-      window.clearInterval(timer);
-      timer = window.setInterval(run, 5000);
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") start();
-    };
-    start();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [refresh]);
 
   const checkpoint = state?.checkpoint ?? null;
   const language = state?.participant.language ?? "he";
@@ -139,8 +90,12 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Skip failed");
       }
-      setMessage(isHebrew ? "התחנה דולגה. עוברים הלאה…" : "Checkpoint skipped. Moving on…");
-      window.setTimeout(() => window.location.reload(), 650);
+      setMessage(
+        isHebrew
+          ? "התחנה דולגה. עוברים הלאה…"
+          : "Checkpoint skipped. Moving on…"
+      );
+      window.setTimeout(() => void refresh(), 250);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unexpected error");
     } finally {
@@ -182,8 +137,12 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
       }
 
       setAnswer("");
-      setMessage(isHebrew ? "שאלת הגיבוי נפתרה. ממשיכים…" : "Fallback solved. Continuing…");
-      window.setTimeout(() => window.location.reload(), 650);
+      setMessage(
+        isHebrew
+          ? "שאלת הגיבוי נפתרה. ממשיכים…"
+          : "Fallback solved. Continuing…"
+      );
+      window.setTimeout(() => void refresh(), 250);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unexpected error");
     } finally {
@@ -227,7 +186,9 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
 
       {fallbackReady && (
         <section className={styles.fallback}>
-          <span className={styles.fallbackBadge}>{isHebrew ? "שאלת גיבוי" : "Fallback question"}</span>
+          <span className={styles.fallbackBadge}>
+            {isHebrew ? "שאלת גיבוי" : "Fallback question"}
+          </span>
           <strong>{fallbackPrompt}</strong>
           <form onSubmit={submitFallback}>
             <input
@@ -261,7 +222,13 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
             </small>
           </div>
           <button type="button" onClick={skipCheckpoint} disabled={busy === "skip"}>
-            {busy === "skip" ? (isHebrew ? "מדלג…" : "Skipping…") : isHebrew ? "דילוג" : "Skip"}
+            {busy === "skip"
+              ? isHebrew
+                ? "מדלג…"
+                : "Skipping…"
+              : isHebrew
+                ? "דילוג"
+                : "Skip"}
           </button>
         </section>
       )}
