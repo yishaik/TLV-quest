@@ -19,8 +19,10 @@ type ParticipantState = {
     sequenceNo: number;
     kind: string;
     content: Record<string, unknown>;
-    validation: Record<string, unknown>;
-    fallback: Record<string, unknown> | null;
+    validationType: string;
+    choiceOptions: string[];
+    hasFallback: boolean;
+    fallbackPrompt: string | null;
     latitude: number | null;
     longitude: number | null;
     radiusMeters: number | null;
@@ -63,8 +65,8 @@ const statusCopy = (status: string, he: boolean) => {
 const validationOptions = (
   checkpoint: NonNullable<ParticipantState["checkpoint"]>
 ) =>
-  Array.isArray(checkpoint.validation.options)
-    ? checkpoint.validation.options.filter(
+  Array.isArray(checkpoint.choiceOptions)
+    ? checkpoint.choiceOptions.filter(
         (option): option is string => typeof option === "string" && Boolean(option.trim())
       )
     : [];
@@ -275,10 +277,10 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
         setPhoto(null);
         window.setTimeout(() => void refresh(), 850);
       } else {
-        const fallback = payload.data.fallback;
         const fallbackText =
-          fallback && typeof fallback[language] === "string"
-            ? fallback[language]
+          typeof payload.data.fallbackPrompt === "string" &&
+          payload.data.fallbackPrompt.trim()
+            ? payload.data.fallbackPrompt
             : isHebrew
               ? "לא הצלחנו לזהות את הרגע. נסו צילום נוסף או השתמשו בשאלת הגיבוי."
               : "We could not verify the moment. Try another photo or use the fallback question.";

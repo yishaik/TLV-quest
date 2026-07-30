@@ -25,7 +25,6 @@ type ParticipantState = {
     sequenceNo: number;
     kind: string;
     content: Record<string, unknown>;
-    fallback: Record<string, unknown> | null;
     latitude: number | null;
     longitude: number | null;
     radiusMeters: number | null;
@@ -257,10 +256,10 @@ export function QuestPlayer({ token }: { token: string }) {
         setPhoto(null);
         await loadState();
       } else {
-        const fallback = payload.data.fallback;
         const fallbackText =
-          fallback && typeof fallback[language] === "string"
-            ? fallback[language]
+          typeof payload.data.fallbackPrompt === "string" &&
+          payload.data.fallbackPrompt.trim()
+            ? payload.data.fallbackPrompt
             : isHebrew
               ? "לא ניתן לאמת את התמונה. השתמשו בשאלת הגיבוי."
               : "The photo could not be verified. Use the fallback question.";
