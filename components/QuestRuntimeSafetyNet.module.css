@@ -1,0 +1,154 @@
+.panel {
+  position: fixed;
+  z-index: 45;
+  right: 16px;
+  bottom: 92px;
+  width: min(560px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(230, 195, 115, 0.28);
+  border-radius: 18px;
+  background: rgba(10, 17, 25, 0.94);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(18px);
+}
+
+.step,
+.optional,
+.fallback {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.step > div,
+.optional > div {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+
+.step strong,
+.optional strong,
+.fallback strong {
+  color: #f7f1df;
+  font-size: 0.95rem;
+}
+
+.step small,
+.optional small {
+  color: rgba(247, 241, 223, 0.7);
+  line-height: 1.4;
+}
+
+.pendingBadge,
+.goodBadge,
+.fallbackBadge {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pendingBadge {
+  color: #ffdca0;
+  background: rgba(205, 138, 44, 0.16);
+  border: 1px solid rgba(237, 180, 86, 0.28);
+}
+
+.goodBadge {
+  color: #b8f1cf;
+  background: rgba(53, 166, 104, 0.15);
+  border: 1px solid rgba(83, 196, 132, 0.28);
+}
+
+.fallback {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.fallbackBadge {
+  width: fit-content;
+  color: #cbd9ff;
+  background: rgba(83, 113, 204, 0.16);
+  border: 1px solid rgba(118, 145, 230, 0.28);
+}
+
+.fallback form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.fallback input {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.fallback button,
+.optional button {
+  border: 1px solid rgba(230, 195, 115, 0.32);
+  border-radius: 11px;
+  padding: 10px 13px;
+  color: #19140b;
+  font-weight: 800;
+  background: linear-gradient(135deg, #f5dfa1, #d7ad58);
+  cursor: pointer;
+}
+
+.fallback button:disabled,
+.optional button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.success,
+.error {
+  padding: 9px 11px;
+  border-radius: 11px;
+  font-size: 0.88rem;
+}
+
+.success {
+  color: #b8f1cf;
+  background: rgba(53, 166, 104, 0.14);
+}
+
+.error {
+  color: #ffd0c9;
+  background: rgba(190, 69, 53, 0.16);
+}
+
+@media (max-width: 620px) {
+  .panel {
+    right: 10px;
+    bottom: 82px;
+    width: calc(100vw - 20px);
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .step,
+  .optional {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .optional button {
+    width: 100%;
+  }
+
+  .fallback form {
+    grid-template-columns: 1fr;
+  }
+}
