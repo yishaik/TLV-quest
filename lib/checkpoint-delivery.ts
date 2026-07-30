@@ -1,62 +1,21 @@
 import "server-only";
 
+import {
+  formatCheckpointMessage,
+  formatCheckpointSkipMessage,
+  type CheckpointMessageLocale
+} from "@/lib/checkpoint-messages";
 import { decryptPii } from "@/lib/crypto";
 import { publicEnv } from "@/lib/env";
 import { participantResumeUrl } from "@/lib/participant-resume";
 import { sendWhatsapp } from "@/lib/providers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type JsonRecord = Record<string, unknown>;
-type Locale = "he" | "en";
-
-const asObject = (value: unknown): JsonRecord =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : {};
-
-const text = (value: unknown): string => (typeof value === "string" ? value : "");
+type Locale = CheckpointMessageLocale;
 
 export const resumeUrl = `${publicEnv.appUrl}/resume`;
 
-export const formatCheckpointMessage = ({
-  contentValue,
-  locale,
-  sequenceNo,
-  resumeLink = resumeUrl
-}: {
-  contentValue: unknown;
-  locale: Locale;
-  sequenceNo?: number | null;
-  resumeLink?: string;
-}): string => {
-  const content = asObject(contentValue);
-  const localized = asObject(content[locale]);
-  const title = text(localized.title);
-  const story = text(localized.story);
-  const prompt = text(localized.prompt);
-  const locationHint = text(localized.locationHint);
-  const stationLabel = sequenceNo
-    ? locale === "he"
-      ? `🧭 תחנה ${sequenceNo}${title ? ` — ${title}` : ""}`
-      : `🧭 Checkpoint ${sequenceNo}${title ? ` — ${title}` : ""}`
-    : title;
-  const taskLabel = locale === "he" ? "המשימה:" : "Your mission:";
-  const locationLabel = locale === "he" ? "📍 איפה:" : "📍 Where:";
-  const appLabel =
-    locale === "he"
-      ? `למפה, ניקוד והמשך המשחק:\n${resumeLink}`
-      : `Open the map, score and web game:\n${resumeLink}`;
-
-  return [
-    stationLabel,
-    story,
-    prompt ? `${taskLabel}\n${prompt}` : "",
-    locationHint ? `${locationLabel} ${locationHint}` : "",
-    appLabel
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-};
+export { formatCheckpointMessage, formatCheckpointSkipMessage };
 
 export const getCheckpointMessage = async ({
   runId,

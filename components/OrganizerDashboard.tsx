@@ -92,7 +92,10 @@ export function OrganizerDashboard({ token }: { token: string }) {
         `/api/organizer/${encodeURIComponent(token)}/control`,
         {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": `web-organizer-${action}:${crypto.randomUUID()}`
+          },
           body: JSON.stringify({ action, ...extra })
         }
       );
@@ -107,10 +110,28 @@ export function OrganizerDashboard({ token }: { token: string }) {
         !Array.isArray(result.delivery)
           ? (result.delivery as Record<string, unknown>)
           : null;
+      const skip =
+        result.skip &&
+        typeof result.skip === "object" &&
+        !Array.isArray(result.skip)
+          ? (result.skip as Record<string, unknown>)
+          : null;
+      const skipFailures = Array.isArray(skip?.failures)
+        ? skip.failures
+        : [];
       if (action === "broadcast" && delivery) {
         setNotice(
           `ההודעה נכנסה לתור עבור ${Number(delivery.queued ?? 0)} משתתפים. הסטטוס יתעדכן אוטומטית.`
         );
+      } else if (action === "skip" && skip) {
+        setNotice(
+          `הדילוג הושלם עבור ${Number(skip.advanced ?? 0) + Number(skip.finished ?? 0)} צוותים, ו־${Number(skip.queued ?? 0)} הודעות נכנסו לתור.`
+        );
+        if (skipFailures.length) {
+          setError(
+            `הדילוג הושלם חלקית. ${skipFailures.length} צוותים לא עודכנו וניתן לנסות שוב בבטחה.`
+          );
+        }
       } else {
         setNotice("הפעולה בוצעה.");
       }

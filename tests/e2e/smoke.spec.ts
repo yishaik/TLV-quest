@@ -165,6 +165,141 @@ test("content operating system requires an authenticated admin session", async (
   await expect(page.getByRole("link", { name: "מעבר לכניסה" })).toHaveAttribute("href", "/admin");
 });
 
+test("optional checkpoint skip advances the web player and sends a stable action key", async ({
+  page
+}) => {
+  let skipped = false;
+  let skipCalls = 0;
+  const initialState = {
+    ...photoState,
+    run: { ...photoState.run, publicCode: "SKIP1" },
+    team: {
+      ...photoState.team,
+      name: "צוות דילוג",
+      completedCount: 1
+    },
+    checkpoint: {
+      ...photoState.checkpoint,
+      id: "66666666-6666-4666-8666-666666666666",
+      slug: "optional-checkpoint",
+      sequenceNo: 2,
+      kind: "text",
+      content: {
+        he: {
+          title: "תחנה אופציונלית",
+          story: "אפשר לבחור אם להמשיך.",
+          prompt: "מצאו את הסימן."
+        },
+        en: {
+          title: "Optional checkpoint",
+          story: "You may choose whether to continue.",
+          prompt: "Find the sign."
+        }
+      },
+      validationType: "text",
+      hasFallback: false,
+      fallbackPrompt: null,
+      isOptional: true,
+      photoFallbackAvailable: false
+    }
+  };
+  const advancedState = {
+    ...initialState,
+    team: { ...initialState.team, completedCount: 2 },
+    checkpoint: {
+      ...initialState.checkpoint,
+      id: "77777777-7777-4777-8777-777777777777",
+      slug: "after-skip",
+      sequenceNo: 3,
+      content: {
+        he: {
+          title: "התחנה הבאה",
+          story: "הקבוצה המשיכה יחד.",
+          prompt: "המשיכו אל המגדל."
+        },
+        en: {
+          title: "Next checkpoint",
+          story: "The team continued together.",
+          prompt: "Continue to the tower."
+        }
+      },
+      isOptional: false
+    }
+  };
+
+  await page.route(
+    "**/api/participants/optional-skip-e2e/state",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          data: skipped ? advancedState : initialState
+        })
+      });
+    }
+  );
+  await page.route(
+    "**/api/participants/optional-skip-e2e/skip",
+    async (route) => {
+      skipCalls += 1;
+      expect(route.request().headers()["idempotency-key"]).toMatch(
+        /^web-optional-skip:optional-checkpoint:/
+      );
+      skipped = true;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          data: {
+            skipped: true,
+            transition: {
+              duplicate: false,
+              outcome: "advanced",
+              previousCheckpointSlug: "optional-checkpoint",
+              nextCheckpointSlug: "after-skip"
+            },
+            delivery: { queued: 1 }
+          }
+        })
+      });
+    }
+  );
+  await page.route("**/api/leaderboard/SKIP1", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, data: [] })
+    });
+  });
+  await page.route(
+    "**/api/participants/optional-skip-e2e/realtime-auth",
+    async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: false,
+          error: { message: "Realtime disabled in skip test" }
+        })
+      });
+    }
+  );
+
+  page.on("dialog", (dialog) => void dialog.accept());
+  await page.goto("/play/optional-skip-e2e");
+  await expect(
+    page.getByRole("heading", { name: "תחנה אופציונלית" })
+  ).toBeVisible();
+  await page.getByRole("button", { name: "דילוג", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "התחנה הבאה" })
+  ).toBeVisible();
+  expect(skipCalls).toBe(1);
+});
+
 for (const scenario of [
   { label: "small", size: 128 * 1024 },
   { label: "5 MB", size: 5 * 1024 * 1024 }

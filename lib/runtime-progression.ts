@@ -1,7 +1,17 @@
 import "server-only";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { hashSecret } from "@/lib/crypto";
+import { skipCheckpointForTeam } from "@/lib/checkpoint-skip";
 import { getParticipantState } from "@/lib/repository";
+
+const normalizedSkipKey = (value: string): string => {
+  const candidate = value.trim();
+  return candidate.length >= 12 &&
+    candidate.length <= 240 &&
+    /^[a-zA-Z0-9:_-]+$/.test(candidate)
+    ? candidate
+    : `participant-skip:${hashSecret(candidate)}`;
+};
 
 export const skipOptionalCheckpoint = async ({
   token,
@@ -14,18 +24,24 @@ export const skipOptionalCheckpoint = async ({
   if (state.run.status !== "active") throw new Error("Game is not active");
   if (!state.checkpoint) throw new Error("No active checkpoint");
 
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.rpc("skip_optional_checkpoint", {
-    p_team_id: state.team.id,
-    p_participant_id: state.participant.id,
-    p_checkpoint_id: state.checkpoint.id,
-    p_idempotency_key: idempotencyKey
+  const transition = await skipCheckpointForTeam({
+    teamId: state.team.id,
+    actor: {
+      type: "participant",
+      participantId: state.participant.id
+    },
+    reason: "participant_optional_skip",
+    requireOptional: true,
+    idempotencyKey: normalizedSkipKey(idempotencyKey)
   });
-  if (error) throw error;
 
   return {
     skipped: true,
     checkpointSlug: state.checkpoint.slug,
-    result: data
+    transition,
+    delivery: {
+      queued: transition.queued,
+      outboxIds: transition.outboxIds
+    }
   };
 };
