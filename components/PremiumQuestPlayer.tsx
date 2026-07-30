@@ -3,6 +3,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useQuestRealtime } from "@/components/QuestRealtimeProvider";
 import { uploadParticipantPhoto } from "@/lib/photo-upload-client";
+import {
+  announcePhotoApproved,
+  announcePhotoRetry
+} from "@/lib/quest-runtime-events";
 import { readRetryAfterSeconds } from "@/lib/rate-limit-client";
 
 type Locale = "he" | "en";
@@ -268,6 +272,8 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
   async function submitPhoto(event: FormEvent) {
     event.preventDefault();
     if (!photo) return;
+    const checkpointSlug = state?.checkpoint?.slug;
+    if (!checkpointSlug) return;
     setBusy(true);
     setError("");
     setMessage("");
@@ -278,6 +284,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
         locale: language
       });
       if (result.approved) {
+        announcePhotoApproved(checkpointSlug);
         setMessage(
           mission?.success ||
             (isHebrew
@@ -295,6 +302,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
               ? "לא הצלחנו לזהות את הרגע. נסו צילום נוסף או השתמשו בשאלת הגיבוי."
               : "We could not verify the moment. Try another photo or use the fallback question.";
         setError(fallbackText);
+        window.setTimeout(() => void refresh(), 100);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unexpected error");
@@ -426,6 +434,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
 
           {needsLocation && (
             <button
+              id="quest-location-verify"
               className={`location-signal ${locationVerified ? "verified" : ""}`}
               type="button"
               disabled={busy || locationVerified}
@@ -456,7 +465,16 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   capture="environment"
-                  onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+                  onClick={() =>
+                    announcePhotoRetry(state.checkpoint!.slug)
+                  }
+                  onChange={(event) => {
+                    const selected = event.target.files?.[0] ?? null;
+                    setPhoto(selected);
+                    if (selected) {
+                      announcePhotoRetry(state.checkpoint!.slug);
+                    }
+                  }}
                 />
                 <span>＋</span>
                 <strong>
