@@ -14,6 +14,9 @@ export async function GET(
     await enforceParticipantRateLimit("participantState", token);
     return jsonOk(await getParticipantExperienceState(token));
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "participant.state"
+    });
   }
 }

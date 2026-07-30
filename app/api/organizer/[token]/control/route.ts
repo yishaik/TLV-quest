@@ -286,6 +286,9 @@ export async function POST(
       { status: skip?.failures.length ? 207 : 200 }
     );
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "organizer.control"
+    });
   }
 }

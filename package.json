@@ -15,6 +15,7 @@
     "test:e2e": "playwright test",
     "test:load": "node scripts/quest-load-test.mjs",
     "test:rls-remote": "node scripts/verify-supabase-public-access.mjs",
+    "verify:sentry-production": "node scripts/verify-sentry-production.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "check": "npm run lint && npm run test && npm run build"
   },

@@ -12,6 +12,9 @@ export async function GET(
     const { code } = await context.params;
     return jsonOk(await getLeaderboard(code));
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "leaderboard.state"
+    });
   }
 }

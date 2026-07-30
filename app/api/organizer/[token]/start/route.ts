@@ -27,6 +27,9 @@ export async function POST(
 
     return jsonOk({ ...started, delivery });
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "organizer.start"
+    });
   }
 }

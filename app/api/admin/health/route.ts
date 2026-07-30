@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/admin-auth";
 import { handleRouteError, jsonOk } from "@/lib/http";
+import { sentryRuntimeStatus } from "@/lib/sentry-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
     return jsonOk({
       admin: email,
       checkedAt: now,
+      observability: sentryRuntimeStatus(process.env),
       summary: {
         failedMessages: failedOutbox.count ?? 0,
         delayedMessages: pendingOutbox.count ?? 0,

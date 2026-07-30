@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { getServerEnv, publicEnv } from "@/lib/env";
+import { reportOperationalError } from "@/lib/observability";
 import { participantResumeUrl } from "@/lib/participant-resume";
 import { linkWhatsappParticipant } from "@/lib/repository";
 import { handleWhatsappGameMessage } from "@/lib/whatsapp-game";
@@ -72,6 +73,11 @@ const deliverWhatsappPhotoAfterResponse = async ({
       messageSid
     });
   } catch (error) {
+    reportOperationalError(error, {
+      errorCode: "whatsapp_photo_processing_failed",
+      operationalScope: "live_run",
+      route: "twilio.whatsapp.photo_processing"
+    });
     console.error("whatsapp.photo_processing", {
       outcome: "failed",
       code: errorMessage(error)
@@ -85,6 +91,11 @@ const deliverWhatsappPhotoAfterResponse = async ({
       outcome: result.status
     });
   } catch (error) {
+    reportOperationalError(error, {
+      errorCode: "whatsapp_async_response_failed",
+      operationalScope: "live_run",
+      route: "twilio.whatsapp.async_response"
+    });
     console.error("whatsapp.photo_async_response", {
       outcome: "failed",
       code: errorMessage(error)
@@ -164,6 +175,11 @@ export async function POST(request: Request) {
     if (isExpectedGameState(error)) {
       console.info("WhatsApp guided game state", { code: errorMessage(error), messageSid });
     } else {
+      reportOperationalError(error, {
+        errorCode: "whatsapp_webhook_failed",
+        operationalScope: "live_run",
+        route: "twilio.whatsapp"
+      });
       console.error("Twilio webhook failed", error);
     }
     return whatsappTwiml(whatsappErrorMessage(error));

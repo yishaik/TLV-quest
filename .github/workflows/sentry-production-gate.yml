@@ -1,0 +1,33 @@
+name: Sentry production gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Production Vercel Git commit SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      SENTRY_RELEASE: ${{ inputs.release }}
+      SENTRY_ALERT_NAME: TLV Quest live-run 5xx
+      SENTRY_MONITOR_SLUG: tlv-quest-maintenance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify release, production deploy, alert and monitor
+        run: npm run verify:sentry-production

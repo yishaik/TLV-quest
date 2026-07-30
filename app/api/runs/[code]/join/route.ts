@@ -27,6 +27,9 @@ export async function POST(
     });
     return jsonOk(result, { status: 201 });
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "run.join"
+    });
   }
 }

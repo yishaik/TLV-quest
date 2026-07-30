@@ -27,6 +27,9 @@ export async function POST(
       })
     );
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "participant.photo_upload"
+    });
   }
 }

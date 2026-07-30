@@ -37,6 +37,9 @@ export async function POST(
 
     return jsonOk(finalized.result);
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "participant.photo_finalize"
+    });
   }
 }

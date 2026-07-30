@@ -38,6 +38,9 @@ export async function POST(
 
     return jsonOk(result);
   } catch (error) {
-    return handleRouteError(error);
+    return handleRouteError(error, {
+      operationalScope: "live_run",
+      route: "participant.answer"
+    });
   }
 }
