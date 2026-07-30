@@ -17,6 +17,14 @@ export type QuestActivityEntry = {
   createdAt: string;
 };
 
+export type QuestPresenceDevice = {
+  participantId: string;
+  deviceId: string;
+  visible: boolean;
+  onlineAt: string;
+  expiresAt: string;
+};
+
 export type QuestPresenceMember = {
   participantId: string;
   firstName: string;
@@ -55,6 +63,7 @@ export type QuestParticipantState = {
   };
   members: Array<{ id: string; firstName: string }>;
   activity: QuestActivityEntry[];
+  presence: QuestPresenceDevice[];
   checkpoint: null | {
     id: string;
     slug: string;
