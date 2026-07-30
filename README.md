@@ -18,3 +18,6 @@ handling, and production probe are documented in
 
 The public API error contract, safe `AppError` usage, and correlation-ID
 workflow are documented in `docs/error-handling.md`.
+
+The production audit gate, Dependabot policy, and reviewed transitive
+dependency overrides are documented in `docs/dependency-security.md`.
