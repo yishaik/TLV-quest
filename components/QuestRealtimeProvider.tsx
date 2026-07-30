@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getQuestRealtimeClient } from "@/lib/supabase/quest-realtime-browser";
 import type {
   QuestConnectionState,
@@ -102,10 +103,10 @@ export function QuestRealtimeProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [authExpiresAt, setAuthExpiresAt] = useState<number | null>(null);
   const stateRefreshTimer = useRef<number | undefined>(undefined);
   const boardRefreshTimer = useRef<number | undefined>(undefined);
   const staleTimer = useRef<number | undefined>(undefined);
-  const authRenewalTimer = useRef<number | undefined>(undefined);
   const stateRequest = useRef<Promise<QuestParticipantState> | null>(null);
   const boardRequest = useRef<Promise<void> | null>(null);
   const authRequest = useRef<Promise<RealtimeAccess> | null>(null);
@@ -224,20 +225,7 @@ export function QuestRealtimeProvider({
         const client = getQuestRealtimeClient();
         await client.realtime.setAuth(access.accessToken);
         accessRef.current = access;
-
-        window.clearTimeout(authRenewalTimer.current);
-        const renewalDelay = Math.max(
-          10_000,
-          access.expiresAt - Date.now() - AUTH_RENEWAL_MARGIN_MS
-        );
-        authRenewalTimer.current = window.setTimeout(() => {
-          void issueRealtimeAccess(true).catch((cause) => {
-            setError(
-              cause instanceof Error ? cause.message : "Realtime authentication failed"
-            );
-          });
-        }, renewalDelay);
-
+        setAuthExpiresAt(access.expiresAt);
         return access;
       })();
 
@@ -250,6 +238,23 @@ export function QuestRealtimeProvider({
     },
     [token]
   );
+
+  useEffect(() => {
+    if (!authExpiresAt) return;
+    const renewalDelay = Math.max(
+      10_000,
+      authExpiresAt - Date.now() - AUTH_RENEWAL_MARGIN_MS
+    );
+    const timer = window.setTimeout(() => {
+      accessRef.current = null;
+      void issueRealtimeAccess(true).catch((cause) => {
+        setError(
+          cause instanceof Error ? cause.message : "Realtime authentication failed"
+        );
+      });
+    }, renewalDelay);
+    return () => window.clearTimeout(timer);
+  }, [authExpiresAt, issueRealtimeAccess]);
 
   useEffect(() => {
     localStorage.setItem("tlvQuestParticipantToken", token);
@@ -276,27 +281,30 @@ export function QuestRealtimeProvider({
       window.clearTimeout(stateRefreshTimer.current);
       window.clearTimeout(boardRefreshTimer.current);
       window.clearTimeout(staleTimer.current);
-      window.clearTimeout(authRenewalTimer.current);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
   }, [refresh, token]);
 
+  const teamTopic = state?.realtime.teamTopic;
+  const runTopic = state?.realtime.runTopic;
+  const runCode = state?.run.publicCode;
+  const participantId = state?.participant.id;
+  const participantName = state?.participant.firstName;
+
   useEffect(() => {
-    const teamTopic = state?.realtime.teamTopic;
-    const runTopic = state?.realtime.runTopic;
-    const code = state?.run.publicCode;
-    const participant = state?.participant;
-    if (!teamTopic || !runTopic || !code || !participant) return;
+    if (!teamTopic || !runTopic || !runCode || !participantId || !participantName) {
+      return;
+    }
 
     let active = true;
     const client = getQuestRealtimeClient();
     const deviceId = getDeviceId();
     const statuses = new Map<string, boolean>();
-    let teamChannel: ReturnType<typeof client.channel> | null = null;
-    let runChannel: ReturnType<typeof client.channel> | null = null;
-    let boardChannel: ReturnType<typeof client.channel> | null = null;
+    let teamChannel: RealtimeChannel | null = null;
+    let runChannel: RealtimeChannel | null = null;
+    let boardChannel: RealtimeChannel | null = null;
 
     const updateStatus = (name: string, status: string) => {
       if (!active) return;
@@ -324,8 +332,8 @@ export function QuestRealtimeProvider({
     const trackPresence = () => {
       if (!teamChannel) return;
       void teamChannel.track({
-        participantId: participant.id,
-        firstName: participant.firstName,
+        participantId,
+        firstName: participantName,
         deviceId,
         visible: document.visibilityState === "visible",
         onlineAt: new Date().toISOString()
@@ -365,16 +373,16 @@ export function QuestRealtimeProvider({
         .subscribe((status) => updateStatus("run", status));
 
       boardChannel = client
-        .channel(`quest-board:${code}`)
+        .channel(`quest-board:${runCode}`)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "leaderboard_entries",
-            filter: `run_public_code=eq.${code}`
+            filter: `run_public_code=eq.${runCode}`
           },
-          () => scheduleBoardRefresh(code)
+          () => scheduleBoardRefresh(runCode)
         )
         .subscribe((status) => updateStatus("board", status));
 
@@ -391,20 +399,20 @@ export function QuestRealtimeProvider({
     return () => {
       active = false;
       document.removeEventListener("visibilitychange", onVisibility);
-      setPresence([]);
       if (teamChannel) void client.removeChannel(teamChannel);
       if (runChannel) void client.removeChannel(runChannel);
       if (boardChannel) void client.removeChannel(boardChannel);
     };
   }, [
     issueRealtimeAccess,
+    participantId,
+    participantName,
+    runCode,
+    runTopic,
     scheduleBoardRefresh,
     scheduleStateRefresh,
     scheduleStaleState,
-    state?.participant,
-    state?.realtime.runTopic,
-    state?.realtime.teamTopic,
-    state?.run.publicCode
+    teamTopic
   ]);
 
   const value = useMemo<QuestRealtimeContextValue>(
