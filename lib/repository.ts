@@ -19,6 +19,10 @@ import {
   type TextValidation
 } from "@/lib/game-engine";
 import { publicEnv } from "@/lib/env";
+import {
+  adjustScoreForDifficulty,
+  evaluateDifficulty
+} from "@/lib/difficulty";
 
 const TEMPLATE_SLUG = "tel-aviv-port-time-capsule";
 const DEFAULT_TEAM_SIZE = 4;
@@ -91,11 +95,15 @@ export type ParticipantState = {
   };
   run: {
     id: string;
+    templateId: string;
+    templateVersion: number;
+    tenantId: string;
     publicCode: string;
     status: string;
     routeMode: string;
     scoringMode: string;
     scheduledAt: string | null;
+    settings: UnknownRecord;
   };
   team: {
     id: string;
@@ -108,6 +116,7 @@ export type ParticipantState = {
     currentCheckpointSlug: string | null;
     startedAt: string | null;
     lastProgressAt: string | null;
+    routeState: UnknownRecord;
   };
   members: Array<{ id: string; firstName: string }>;
   checkpoint: null | {
@@ -163,7 +172,7 @@ export const createRun = async (input: CreateRunInput) => {
   const supabase = createAdminClient();
   const { data: template, error: templateError } = await supabase
     .from("game_templates")
-    .select("id,active_version")
+    .select("id,tenant_id,active_version")
     .eq("slug", TEMPLATE_SLUG)
     .eq("is_active", true)
     .single();
@@ -206,6 +215,7 @@ export const createRun = async (input: CreateRunInput) => {
     .from("game_runs")
     .insert({
       template_id: template.id,
+      tenant_id: template.tenant_id,
       template_version: template.active_version,
       public_code: publicCode,
       organizer_token_hash: hashSecret(organizerToken),
@@ -558,11 +568,15 @@ export const getParticipantState = async (token: string): Promise<ParticipantSta
     },
     run: {
       id: run.id,
+      templateId: run.template_id,
+      templateVersion: run.template_version,
+      tenantId: run.tenant_id,
       publicCode: run.public_code,
       status: run.status,
       routeMode: run.route_mode,
       scoringMode: run.scoring_mode,
-      scheduledAt: run.scheduled_at
+      scheduledAt: run.scheduled_at,
+      settings: objectValue(run.settings)
     },
     team: {
       id: team.id,
@@ -574,7 +588,8 @@ export const getParticipantState = async (token: string): Promise<ParticipantSta
       hintsUsed: team.hints_used,
       currentCheckpointSlug: team.current_checkpoint_slug,
       startedAt: team.started_at,
-      lastProgressAt: team.last_progress_at
+      lastProgressAt: team.last_progress_at,
+      routeState: objectValue(team.route_state)
     },
     members: (memberRows ?? []).map((member) => ({
       id: member.id,
@@ -640,13 +655,24 @@ export const submitTextAnswer = async ({
     0,
     Math.floor((Date.now() - new Date(referenceTime).getTime()) / 1000)
   );
-  const scoreDelta = calculateScoreDelta({
-    correct: evaluation.correct,
+  const adaptiveSettings = objectValue(state.run.settings.adaptiveDifficulty);
+  const policy = evaluateDifficulty({
+    enabled: adaptiveSettings.enabled !== false,
     wrongAttempts: state.team.wrongAttempts,
     hintsUsed: state.team.hintsUsed,
-    elapsedSeconds,
-    scoring
+    completedCount: state.team.completedCount,
+    minutesSinceProgress: Math.floor(elapsedSeconds / 60)
   });
+  const scoreDelta = adjustScoreForDifficulty(
+    calculateScoreDelta({
+      correct: evaluation.correct,
+      wrongAttempts: state.team.wrongAttempts,
+      hintsUsed: state.team.hintsUsed,
+      elapsedSeconds,
+      scoring
+    }),
+    policy
+  );
 
   const supabase = createAdminClient();
   const { data: nextCheckpoint, error: nextError } = await supabase
@@ -667,7 +693,15 @@ export const submitTextAnswer = async ({
     p_checkpoint_id: state.checkpoint.id,
     p_submission_type: "text",
     p_normalized_answer: evaluation.normalizedAnswer,
-    p_payload: { rawLength: answer.length, reason: evaluation.reason },
+    p_payload: {
+      rawLength: answer.length,
+      reason: evaluation.reason,
+      adaptive_difficulty: {
+        level: policy.level,
+        reward_multiplier: policy.rewardMultiplier,
+        penalty_multiplier: policy.penaltyMultiplier
+      }
+    },
     p_is_correct: evaluation.correct,
     p_score_delta: scoreDelta,
     p_validation_reason: evaluation.reason,
@@ -706,6 +740,29 @@ export const requestHint = async ({
   const state = await getParticipantState(token);
   if (state.run.status !== "active" || !state.checkpoint) {
     throw new Error("No active checkpoint");
+  }
+  const hintReference =
+    state.team.lastProgressAt ?? state.team.startedAt ?? new Date().toISOString();
+  const inactiveSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(hintReference).getTime()) / 1000)
+  );
+  const adaptiveSettings = objectValue(state.run.settings.adaptiveDifficulty);
+  const policy = evaluateDifficulty({
+    enabled: adaptiveSettings.enabled !== false,
+    wrongAttempts: state.team.wrongAttempts,
+    hintsUsed: state.team.hintsUsed,
+    completedCount: state.team.completedCount,
+    minutesSinceProgress: Math.floor(inactiveSeconds / 60)
+  });
+  const hintDelaySeconds = policy.inactivityMinutesToUnlock * 60;
+  if (
+    state.team.wrongAttempts < policy.wrongAttemptsToUnlock &&
+    inactiveSeconds < hintDelaySeconds
+  ) {
+    throw new Error(
+      `hint_not_available:${hintDelaySeconds - inactiveSeconds}`
+    );
   }
 
   const supabase = createAdminClient();
@@ -770,29 +827,228 @@ export const getOrganizerRun = async (organizerToken: string) => {
     .single();
   if (error || !run) throw new Error("Organizer link is invalid or expired");
 
-  const [{ data: teams }, { data: participants }, { data: checkpoints }] =
-    await Promise.all([
-      supabase
-        .from("teams")
-        .select("id,public_name,status,score,completed_count,last_progress_at")
-        .eq("run_id", run.id)
-        .order("score", { ascending: false }),
-      supabase
-        .from("participants")
-        .select("id,team_id,public_alias,language,whatsapp_connected_at")
-        .eq("run_id", run.id),
-      supabase
-        .from("run_checkpoints")
-        .select("slug,sequence_no,kind,is_disabled")
-        .eq("run_id", run.id)
-        .order("sequence_no")
-    ]);
+  const now = new Date();
+  const [
+    teamsResult,
+    participantsResult,
+    checkpointsResult,
+    presenceResult,
+    outboxResult,
+    auditResult,
+    bannersResult,
+    recapSharesResult,
+    crossTeamEventsResult
+  ] = await Promise.all([
+    supabase
+      .from("teams")
+      .select(
+        "id,public_name,status,score,completed_count,current_checkpoint_slug,wrong_attempts,hints_used,last_progress_at,started_at,finished_at"
+      )
+      .eq("run_id", run.id)
+      .order("score", { ascending: false }),
+    supabase
+      .from("participants")
+      .select(
+        "id,team_id,public_alias,language,whatsapp_connected_at,last_seen_at"
+      )
+      .eq("run_id", run.id),
+    supabase
+      .from("run_checkpoints")
+      .select(
+        "id,source_checkpoint_id,slug,sequence_no,kind,is_disabled,is_optional,fallback_checkpoint,validation"
+      )
+      .eq("run_id", run.id)
+      .order("sequence_no"),
+    supabase
+      .from("quest_presence")
+      .select("team_id,participant_id,visible,online_at,expires_at")
+      .eq("run_id", run.id)
+      .gt("expires_at", now.toISOString()),
+    supabase
+      .from("message_outbox")
+      .select(
+        "id,participant_id,status,attempts,last_error,created_at,sent_at,send_after,target_scope"
+      )
+      .eq("run_id", run.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("organizer_audit_log")
+      .select(
+        "id,action,actor,reason,before_state,after_state,created_at"
+      )
+      .eq("run_id", run.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("in_app_banners")
+      .select("id,team_id,body,active_until,revoked_at,created_at")
+      .eq("run_id", run.id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("recap_shares")
+      .select("id,team_id,active_until,revoked_at,created_by,created_at")
+      .eq("run_id", run.id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("cross_team_events")
+      .select(
+        "id,title,instructions,team_ids,bonus_points,status,winning_team_ids,starts_at,expires_at,resolved_at,created_by,created_at"
+      )
+      .eq("run_id", run.id)
+      .order("created_at", { ascending: false })
+      .limit(50)
+  ]);
+
+  for (const result of [
+    teamsResult,
+    participantsResult,
+    checkpointsResult,
+    presenceResult,
+    outboxResult,
+    auditResult,
+    bannersResult,
+    recapSharesResult,
+    crossTeamEventsResult
+  ]) {
+    if (result.error) throw result.error;
+  }
+
+  const checkpoints = checkpointsResult.data ?? [];
+  const sourceIds = checkpoints
+    .map((checkpoint) => checkpoint.source_checkpoint_id)
+    .filter((sourceId): sourceId is string => Boolean(sourceId));
+  const sourceHealth = new Map<string, boolean>();
+  if (sourceIds.length) {
+    const { data: sources, error: sourceError } = await supabase
+      .from("template_checkpoints")
+      .select("id,is_active")
+      .in("id", sourceIds);
+    if (sourceError) throw sourceError;
+    for (const source of sources ?? []) {
+      sourceHealth.set(source.id, source.is_active);
+    }
+  }
+
+  const settings =
+    run.settings && typeof run.settings === "object" && !Array.isArray(run.settings)
+      ? (run.settings as Record<string, unknown>)
+      : {};
+  const configuredStuckMinutes =
+    typeof settings.stuck_threshold_minutes === "number"
+      ? settings.stuck_threshold_minutes
+      : typeof settings.stuckThresholdMinutes === "number"
+        ? settings.stuckThresholdMinutes
+        : 10;
+  const stuckThresholdMinutes = Math.max(
+    3,
+    Math.min(60, Math.round(configuredStuckMinutes))
+  );
+  const presenceByTeam = new Map<string, Set<string>>();
+  for (const presence of presenceResult.data ?? []) {
+    const teamId = presence.team_id;
+    if (!teamId) continue;
+    const teamPresence = presenceByTeam.get(teamId) ?? new Set<string>();
+    teamPresence.add(presence.participant_id);
+    presenceByTeam.set(teamId, teamPresence);
+  }
+  const teams = (teamsResult.data ?? []).map((team) => {
+    const lastProgress = team.last_progress_at
+      ? new Date(team.last_progress_at).getTime()
+      : team.started_at
+        ? new Date(team.started_at).getTime()
+        : null;
+    const minutesSinceProgress =
+      lastProgress === null
+        ? null
+        : Math.max(0, Math.floor((now.getTime() - lastProgress) / 60_000));
+    return {
+      ...team,
+      online_count: presenceByTeam.get(team.id)?.size ?? 0,
+      minutes_since_progress: minutesSinceProgress,
+      is_stuck:
+        ["travelling", "solving"].includes(team.status) &&
+        minutesSinceProgress !== null &&
+        minutesSinceProgress >= stuckThresholdMinutes
+    };
+  });
+  const checkpointHealth = checkpoints.map((checkpoint) => {
+    const fallback =
+      checkpoint.fallback_checkpoint &&
+      typeof checkpoint.fallback_checkpoint === "object" &&
+      !Array.isArray(checkpoint.fallback_checkpoint)
+        ? (checkpoint.fallback_checkpoint as Record<string, unknown>)
+        : null;
+    const fallbackReady = Boolean(
+      fallback &&
+        (typeof fallback.he === "string" || typeof fallback.en === "string") &&
+        Array.isArray(fallback.accepted) &&
+        fallback.accepted.length > 0
+    );
+    const sourceActive = checkpoint.source_checkpoint_id
+      ? sourceHealth.get(checkpoint.source_checkpoint_id) === true
+      : true;
+    return {
+      ...checkpoint,
+      source_active: sourceActive,
+      fallback_ready: fallbackReady,
+      healthy: !checkpoint.is_disabled && sourceActive
+    };
+  });
+  const outbox = outboxResult.data ?? [];
+  const outboxSummary = outbox.reduce(
+    (summary, message) => {
+      summary.total += 1;
+      if (message.status === "sent") summary.sent += 1;
+      else if (message.status === "failed") summary.failed += 1;
+      else if (message.status === "processing") summary.processing += 1;
+      else summary.pending += 1;
+      return summary;
+    },
+    { total: 0, sent: 0, failed: 0, processing: 0, pending: 0 }
+  );
 
   return {
     run,
-    teams: teams ?? [],
-    participants: participants ?? [],
-    checkpoints: checkpoints ?? [],
+    teams,
+    participants: participantsResult.data ?? [],
+    checkpoints: checkpointHealth,
+    presence: presenceResult.data ?? [],
+    outbox,
+    outboxSummary,
+    audit: auditResult.data ?? [],
+    banners: bannersResult.data ?? [],
+    recapShares: (recapSharesResult.data ?? []).map((share) => ({
+      ...share,
+      is_active:
+        !share.revoked_at &&
+        new Date(share.active_until).getTime() > now.getTime()
+    })),
+    crossTeamEvents: crossTeamEventsResult.data ?? [],
+    goNoGo: {
+      ready:
+        checkpointHealth.some((checkpoint) => checkpoint.healthy) &&
+        checkpointHealth.every(
+          (checkpoint) => checkpoint.is_disabled || checkpoint.source_active
+        ) &&
+        outboxSummary.failed === 0,
+      activeCheckpoints: checkpointHealth.filter(
+        (checkpoint) => checkpoint.healthy
+      ).length,
+      unhealthyCheckpoints: checkpointHealth.filter(
+        (checkpoint) => !checkpoint.is_disabled && !checkpoint.source_active
+      ).length,
+      missingFallbacks: checkpointHealth.filter(
+        (checkpoint) =>
+          !checkpoint.is_disabled &&
+          ["photo", "hybrid"].includes(checkpoint.kind) &&
+          !checkpoint.fallback_ready
+      ).length,
+      failedMessages: outboxSummary.failed,
+      stuckThresholdMinutes
+    },
     joinUrl: `${publicEnv.appUrl}/join/${run.public_code}`,
     liveUrl: `${publicEnv.appUrl}/live/${run.public_code}`
   };

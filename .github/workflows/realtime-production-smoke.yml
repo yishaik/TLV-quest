@@ -16,8 +16,8 @@ jobs:
         shell: bash
         env:
           APP_URL: https://play.yishaik.com
-          SUPABASE_URL: https://vybivdkskrkafcuedvbg.supabase.co
-          SUPABASE_PUBLISHABLE_KEY: sb_publishable_grXh4GXsoiFworQI6LNtgw_Ib_ac_e4
+          SUPABASE_URL: ${{ secrets.PRODUCTION_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           set -euo pipefail
           work="$(mktemp -d)"

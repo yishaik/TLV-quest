@@ -1,15 +1,28 @@
 import { deliverCheckpointToRun } from "@/lib/checkpoint-delivery";
 import { startRunByOrganizerToken } from "@/lib/repository";
-import { handleRouteError, jsonOk } from "@/lib/http";
+import { hashSecret } from "@/lib/crypto";
+import {
+  handleRouteError,
+  jsonOk,
+  requireIdempotencyKey
+} from "@/lib/http";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ token: string }> }
 ) {
   try {
     const { token } = await context.params;
+    requireIdempotencyKey(request, "organizer-start");
+    await enforceRateLimit({
+      scope: "organizer-start",
+      identifier: hashSecret(token),
+      limit: 3,
+      windowSeconds: 60
+    });
     const started = await startRunByOrganizerToken(token);
     const result =
       started.result && typeof started.result === "object" && !Array.isArray(started.result)

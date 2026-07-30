@@ -1,6 +1,11 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  actionFingerprint,
+  pendingIdempotencyKey,
+  settleIdempotencyKey
+} from "@/lib/client-idempotency";
 
 type ParticipantState = {
   participant: {
@@ -25,7 +30,9 @@ type ParticipantState = {
     sequenceNo: number;
     kind: string;
     content: Record<string, unknown>;
-    fallback: Record<string, unknown> | null;
+    choiceOptions: string[];
+    fallbackPrompt: string | null;
+    hasFallback: boolean;
     latitude: number | null;
     longitude: number | null;
     radiusMeters: number | null;
@@ -126,7 +133,10 @@ export function QuestPlayer({ token }: { token: string }) {
 
   async function submitAnswer(event: FormEvent) {
     event.preventDefault();
-    if (!answer.trim()) return;
+    const submitted = answer.trim();
+    if (!submitted) return;
+    const idempotencyPrefix = "web-answer";
+    const idempotencyScope = `${state?.checkpoint?.slug ?? "none"}:${actionFingerprint(submitted)}`;
     setBusy(true);
     setError("");
     setMessage("");
@@ -135,10 +145,14 @@ export function QuestPlayer({ token }: { token: string }) {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "idempotency-key": `web-answer:${crypto.randomUUID()}`
+          "idempotency-key": pendingIdempotencyKey(
+            idempotencyPrefix,
+            idempotencyScope
+          )
         },
-        body: JSON.stringify({ answer })
+        body: JSON.stringify({ answer: submitted })
       });
+      settleIdempotencyKey(idempotencyPrefix, idempotencyScope, response);
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Answer failed");
@@ -158,13 +172,21 @@ export function QuestPlayer({ token }: { token: string }) {
   }
 
   async function requestHint() {
+    const idempotencyPrefix = "web-hint";
+    const idempotencyScope = state?.checkpoint?.slug ?? "none";
     setBusy(true);
     setError("");
     try {
       const response = await fetch(`/api/participants/${encodeURIComponent(token)}/hint`, {
         method: "POST",
-        headers: { "idempotency-key": `web-hint:${crypto.randomUUID()}` }
+        headers: {
+          "idempotency-key": pendingIdempotencyKey(
+            idempotencyPrefix,
+            idempotencyScope
+          )
+        }
       });
+      settleIdempotencyKey(idempotencyPrefix, idempotencyScope, response);
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Hint failed");
@@ -187,6 +209,8 @@ export function QuestPlayer({ token }: { token: string }) {
     setError("");
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        const idempotencyPrefix = "web-location";
+        const idempotencyScope = `${state?.checkpoint?.slug ?? "none"}:${position.coords.latitude.toFixed(5)}:${position.coords.longitude.toFixed(5)}`;
         try {
           const response = await fetch(
             `/api/participants/${encodeURIComponent(token)}/location`,
@@ -194,7 +218,10 @@ export function QuestPlayer({ token }: { token: string }) {
               method: "POST",
               headers: {
                 "content-type": "application/json",
-                "idempotency-key": `web-location:${crypto.randomUUID()}`
+                "idempotency-key": pendingIdempotencyKey(
+                  idempotencyPrefix,
+                  idempotencyScope
+                )
               },
               body: JSON.stringify({
                 latitude: position.coords.latitude,
@@ -202,6 +229,7 @@ export function QuestPlayer({ token }: { token: string }) {
               })
             }
           );
+          settleIdempotencyKey(idempotencyPrefix, idempotencyScope, response);
           const payload = await response.json();
           if (!response.ok || !payload.ok) {
             throw new Error(payload.error?.message ?? "Location verification failed");
@@ -237,6 +265,10 @@ export function QuestPlayer({ token }: { token: string }) {
   async function submitPhoto(event: FormEvent) {
     event.preventDefault();
     if (!photo) return;
+    const idempotencyPrefix = "web-photo";
+    const idempotencyScope = `${state?.checkpoint?.slug ?? "none"}:${actionFingerprint(
+      `${photo.name}:${photo.size}:${photo.lastModified}`
+    )}`;
     setBusy(true);
     setError("");
     setMessage("");
@@ -245,9 +277,15 @@ export function QuestPlayer({ token }: { token: string }) {
       form.set("photo", photo);
       const response = await fetch(`/api/participants/${encodeURIComponent(token)}/photo`, {
         method: "POST",
-        headers: { "idempotency-key": `web-photo:${crypto.randomUUID()}` },
+        headers: {
+          "idempotency-key": pendingIdempotencyKey(
+            idempotencyPrefix,
+            idempotencyScope
+          )
+        },
         body: form
       });
+      settleIdempotencyKey(idempotencyPrefix, idempotencyScope, response);
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Photo validation failed");
@@ -259,8 +297,8 @@ export function QuestPlayer({ token }: { token: string }) {
       } else {
         const fallback = payload.data.fallback;
         const fallbackText =
-          fallback && typeof fallback[language] === "string"
-            ? fallback[language]
+          typeof fallback === "string" && fallback.trim()
+            ? fallback
             : isHebrew
               ? "לא ניתן לאמת את התמונה. השתמשו בשאלת הגיבוי."
               : "The photo could not be verified. Use the fallback question.";

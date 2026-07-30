@@ -15,6 +15,7 @@ import type {
   RealtimePostgresChangesPayload
 } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
+import { actionFingerprint } from "@/lib/client-idempotency";
 import { getQuestRealtimeClient } from "@/lib/supabase/quest-realtime-browser";
 import type {
   QuestConnectionState,
@@ -29,6 +30,7 @@ const STALE_AFTER_MS = 30 * 1000;
 const PRESENCE_HEARTBEAT_MS = 25 * 1000;
 const PRESENCE_TTL_MS = 70 * 1000;
 const PRESENCE_CLOCK_MS = 5 * 1000;
+const OFFLINE_STATE_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
 type RealtimeAccess = {
   accessToken: string;
@@ -141,19 +143,58 @@ export function QuestRealtimeProvider({
     if (stateRequest.current) return stateRequest.current;
 
     const request = (async () => {
-      const response = await fetch(
-        `/api/participants/${encodeURIComponent(token)}/state`,
-        { cache: "no-store" }
-      );
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error?.message ?? "Failed to load game");
+      const cacheKey = `tlvQuest:offline-state:${actionFingerprint(token)}`;
+      try {
+        const response = await fetch(
+          `/api/participants/${encodeURIComponent(token)}/state`,
+          { cache: "no-store" }
+        );
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error?.message ?? "Failed to load game");
+        }
+        const next = payload.data as QuestParticipantState;
+        setState(next);
+        setPresenceDevices(next.presence ?? []);
+        const syncedAt = Date.now();
+        setLastSyncedAt(syncedAt);
+        try {
+          window.sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({ version: 1, savedAt: syncedAt, state: next })
+          );
+        } catch {
+          // The live state remains available when private browsing blocks storage.
+        }
+        return next;
+      } catch (cause) {
+        try {
+          const cached = JSON.parse(
+            window.sessionStorage.getItem(cacheKey) ?? "null"
+          ) as {
+            version?: unknown;
+            savedAt?: unknown;
+            state?: unknown;
+          } | null;
+          if (
+            cached?.version === 1 &&
+            typeof cached.savedAt === "number" &&
+            Date.now() - cached.savedAt <= OFFLINE_STATE_MAX_AGE_MS &&
+            cached.state &&
+            typeof cached.state === "object"
+          ) {
+            const next = cached.state as QuestParticipantState;
+            setState(next);
+            setPresenceDevices(next.presence ?? []);
+            setLastSyncedAt(cached.savedAt);
+            setConnectionState("offline");
+            return next;
+          }
+        } catch {
+          // Ignore malformed or unavailable session storage.
+        }
+        throw cause;
       }
-      const next = payload.data as QuestParticipantState;
-      setState(next);
-      setPresenceDevices(next.presence ?? []);
-      setLastSyncedAt(Date.now());
-      return next;
     })();
 
     stateRequest.current = request;

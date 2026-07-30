@@ -2,6 +2,11 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useQuestRealtime } from "@/components/QuestRealtimeProvider";
+import {
+  actionFingerprint,
+  pendingIdempotencyKey,
+  settleIdempotencyKey
+} from "@/lib/client-idempotency";
 import styles from "./QuestRuntimeSafetyNet.module.css";
 
 type Locale = "he" | "en";
@@ -12,30 +17,13 @@ type RuntimeState = {
   checkpoint: null | {
     slug: string;
     kind: string;
-    fallback: Record<string, unknown> | null;
+    fallbackPrompt: string | null;
+    hasFallback: boolean;
     isOptional: boolean;
     scanVerified: boolean;
     photoFallbackAvailable: boolean;
   };
 };
-
-const localizedFallback = (
-  fallback: Record<string, unknown> | null,
-  language: Locale
-) => {
-  if (!fallback) return "";
-  const value = fallback[language];
-  return typeof value === "string" ? value.trim() : "";
-};
-
-const hasFallbackAnswers = (fallback: Record<string, unknown> | null) =>
-  Boolean(
-    fallback &&
-      Array.isArray(fallback.accepted) &&
-      fallback.accepted.some(
-        (answer) => typeof answer === "string" && Boolean(answer.trim())
-      )
-  );
 
 export function QuestRuntimeSafetyNet({ token }: { token: string }) {
   const { state: realtimeState, refresh } = useQuestRealtime();
@@ -49,14 +37,14 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
   const language = state?.participant.language ?? "he";
   const isHebrew = language === "he";
   const fallbackPrompt = useMemo(
-    () => localizedFallback(checkpoint?.fallback ?? null, language),
-    [checkpoint?.fallback, language]
+    () => checkpoint?.fallbackPrompt?.trim() ?? "",
+    [checkpoint?.fallbackPrompt]
   );
   const fallbackReady = Boolean(
-    checkpoint?.kind === "photo" &&
+      checkpoint?.kind === "photo" &&
       checkpoint.photoFallbackAvailable &&
       fallbackPrompt &&
-      hasFallbackAnswers(checkpoint.fallback)
+      checkpoint.hasFallback
   );
   const relevant = Boolean(
     state?.run.status === "active" &&
@@ -77,15 +65,21 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
     setError("");
     setMessage("");
     try {
+      const idempotencyPrefix = "web-optional-skip";
+      const idempotencyScope = checkpoint.slug;
       const response = await fetch(
         `/api/participants/${encodeURIComponent(token)}/skip`,
         {
           method: "POST",
           headers: {
-            "idempotency-key": `web-optional-skip:${checkpoint.slug}:${crypto.randomUUID()}`
+            "idempotency-key": pendingIdempotencyKey(
+              idempotencyPrefix,
+              idempotencyScope
+            )
           }
         }
       );
+      settleIdempotencyKey(idempotencyPrefix, idempotencyScope, response);
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Skip failed");
@@ -112,17 +106,23 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
     setError("");
     setMessage("");
     try {
+      const idempotencyPrefix = "web-photo-fallback";
+      const idempotencyScope = `${checkpoint.slug}:${actionFingerprint(submitted)}`;
       const response = await fetch(
         `/api/participants/${encodeURIComponent(token)}/answer`,
         {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "idempotency-key": `web-photo-fallback:${crypto.randomUUID()}`
+            "idempotency-key": pendingIdempotencyKey(
+              idempotencyPrefix,
+              idempotencyScope
+            )
           },
           body: JSON.stringify({ answer: submitted })
         }
       );
+      settleIdempotencyKey(idempotencyPrefix, idempotencyScope, response);
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Fallback answer failed");

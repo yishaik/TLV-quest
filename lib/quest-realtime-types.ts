@@ -46,6 +46,7 @@ export type QuestParticipantState = {
     firstName: string;
     language: QuestLocale;
     whatsappConnected: boolean;
+    recoveryUrl: string;
   };
   run: {
     id: string;
@@ -64,16 +65,45 @@ export type QuestParticipantState = {
   members: Array<{ id: string; firstName: string }>;
   activity: QuestActivityEntry[];
   presence: QuestPresenceDevice[];
+  banners: Array<{
+    id: string;
+    body: string;
+    activeUntil: string;
+    createdAt: string;
+  }>;
+  branding: {
+    productName: string;
+    primaryColor: string;
+    surfaceColor: string;
+    logoUrl: string;
+  };
+  difficulty: {
+    level: "challenge" | "standard" | "assisted";
+    wrongAttemptsToUnlock: number;
+    inactivityMinutesToUnlock: number;
+    rewardMultiplier: number;
+    penaltyMultiplier: number;
+    reason: "fast_progress" | "steady_progress" | "needs_support";
+  };
+  hintOffer: null | {
+    available: boolean;
+    reason: "wrong_attempts" | "inactivity" | "locked";
+    penalty: number;
+    index: number;
+    total: number;
+    wrongAttemptsToUnlock: number;
+    unlockAt: string;
+    secondsUntilUnlock: number;
+  };
   checkpoint: null | {
     id: string;
     slug: string;
     sequenceNo: number;
     kind: string;
     content: Record<string, unknown>;
-    validation: Record<string, unknown>;
-    hints?: unknown[];
-    scoring?: Record<string, unknown>;
-    fallback: Record<string, unknown> | null;
+    choiceOptions: string[];
+    fallbackPrompt: string | null;
+    hasFallback: boolean;
     latitude: number | null;
     longitude: number | null;
     radiusMeters: number | null;

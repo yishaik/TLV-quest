@@ -1,0 +1,38 @@
+name: Production-like load gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_code:
+        description: Disposable active run code
+        required: true
+        type: string
+      app_url:
+        description: Release-candidate URL
+        required: true
+        default: https://play.yishaik.com
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-load-test
+    env:
+      LOAD_TEST_APP_URL: ${{ inputs.app_url }}
+      LOAD_TEST_RUN_CODE: ${{ inputs.run_code }}
+      LOAD_TEST_ANSWER: ${{ secrets.LOAD_TEST_ANSWER }}
+      LOAD_TEST_PARTICIPANTS: "30"
+      LOAD_TEST_TEAMS: "10"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Exercise 30 participants and 10 teams
+        run: npm run test:load

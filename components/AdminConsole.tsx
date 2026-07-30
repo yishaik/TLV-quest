@@ -243,6 +243,9 @@ export function AdminConsole() {
           <Link className="button button-primary" href="/admin/content">
             פתיחת Content Studio
           </Link>
+          <Link className="button button-secondary" href="/portal">
+            פתיחת פורטל הארגון
+          </Link>
         </div>
       </section>
 

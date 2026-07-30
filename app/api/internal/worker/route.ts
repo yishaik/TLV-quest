@@ -1,12 +1,22 @@
 import { runMaintenanceWorker } from "@/lib/maintenance";
-import { handleRouteError, jsonOk, requireBearer } from "@/lib/http";
+import { handleRouteError, jsonOk, requireAnyBearer } from "@/lib/http";
+import { enforceRateLimit, requestIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
-    requireBearer(request, process.env.WORKER_SECRET);
+    requireAnyBearer(request, [
+      process.env.WORKER_SECRET,
+      process.env.CRON_SECRET
+    ]);
+    await enforceRateLimit({
+      scope: "internal-worker",
+      identifier: requestIp(request),
+      limit: 12,
+      windowSeconds: 60
+    });
     return jsonOk(await runMaintenanceWorker());
   } catch (error) {
     return handleRouteError(error);

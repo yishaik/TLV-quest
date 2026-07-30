@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { deliverCheckpointToTeam } from "@/lib/checkpoint-delivery";
 import { submitPhoto } from "@/lib/physical-actions";
 import { getParticipantState } from "@/lib/repository";
-import { handleRouteError, jsonOk } from "@/lib/http";
+import { handleRouteError, jsonOk, requireIdempotencyKey } from "@/lib/http";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +12,12 @@ export async function POST(
 ) {
   try {
     const { token } = await context.params;
+    await enforceRateLimit({
+      scope: "participant-photo",
+      identifier: token,
+      limit: 6,
+      windowSeconds: 60
+    });
     const form = await request.formData();
     const file = form.get("photo");
     if (!(file instanceof File)) throw new Error("Photo is required");
@@ -21,8 +27,7 @@ export async function POST(
       token,
       bytes,
       mimeType: file.type,
-      idempotencyKey:
-        request.headers.get("idempotency-key") ?? `photo:${randomUUID()}`
+      idempotencyKey: requireIdempotencyKey(request)
     });
 
     if (result.approved) {

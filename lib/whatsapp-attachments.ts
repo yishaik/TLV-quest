@@ -10,8 +10,16 @@ import {
   type ScoringConfig
 } from "@/lib/game-engine";
 import { validatePhotoWithGemini } from "@/lib/providers";
+import {
+  SUPPORTED_TWILIO_MEDIA_TYPES,
+  TwilioMediaError,
+  validatedTwilioMediaUrl
+} from "@/lib/twilio-media-security";
 
 type JsonRecord = Record<string, unknown>;
+
+const TWILIO_MEDIA_MAX_BYTES = 10 * 1024 * 1024;
+const TWILIO_MEDIA_TIMEOUT_MS = 10_000;
 
 const asObject = (value: unknown): JsonRecord =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -19,6 +27,108 @@ const asObject = (value: unknown): JsonRecord =>
     : {};
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
+
+const downloadTwilioMedia = async ({
+  mediaUrl,
+  declaredContentType,
+  accountSid,
+  authToken
+}: {
+  mediaUrl: string;
+  declaredContentType: string;
+  accountSid: string;
+  authToken: string;
+}) => {
+  const trustedUrl = validatedTwilioMediaUrl(mediaUrl, accountSid);
+  const authorization = Buffer.from(`${accountSid}:${authToken}`).toString(
+    "base64"
+  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TWILIO_MEDIA_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(trustedUrl, {
+      headers: { authorization: `Basic ${authorization}` },
+      redirect: "error",
+      signal: controller.signal
+    });
+  } catch (error) {
+    clearTimeout(timeout);
+    throw new TwilioMediaError(
+      error instanceof DOMException && error.name === "AbortError"
+        ? "twilio_media_download_timeout"
+        : "twilio_media_download_failed"
+    );
+  }
+
+  try {
+    if (!response.ok) {
+      throw new TwilioMediaError("twilio_media_download_failed");
+    }
+
+    const contentLength = Number(response.headers.get("content-length") ?? "0");
+    if (
+      Number.isFinite(contentLength) &&
+      contentLength > TWILIO_MEDIA_MAX_BYTES
+    ) {
+      throw new TwilioMediaError("twilio_media_too_large");
+    }
+
+    const responseContentType =
+      response.headers
+        .get("content-type")
+        ?.split(";")[0]
+        ?.trim()
+        .toLowerCase() ?? "";
+    const declared =
+      declaredContentType.split(";")[0]?.trim().toLowerCase() ?? "";
+    const mimeType = responseContentType || declared;
+    if (!SUPPORTED_TWILIO_MEDIA_TYPES.has(mimeType)) {
+      throw new TwilioMediaError("twilio_media_type_rejected");
+    }
+    if (
+      responseContentType &&
+      declared &&
+      SUPPORTED_TWILIO_MEDIA_TYPES.has(declared) &&
+      responseContentType !== declared
+    ) {
+      throw new TwilioMediaError("twilio_media_type_mismatch");
+    }
+    if (!response.body) {
+      throw new TwilioMediaError("twilio_media_download_failed");
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > TWILIO_MEDIA_MAX_BYTES) {
+        await reader.cancel();
+        throw new TwilioMediaError("twilio_media_too_large");
+      }
+      chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return { bytes, mimeType };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new TwilioMediaError("twilio_media_download_timeout");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 const getContextByPhone = async (from: string) => {
   const participantRef = await findParticipantTokenlessByPhone(from);
@@ -189,7 +299,7 @@ export const handleWhatsappPhoto = async ({
       ? "התחנה הנוכחית אינה מקבלת תמונה."
       : "The current checkpoint does not accept a photo.";
   }
-  if (!["image/jpeg", "image/png", "image/webp"].includes(mediaContentType)) {
+  if (!SUPPORTED_TWILIO_MEDIA_TYPES.has(mediaContentType.toLowerCase())) {
     return locale === "he"
       ? "פורמט התמונה אינו נתמך. שלחו JPG, PNG או WebP."
       : "Unsupported image format. Send JPG, PNG or WebP.";
@@ -199,22 +309,33 @@ export const handleWhatsappPhoto = async ({
   if (!env.twilioAccountSid || !env.twilioAuthToken) {
     throw new Error("twilio_credentials_missing");
   }
-  const authorization = Buffer.from(
-    `${env.twilioAccountSid}:${env.twilioAuthToken}`
-  ).toString("base64");
-  const mediaResponse = await fetch(mediaUrl, {
-    headers: { authorization: `Basic ${authorization}` }
-  });
-  if (!mediaResponse.ok) {
-    throw new Error(`twilio_media_download_failed:${mediaResponse.status}`);
+  let download: Awaited<ReturnType<typeof downloadTwilioMedia>>;
+  try {
+    download = await downloadTwilioMedia({
+      mediaUrl,
+      declaredContentType: mediaContentType,
+      accountSid: env.twilioAccountSid,
+      authToken: env.twilioAuthToken
+    });
+  } catch (error) {
+    if (error instanceof TwilioMediaError) {
+      if (error.code === "twilio_media_too_large") {
+        return locale === "he"
+          ? "התמונה גדולה מדי. המגבלה היא 10MB."
+          : "The image is too large. The limit is 10MB.";
+      }
+      if (
+        error.code === "twilio_media_type_rejected" ||
+        error.code === "twilio_media_type_mismatch"
+      ) {
+        return locale === "he"
+          ? "פורמט התמונה אינו נתמך. שלחו JPG, PNG או WebP."
+          : "Unsupported image format. Send JPG, PNG or WebP.";
+      }
+    }
+    throw error;
   }
-
-  const bytes = new Uint8Array(await mediaResponse.arrayBuffer());
-  if (bytes.byteLength > 10 * 1024 * 1024) {
-    return locale === "he"
-      ? "התמונה גדולה מדי. המגבלה היא 10MB."
-      : "The image is too large. The limit is 10MB.";
-  }
+  const { bytes, mimeType } = download;
 
   const validation = asObject(checkpoint.validation);
   const criteria =
@@ -230,16 +351,16 @@ export const handleWhatsappPhoto = async ({
   });
 
   const extension =
-    mediaContentType === "image/png"
+    mimeType === "image/png"
       ? "png"
-      : mediaContentType === "image/webp"
+      : mimeType === "image/webp"
         ? "webp"
         : "jpg";
   const storagePath = `${run.id}/${team.id}/${checkpoint.slug}/${crypto.randomUUID()}.${extension}`;
   const { error: uploadError } = await supabase.storage
     .from("game-media")
     .upload(storagePath, bytes, {
-      contentType: mediaContentType,
+      contentType: mimeType,
       upsert: false
     });
   if (uploadError) throw uploadError;
@@ -252,7 +373,7 @@ export const handleWhatsappPhoto = async ({
       participant_id: participant.id,
       checkpoint_id: checkpoint.id,
       storage_path: storagePath,
-      mime_type: mediaContentType,
+      mime_type: mimeType,
       source: "whatsapp",
       validation: assessment
     })
