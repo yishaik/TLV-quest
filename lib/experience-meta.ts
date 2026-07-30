@@ -3,6 +3,11 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParticipantState } from "@/lib/repository";
 
+const objectValue = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
 export async function getParticipantExperienceState(token: string) {
   const state = await getParticipantState(token);
   const supabase = createAdminClient();
@@ -13,8 +18,73 @@ export async function getParticipantExperienceState(token: string) {
     .eq("is_disabled", false);
   if (error) throw error;
 
+  let checkpoint = state.checkpoint
+    ? {
+        ...state.checkpoint,
+        isOptional: false,
+        scanVerified: false,
+        photoFallbackAvailable: false
+      }
+    : null;
+
+  if (state.checkpoint) {
+    const currentCheckpoint = state.checkpoint;
+    const { data: checkpointMeta, error: checkpointMetaError } = await supabase
+      .from("run_checkpoints")
+      .select("is_optional")
+      .eq("id", currentCheckpoint.id)
+      .single();
+    if (checkpointMetaError) throw checkpointMetaError;
+
+    let scanVerified = false;
+    if (currentCheckpoint.kind === "hybrid") {
+      const { data: scanEvent, error: scanError } = await supabase
+        .from("game_events")
+        .select("id")
+        .eq("team_id", state.team.id)
+        .eq("event_type", "STATION_SCANNED")
+        .contains("payload", { checkpoint_slug: currentCheckpoint.slug })
+        .limit(1)
+        .maybeSingle();
+      if (scanError) throw scanError;
+      scanVerified = Boolean(scanEvent);
+    }
+
+    let photoFallbackAvailable = false;
+    if (currentCheckpoint.kind === "photo") {
+      const { data: assets, error: assetsError } = await supabase
+        .from("media_assets")
+        .select("validation")
+        .eq("team_id", state.team.id)
+        .eq("checkpoint_id", currentCheckpoint.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (assetsError) throw assetsError;
+
+      const threshold =
+        typeof currentCheckpoint.validation.confidenceThreshold === "number"
+          ? currentCheckpoint.validation.confidenceThreshold
+          : 0.86;
+      photoFallbackAvailable = (assets ?? []).some((asset) => {
+        const validation = objectValue(asset.validation);
+        const approved = validation.approved === true;
+        const confidence =
+          typeof validation.confidence === "number" ? validation.confidence : 0;
+        return !approved || confidence < threshold;
+      });
+    }
+
+    checkpoint = {
+      ...currentCheckpoint,
+      isOptional: checkpointMeta.is_optional === true,
+      scanVerified,
+      photoFallbackAvailable
+    };
+  }
+
   return {
     ...state,
+    checkpoint,
     run: {
       ...state.run,
       totalCheckpoints: count ?? 0

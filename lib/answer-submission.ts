@@ -63,6 +63,50 @@ const validationForCheckpoint = (state: ParticipantState): TextValidation => {
   throw new Error("This checkpoint does not accept an answer");
 };
 
+const assertAnswerPrerequisites = async (state: ParticipantState) => {
+  const checkpoint = state.checkpoint;
+  if (!checkpoint) throw new Error("No active checkpoint");
+  const supabase = createAdminClient();
+
+  if (checkpoint.kind === "hybrid") {
+    const { data, error } = await supabase
+      .from("game_events")
+      .select("id")
+      .eq("team_id", state.team.id)
+      .eq("event_type", "STATION_SCANNED")
+      .contains("payload", { checkpoint_slug: checkpoint.slug })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("scan_verification_required");
+  }
+
+  if (checkpoint.kind === "photo") {
+    const { data, error } = await supabase
+      .from("media_assets")
+      .select("validation")
+      .eq("team_id", state.team.id)
+      .eq("checkpoint_id", checkpoint.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+
+    const threshold =
+      typeof checkpoint.validation.confidenceThreshold === "number"
+        ? checkpoint.validation.confidenceThreshold
+        : 0.86;
+    const rejectedAttempt = (data ?? []).some((asset) => {
+      const validation = objectValue(asset.validation);
+      const approved = validation.approved === true;
+      const confidence =
+        typeof validation.confidence === "number" ? validation.confidence : 0;
+      return !approved || confidence < threshold;
+    });
+
+    if (!rejectedAttempt) throw new Error("photo_fallback_not_unlocked");
+  }
+};
+
 const queueSuccessMessage = async ({
   state,
   success
@@ -104,6 +148,8 @@ export const submitCheckpointAnswer = async ({
   if (state.run.status !== "active") throw new Error("Game is not active");
   if (!state.checkpoint) throw new Error("No active checkpoint");
 
+  await assertAnswerPrerequisites(state);
+
   const validation = validationForCheckpoint(state);
   const evaluation = evaluateTextAnswer(answer, validation);
   const scoring = state.checkpoint.scoring as ScoringConfig;
@@ -139,7 +185,11 @@ export const submitCheckpointAnswer = async ({
     p_participant_id: state.participant.id,
     p_checkpoint_id: state.checkpoint.id,
     p_submission_type:
-      state.checkpoint.validation.type === "choice" ? "choice" : "text",
+      state.checkpoint.kind === "photo"
+        ? "fallback"
+        : state.checkpoint.validation.type === "choice"
+          ? "choice"
+          : "text",
     p_normalized_answer: evaluation.normalizedAnswer,
     p_payload: {
       rawLength: answer.length,

@@ -37,6 +37,22 @@ export const handleRouteError = (error: unknown) => {
     );
   }
 
+  if (/photo_fallback_not_unlocked/i.test(rawMessage)) {
+    return jsonError(
+      "שאלת הגיבוי נפתחת רק לאחר ניסיון צילום שלא אושר.",
+      409,
+      { code: "photo_fallback_not_unlocked" }
+    );
+  }
+
+  if (/inactive_content_sources/i.test(rawMessage)) {
+    return jsonError(
+      "לא ניתן לפרסם מסלול שמשתמש בתחנה או בחידה שאינן במצב פעיל.",
+      409,
+      { code: "inactive_content_sources" }
+    );
+  }
+
   const status =
     /unauthorized/i.test(rawMessage)
       ? 401
@@ -44,7 +60,7 @@ export const handleRouteError = (error: unknown) => {
         ? 403
         : /not found|invalid|expired/i.test(rawMessage)
           ? 404
-          : /closed|full|not active|locked|cannot|not optional/i.test(rawMessage)
+          : /closed|full|not active|locked|cannot|not optional|not_optional/i.test(rawMessage)
             ? 409
             : 400;
   return jsonError(rawMessage, status);

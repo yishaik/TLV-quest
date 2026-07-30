@@ -34,7 +34,11 @@ export function StationScanner({ stationSlug }: { stationSlug: string }) {
       }
 
       if (!active) return;
-      setStatus("התחנה זוהתה. חוזרים למשימה…");
+      setStatus(
+        payload.data.completed
+          ? "התחנה הושלמה. עוברים למשימה הבאה…"
+          : "הסריקה אושרה. חוזרים לפתור את החידה…"
+      );
       window.setTimeout(() => {
         window.location.href = `/play/${token}`;
       }, 900);
