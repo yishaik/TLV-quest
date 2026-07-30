@@ -18,15 +18,15 @@ const authRoute = readFileSync(
 const experienceMeta = readFileSync("lib/experience-meta.ts", "utf8");
 
 describe("private quest realtime", () => {
-  it("authorizes participant-bound private Broadcast and Presence topics", () => {
+  it("authorizes participant-bound event and presence tables", () => {
     expect(migration).toContain("realtime_participant_authorizations");
-    expect(migration).toContain("quest_realtime_topic_allowed");
-    expect(migration).toContain("quest_participant_receive_realtime");
-    expect(migration).toContain("quest_participant_publish_presence");
-    expect(migration).toContain("realtime.messages.extension = 'presence'");
-    expect(migration).toContain("'state_changed'");
-    expect(migration).toContain("true");
+    expect(migration).toContain("quest_realtime_binding_allowed");
+    expect(migration).toContain("quest_realtime_events_participant_read");
+    expect(migration).toContain("quest_presence_team_read");
+    expect(migration).toContain("quest_presence_own_insert");
+    expect(migration).toContain("alter publication supabase_realtime");
     expect(migration).toContain("quest_realtime_event_state");
+    expect(migration).not.toContain("on realtime.messages");
   });
 
   it("issues short-lived access without exposing a refresh token", () => {
@@ -38,18 +38,19 @@ describe("private quest realtime", () => {
     expect(authRoute).toContain("issueParticipantRealtimeAccess");
   });
 
-  it("joins private channels and tracks one presence record per device", () => {
+  it("subscribes with RLS and maintains presence heartbeats without state polling", () => {
     expect(provider).toContain("getQuestRealtimeClient");
-    expect(provider).toContain("private: true");
-    expect(provider).toContain('event: "sync"');
-    expect(provider).toContain("teamChannel.track");
-    expect(provider).toContain("tlvQuestRealtimeDeviceId");
+    expect(provider).toContain('table: "quest_realtime_events"');
+    expect(provider).toContain('table: "quest_presence"');
+    expect(provider).toContain("Presence heartbeat failed");
+    expect(provider).toContain("PRESENCE_HEARTBEAT_MS");
     expect(provider).not.toContain("setInterval");
   });
 
   it("returns a safe persisted activity feed and renders connection health", () => {
     expect(experienceMeta).toContain("ACTIVITY_EVENT_TYPES");
     expect(experienceMeta).toContain("actorName");
+    expect(experienceMeta).toContain('from("quest_presence")');
     expect(experienceMeta).not.toContain("normalized_answer");
     expect(statusPanel).toContain("connectionState");
     expect(statusPanel).toContain("presence.length");
