@@ -3,6 +3,7 @@ import { deliverCheckpointToTeam } from "@/lib/checkpoint-delivery";
 import { submitCheckpointAnswer } from "@/lib/answer-submission";
 import { getParticipantState } from "@/lib/repository";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import { enforceParticipantRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,7 @@ export async function POST(
 ) {
   try {
     const { token } = await context.params;
+    await enforceParticipantRateLimit("answer", token);
     const body = await readJson<Record<string, unknown>>(request);
     const answer = typeof body.answer === "string" ? body.answer.trim() : "";
     if (!answer) throw new Error("Answer is required");
