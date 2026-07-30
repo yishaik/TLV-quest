@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./QuestRuntimeSafetyNet.module.css";
 
 type Locale = "he" | "en";
@@ -42,6 +42,7 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const checkpointSlugRef = useRef("");
 
   const refresh = useCallback(async () => {
     const response = await fetch(
@@ -52,7 +53,15 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
     if (!response.ok || !payload.ok) {
       throw new Error(payload.error?.message ?? "Failed to load runtime state");
     }
-    setState(payload.data as RuntimeState);
+    const next = payload.data as RuntimeState;
+    const nextSlug = next.checkpoint?.slug ?? "";
+    if (checkpointSlugRef.current && checkpointSlugRef.current !== nextSlug) {
+      setAnswer("");
+      setMessage("");
+      setError("");
+    }
+    checkpointSlugRef.current = nextSlug;
+    setState(next);
   }, [token]);
 
   useEffect(() => {
@@ -84,12 +93,6 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [refresh]);
-
-  useEffect(() => {
-    setAnswer("");
-    setMessage("");
-    setError("");
-  }, [state?.checkpoint?.slug]);
 
   const checkpoint = state?.checkpoint ?? null;
   const language = state?.participant.language ?? "he";
