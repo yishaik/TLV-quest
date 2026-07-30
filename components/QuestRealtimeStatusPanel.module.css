@@ -1,0 +1,169 @@
+.shell {
+  position: fixed;
+  z-index: 40;
+  inset-inline: 14px;
+  top: max(12px, env(safe-area-inset-top));
+  margin-inline: auto;
+  width: min(460px, calc(100vw - 28px));
+  pointer-events: none;
+  font-family: inherit;
+}
+
+.connection,
+.details {
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(10, 15, 26, 0.88);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.connection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.72rem;
+}
+
+.connection i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+}
+
+.connection span {
+  font-weight: 700;
+}
+
+.connection small {
+  margin-inline-start: auto;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.live {
+  color: #9ff3b4;
+}
+
+.connecting,
+.reconnecting {
+  color: #ffe08a;
+}
+
+.offline,
+.stale {
+  color: #ff9f9f;
+}
+
+.details {
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.details > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 15px;
+  cursor: pointer;
+  list-style: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.74rem;
+}
+
+.details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.details > summary strong {
+  color: #f5d78a;
+}
+
+.members,
+.activity {
+  padding: 4px 15px 14px;
+}
+
+.members {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.members > div {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.76rem;
+}
+
+.members small {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.onlineDot,
+.offlineDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.onlineDot {
+  background: #7ce99a;
+  box-shadow: 0 0 9px rgba(124, 233, 154, 0.8);
+}
+
+.offlineDot {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.activity {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.activity h2 {
+  margin: 0 0 8px;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.activity > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.74rem;
+}
+
+.activity time,
+.activity p {
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 0.68rem;
+}
+
+.activity p {
+  margin: 0;
+  padding: 7px 0;
+}
+
+@media (min-width: 720px) {
+  .shell {
+    inset-inline-start: auto;
+    inset-inline-end: 24px;
+    width: 360px;
+  }
+}
