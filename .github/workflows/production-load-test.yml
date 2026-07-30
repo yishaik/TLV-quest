@@ -1,0 +1,50 @@
+name: Production-like load gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_code:
+        description: Six-character code for an isolated disposable active run
+        required: true
+        type: string
+      app_url:
+        description: HTTPS release-candidate origin (Preview, not production)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-load-test
+    env:
+      LOAD_TEST_APP_URL: ${{ inputs.app_url }}
+      LOAD_TEST_RUN_CODE: ${{ inputs.run_code }}
+      LOAD_TEST_ANSWER: ${{ secrets.LOAD_TEST_ANSWER }}
+      LOAD_TEST_PARTICIPANTS: "30"
+      LOAD_TEST_TEAMS: "10"
+      LOAD_TEST_RESULT_PATH: production-load-result.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Exercise 30 participants and 10 teams
+        run: npm run test:load
+
+      - name: Preserve non-sensitive gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-load-result-${{ github.run_id }}
+          path: production-load-result.json
+          if-no-files-found: warn
+          retention-days: 30
