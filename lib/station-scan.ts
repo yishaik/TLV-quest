@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParticipantState } from "@/lib/repository";
+import { verifyStationScan } from "@/lib/physical-actions";
 
 export const recordStationScan = async ({
   token,
@@ -17,6 +18,25 @@ export const recordStationScan = async ({
   if (!state.checkpoint) throw new Error("No active checkpoint");
   if (state.checkpoint.slug !== stationSlug) throw new Error("Checkpoint is locked");
 
+  if (state.checkpoint.kind === "scan") {
+    const completion = await verifyStationScan({
+      token,
+      stationSlug,
+      idempotencyKey
+    });
+    return {
+      verified: true,
+      completed: true,
+      stationSlug,
+      playUrl: `/play/${token}`,
+      completion
+    };
+  }
+
+  if (state.checkpoint.kind !== "hybrid") {
+    throw new Error("This checkpoint does not accept a station scan");
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase.from("game_events").upsert(
     {
@@ -25,7 +45,7 @@ export const recordStationScan = async ({
       participant_id: state.participant.id,
       event_type: "STATION_SCANNED",
       idempotency_key: idempotencyKey,
-      payload: { checkpoint_slug: stationSlug }
+      payload: { checkpoint_slug: stationSlug, verified: true }
     },
     { onConflict: "idempotency_key", ignoreDuplicates: true }
   );
@@ -38,6 +58,8 @@ export const recordStationScan = async ({
 
   return {
     verified: true,
+    completed: false,
+    requiresAnswer: true,
     stationSlug,
     playUrl: `/play/${token}`
   };
