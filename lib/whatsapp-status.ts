@@ -296,7 +296,10 @@ export const formatWhatsappRunStatus = ({
   const locale = context.participant.language;
   const teamFinished = context.team?.status === "finished";
 
-  if (teamFinished || context.run.status === "finished") {
+  if (
+    context.run.status === "finished" ||
+    (teamFinished && ["active", "paused"].includes(context.run.status))
+  ) {
     return locale === "he"
       ? `🎉 המסלול הושלם.\n${progressText(context, locale)}\n\nלתוצאות ולסיכום:\n${resumeLink}`
       : `🎉 The route is complete.\n${progressText(context, locale)}\n\nResults and recap:\n${resumeLink}`;

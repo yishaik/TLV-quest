@@ -282,6 +282,27 @@ describe("WhatsApp run-state resolution", () => {
     expect(message).toContain("למארגן");
   });
 
+  it("lets terminal run state override stale team state deterministically", () => {
+    const notStarted = formatWhatsappRunStatus({
+      context: makeContext({
+        runStatus: "registration_open",
+        teamStatus: "finished",
+        checkpoint: false
+      }),
+      resumeLink: "https://example.test/resume"
+    });
+    const cancelled = formatWhatsappRunStatus({
+      context: makeContext({
+        runStatus: "cancelled",
+        teamStatus: "finished",
+        checkpoint: false
+      }),
+      resumeLink: "https://example.test/resume"
+    });
+    expect(notStarted).toContain("עדיין לא התחיל");
+    expect(cancelled).toContain("בוטל");
+  });
+
   it("fetches participant, run, team, and checkpoint in one service-only RPC", () => {
     expect(migration).toContain(
       "create or replace function public.get_whatsapp_game_contexts"
