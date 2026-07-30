@@ -10,6 +10,10 @@ import {
   type ScoringConfig
 } from "@/lib/game-engine";
 import { validatePhotoWithGemini } from "@/lib/providers";
+import {
+  downloadTwilioMedia,
+  TwilioMediaDownloadError
+} from "@/lib/twilio-media";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -199,21 +203,23 @@ export const handleWhatsappPhoto = async ({
   if (!env.twilioAccountSid || !env.twilioAuthToken) {
     throw new Error("twilio_credentials_missing");
   }
-  const authorization = Buffer.from(
-    `${env.twilioAccountSid}:${env.twilioAuthToken}`
-  ).toString("base64");
-  const mediaResponse = await fetch(mediaUrl, {
-    headers: { authorization: `Basic ${authorization}` }
-  });
-  if (!mediaResponse.ok) {
-    throw new Error(`twilio_media_download_failed:${mediaResponse.status}`);
-  }
-
-  const bytes = new Uint8Array(await mediaResponse.arrayBuffer());
-  if (bytes.byteLength > 10 * 1024 * 1024) {
-    return locale === "he"
-      ? "התמונה גדולה מדי. המגבלה היא 10MB."
-      : "The image is too large. The limit is 10MB.";
+  let bytes: Uint8Array;
+  try {
+    bytes = await downloadTwilioMedia({
+      mediaUrl,
+      accountSid: env.twilioAccountSid,
+      authToken: env.twilioAuthToken
+    });
+  } catch (error) {
+    if (
+      error instanceof TwilioMediaDownloadError &&
+      error.code === "twilio_media_too_large"
+    ) {
+      return locale === "he"
+        ? "התמונה גדולה מדי. המגבלה היא 10MB."
+        : "The image is too large. The limit is 10MB.";
+    }
+    throw error;
   }
 
   const validation = asObject(checkpoint.validation);

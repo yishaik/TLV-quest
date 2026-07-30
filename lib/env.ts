@@ -16,6 +16,21 @@ const required = (name: string): string => {
   return value;
 };
 
+export const isProduction = process.env.VERCEL_ENV === "production";
+
+export const parseTwilioSignatureValidation = (
+  value: string | undefined,
+  production = isProduction
+): boolean => {
+  const enabled = value?.trim().toLowerCase() !== "false";
+  if (production && !enabled) {
+    throw new Error(
+      "TWILIO_VALIDATE_SIGNATURES cannot be disabled in production"
+    );
+  }
+  return enabled;
+};
+
 export const publicEnv = {
   appUrl:
     readPublic(process.env.NEXT_PUBLIC_APP_URL) ?? "http://localhost:3000",
@@ -39,7 +54,7 @@ export const getServerEnv = () => ({
   twilioWhatsappFrom:
     read("TWILIO_WHATSAPP_FROM") ?? "whatsapp:+14155238886",
   validateTwilioSignatures:
-    (read("TWILIO_VALIDATE_SIGNATURES") ?? "true") === "true",
+    parseTwilioSignatureValidation(read("TWILIO_VALIDATE_SIGNATURES")),
   resendApiKey: read("RESEND_API_KEY"),
   emailFrom: read("EMAIL_FROM") ?? "TLV Quest <quest@example.com>",
   geminiApiKey: read("GEMINI_API_KEY"),
@@ -59,5 +74,3 @@ export const getServerEnv = () => ({
       .filter(Boolean)
   )
 });
-
-export const isProduction = process.env.VERCEL_ENV === "production";
