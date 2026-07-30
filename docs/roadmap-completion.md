@@ -18,6 +18,8 @@ upgrade and cannot be enabled by application code:
 
 1. Auth leaked-password protection.
 2. Guaranteed backups/PITR followed by an isolated restore rehearsal.
+3. A five-minute maintenance schedule (the connected Vercel Hobby account
+   supports daily cron only).
 
 Sentry paging ownership and the release-candidate 30-player exercise must also
 be evidenced before promotion. The release is therefore deployed to Preview
@@ -33,7 +35,7 @@ first and must not be promoted merely because its build is green.
 | SEC-04 | Complete in code | Critical browser flow and signed Twilio webhook scenarios in `tests/e2e/smoke.spec.ts`; cloud release-candidate execution is part of the deployment record. |
 | SEC-05 | Complete in code | Exact 30-participant/10-team idempotency race gate in `scripts/quest-load-test.mjs` and the manually approved production-like workflow. |
 | SEC-06 | Complete | HMAC-keyed persistent rate limits and cooldown responses cover join, answer, hint, state, lead, realtime, media, physical-action, and worker routes. |
-| SEC-07 | Configuration gate | Sentry release/error capture and worker monitor check-ins are implemented; paging ownership must be confirmed externally. |
+| SEC-07 | Configuration gate | Sentry release/error capture and worker monitor check-ins are implemented; paging ownership and a five-minute Vercel Pro/external schedule must be confirmed externally. |
 | SEC-08 | Complete | Scheduled retention deletes storage before database metadata and records every worker stage. |
 | SEC-09 | External gate | Free-plan project has no guaranteed backup/PITR control; restore rehearsal procedure is documented in the runbook. |
 | SEC-10 | Complete | Anonymous aggregate run metrics exclude participant, team, run, phone, name, and media identifiers. |

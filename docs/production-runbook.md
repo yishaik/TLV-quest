@@ -42,10 +42,16 @@ Organizer recovery order:
 
 ## Scheduled worker and retention
 
-Vercel calls `GET /api/internal/worker` every five minutes with
-`Authorization: Bearer $CRON_SECRET`. A manual retry may use `WORKER_SECRET`.
-The worker records every stage in `maintenance_runs`; a failed stage produces a
-failed Sentry check-in and is retried on the next schedule.
+The production scheduler calls `GET /api/internal/worker` every five minutes
+with `Authorization: Bearer $CRON_SECRET`. A manual retry may use
+`WORKER_SECRET`. The worker records every stage in `maintenance_runs`; a failed
+stage produces a failed Sentry check-in and is retried on the next schedule.
+
+The connected Vercel account was verified on 2026-07-30 as **Hobby**, which
+rejects schedules more frequent than daily. No misleading daily fallback is
+embedded in the release. Production remains a no-go until either Vercel Pro or
+an approved external scheduler is configured at five-minute cadence and three
+consecutive successful `maintenance_runs` plus Sentry check-ins are recorded.
 
 Stages start scheduled runs, apply adaptive-difficulty decisions, issue due
 hints, drain the outbox, record anonymous metrics, detect/resolve operational
@@ -96,6 +102,8 @@ Restore rehearsal after upgrade:
 - Supabase leaked-password protection enabled.
 - Supabase daily backups and PITR enabled, with a completed isolated restore
   rehearsal.
+- Five-minute production worker schedule on Vercel Pro or an approved external
+  scheduler; three consecutive healthy executions recorded.
 - `TWILIO_VALIDATE_SIGNATURES=true`.
 - `CRON_SECRET` and `WORKER_SECRET` are separate random values.
 - Sentry DSN, organization, project, auth token, release, and alert ownership.
