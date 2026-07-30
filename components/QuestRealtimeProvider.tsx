@@ -151,13 +151,7 @@ export function QuestRealtimeProvider({
     const code = state?.run.publicCode;
     if (!teamTopic || !runTopic || !code) return;
 
-    let client: ReturnType<typeof getBrowserClient>;
-    try {
-      client = getBrowserClient();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Realtime is unavailable");
-      return;
-    }
+    const client = getBrowserClient();
 
     const statuses = new Map<string, boolean>();
     const updateStatus = (name: string, status: string) => {
