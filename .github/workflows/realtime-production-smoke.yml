@@ -1,8 +1,9 @@
 name: Realtime production smoke
 
 on:
-  push:
-    branches: [ops/realtime-production-smoke]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -44,7 +45,7 @@ jobs:
           test "$(jq -r '.ok' "$work/auth.json")" = "true"
           access_token=$(jq -r '.data.accessToken' "$work/auth.json")
           test -n "$access_token"
-          test "$(jq -r 'has("refreshToken")' "$work/auth.json")" = "false"
+          test "$(jq -r '.data | has("refreshToken")' "$work/auth.json")" = "false"
 
           read_status=$(curl -sS -o "$work/events.json" -w '%{http_code}' \
             "$SUPABASE_URL/rest/v1/quest_realtime_events?select=id,run_id,team_id,source,operation&order=id.desc&limit=100" \
