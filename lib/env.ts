@@ -31,6 +31,9 @@ export const parseTwilioSignatureValidation = (
   return enabled;
 };
 
+export const parseEnabledFeatureFlag = (value: string | undefined): boolean =>
+  value?.trim().toLowerCase() === "true";
+
 export const publicEnv = {
   appUrl:
     readPublic(process.env.NEXT_PUBLIC_APP_URL) ?? "http://localhost:3000",
@@ -55,6 +58,9 @@ export const getServerEnv = () => ({
     read("TWILIO_WHATSAPP_FROM") ?? "whatsapp:+14155238886",
   validateTwilioSignatures:
     parseTwilioSignatureValidation(read("TWILIO_VALIDATE_SIGNATURES")),
+  enableWhatsappTypingIndicators: parseEnabledFeatureFlag(
+    read("TWILIO_WHATSAPP_TYPING_INDICATORS")
+  ),
   resendApiKey: read("RESEND_API_KEY"),
   emailFrom: read("EMAIL_FROM") ?? "TLV Quest <quest@example.com>",
   geminiApiKey: read("GEMINI_API_KEY"),

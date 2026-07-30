@@ -1,5 +1,5 @@
-import twilio from "twilio";
-import { publicEnv } from "@/lib/env";
+import { after } from "next/server";
+import { getServerEnv, publicEnv } from "@/lib/env";
 import { participantResumeUrl } from "@/lib/participant-resume";
 import { linkWhatsappParticipant } from "@/lib/repository";
 import { handleWhatsappGameMessage } from "@/lib/whatsapp-game";
@@ -7,19 +7,15 @@ import {
   handleWhatsappLocation,
   handleWhatsappPhoto
 } from "@/lib/whatsapp-attachments";
-import { verifyTwilioWebhook } from "@/lib/providers";
+import { sendWhatsapp, verifyTwilioWebhook } from "@/lib/providers";
+import { sendWhatsappTypingIndicator } from "@/lib/twilio-typing";
+import {
+  WHATSAPP_PHOTO_PROCESSING_ACK,
+  whatsappTwiml
+} from "@/lib/twilio-webhook-response";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const twiml = (message?: string) => {
-  const response = new twilio.twiml.MessagingResponse();
-  if (message) response.message(message);
-  return new Response(response.toString(), {
-    status: 200,
-    headers: { "content-type": "text/xml; charset=utf-8" }
-  });
-};
 
 const errorMessage = (error: unknown) =>
   error instanceof Error
@@ -56,7 +52,48 @@ const whatsappErrorMessage = (error: unknown) => {
   return `אירעה תקלה זמנית. נסו שוב בעוד רגע או השתמשו באתר המשחק.\n${publicEnv.appUrl}/resume\n\nA temporary error occurred. Try again or use the web app.`;
 };
 
+const deliverWhatsappPhotoAfterResponse = async ({
+  from,
+  mediaUrl,
+  mediaContentType,
+  messageSid
+}: {
+  from: string;
+  mediaUrl: string;
+  mediaContentType: string;
+  messageSid: string;
+}) => {
+  let reply: string;
+  try {
+    reply = await handleWhatsappPhoto({
+      from,
+      mediaUrl,
+      mediaContentType,
+      messageSid
+    });
+  } catch (error) {
+    console.error("whatsapp.photo_processing", {
+      outcome: "failed",
+      code: errorMessage(error)
+    });
+    reply = whatsappErrorMessage(error);
+  }
+
+  try {
+    const result = await sendWhatsapp({ to: from, body: reply });
+    console.info("whatsapp.photo_async_response", {
+      outcome: result.status
+    });
+  } catch (error) {
+    console.error("whatsapp.photo_async_response", {
+      outcome: "failed",
+      code: errorMessage(error)
+    });
+  }
+};
+
 export async function POST(request: Request) {
+  const requestStartedAtMs = Date.now();
   const formData = await request.formData();
   const params: Record<string, string> = {};
   for (const [key, value] of formData.entries()) {
@@ -70,6 +107,16 @@ export async function POST(request: Request) {
   });
   if (!valid) return new Response("Forbidden", { status: 403 });
 
+  const env = getServerEnv();
+  const typingIndicator = sendWhatsappTypingIndicator({
+    enabled: env.enableWhatsappTypingIndicators,
+    messageSid: params.MessageSid,
+    accountSid: env.twilioAccountSid,
+    authToken: env.twilioAuthToken,
+    requestStartedAtMs
+  });
+  after(typingIndicator);
+
   const from = params.From ?? "";
   const body = params.Body ?? "";
   const messageSid = params.MessageSid ?? crypto.randomUUID();
@@ -78,19 +125,22 @@ export async function POST(request: Request) {
     const linked = await linkWhatsappParticipant({ from, body });
     if (linked) {
       const webAppUrl = participantResumeUrl(linked.participantId);
-      return twiml(
+      return whatsappTwiml(
         `${linked.message}\n\nלממשק המשחק, המפה והניקוד:\n${webAppUrl}\n\nOpen the web game, map and score:\n${webAppUrl}`
       );
     }
 
     if (Number(params.NumMedia ?? "0") > 0 && params.MediaUrl0) {
-      const reply = await handleWhatsappPhoto({
-        from,
-        mediaUrl: params.MediaUrl0,
-        mediaContentType: params.MediaContentType0 ?? "application/octet-stream",
-        messageSid
-      });
-      return twiml(reply);
+      after(() =>
+        deliverWhatsappPhotoAfterResponse({
+          from,
+          mediaUrl: params.MediaUrl0,
+          mediaContentType:
+            params.MediaContentType0 ?? "application/octet-stream",
+          messageSid
+        })
+      );
+      return whatsappTwiml(WHATSAPP_PHOTO_PROCESSING_ACK);
     }
 
     if (params.Latitude && params.Longitude) {
@@ -105,17 +155,17 @@ export async function POST(request: Request) {
         longitude,
         messageSid
       });
-      return twiml(reply);
+      return whatsappTwiml(reply);
     }
 
     const reply = await handleWhatsappGameMessage({ from, body, messageSid });
-    return twiml(reply);
+    return whatsappTwiml(reply);
   } catch (error) {
     if (isExpectedGameState(error)) {
       console.info("WhatsApp guided game state", { code: errorMessage(error), messageSid });
     } else {
       console.error("Twilio webhook failed", error);
     }
-    return twiml(whatsappErrorMessage(error));
+    return whatsappTwiml(whatsappErrorMessage(error));
   }
 }
