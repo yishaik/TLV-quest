@@ -33,6 +33,14 @@ export type QuestPresenceMember = {
   onlineAt: string | null;
 };
 
+export type QuestBanner = {
+  id: string;
+  teamId: string | null;
+  body: string;
+  activeUntil: string;
+  createdAt: string;
+};
+
 export type QuestConnectionState =
   | "connecting"
   | "live"
@@ -64,6 +72,7 @@ export type QuestParticipantState = {
   members: Array<{ id: string; firstName: string }>;
   activity: QuestActivityEntry[];
   presence: QuestPresenceDevice[];
+  banners: QuestBanner[];
   checkpoint: null | {
     id: string;
     slug: string;

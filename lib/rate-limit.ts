@@ -69,6 +69,11 @@ export const enforceParticipantRateLimit = (
   token: string
 ) => enforceRateLimit({ policyName, subject: `participant:${token}` });
 
+export const enforceOrganizerRateLimit = (
+  policyName: "organizerControl" | "organizerState",
+  token: string
+) => enforceRateLimit({ policyName, subject: `organizer:${token}` });
+
 export const enforceIpRateLimit = (
   policyName: "join" | "leads" | "worker",
   request: Request

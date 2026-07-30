@@ -125,9 +125,45 @@
 .broadcast-form { display: grid; gap: 12px; }
 .broadcast-form textarea { width: 100%; min-height: 105px; padding: 13px; color: #fff; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.05); resize: vertical; }
 .team-control-list { display: grid; gap: 1px; margin-top: 18px; background: rgba(255,255,255,.09); }
-.team-control-row { display: grid; grid-template-columns: minmax(160px,1.5fr) repeat(3, minmax(80px,.7fr)) auto; gap: 12px; align-items: center; min-height: 70px; padding: 14px 17px; background: #0a1b29; }
+.team-control-row { display: grid; grid-template-columns: minmax(160px,1.35fr) repeat(4, minmax(75px,.65fr)) minmax(220px,auto); gap: 12px; align-items: center; min-height: 70px; padding: 14px 17px; background: #0a1b29; }
 .team-control-row > span { color: rgba(255,255,255,.5); font-size: .78rem; }
+.team-control-row > span small { display: block; margin-top: 4px; }
 .team-control-row strong { color: #f4d68d; }
+.team-control-row > div:first-child { display: grid; gap: 5px; }
+.team-control-row small { color: rgba(255,255,255,.45); font-size: .68rem; }
+.team-control-row.is-stuck { box-shadow: inset 4px 0 #ef866f; background: rgba(126,42,35,.2); }
+.control-section { margin-top: 18px; }
+.ops-good { color: #8ee1ad; }
+.ops-bad { color: #f2a08d; }
+.ops-health-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.1); }
+.ops-health-grid > div { min-height: 92px; padding: 15px; background: rgba(7,17,28,.75); }
+.ops-health-grid span { display: block; min-height: 32px; color: rgba(255,255,255,.46); font-size: .68rem; }
+.ops-health-grid strong { display: block; margin-top: 9px; color: #f4d68d; font-size: 1.4rem; }
+.ops-field, .ops-stack { display: grid; gap: 9px; }
+.ops-field { margin: 16px 0; }
+.ops-field span { color: rgba(255,255,255,.6); font-size: .72rem; font-weight: 800; }
+.ops-field input, .ops-stack select, .ops-inline-fields select, .broadcast-form input { width: 100%; min-height: 44px; padding: 10px 12px; color: #fff; border: 1px solid rgba(255,255,255,.17); background: rgba(255,255,255,.06); }
+.ops-field input:focus, .ops-stack select:focus, .ops-inline-fields select:focus, .broadcast-form textarea:focus { border-color: #d9aa58; outline: 0; box-shadow: 0 0 0 3px rgba(217,170,88,.1); }
+.ops-inline-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.row-actions .button { min-height: 34px; padding: 7px 10px; font-size: .68rem; }
+.checkpoint-health-list, .outbox-list, .audit-list { display: grid; gap: 1px; margin-top: 14px; background: rgba(255,255,255,.09); }
+.checkpoint-health-list > div, .outbox-list > div, .audit-list > div { display: grid; grid-template-columns: minmax(130px,1fr) minmax(110px,1fr) auto; gap: 10px; align-items: center; padding: 13px; background: #071621; }
+.checkpoint-health-list > div.is-unhealthy { box-shadow: inset 4px 0 #ef866f; }
+.checkpoint-health-list small, .outbox-list small, .audit-list span, .checkpoint-health-list em, .outbox-list em { color: rgba(255,255,255,.5); font-size: .7rem; }
+.checkpoint-health-list em, .outbox-list em { grid-column: 1 / -1; color: #efaa98; font-style: normal; overflow-wrap: anywhere; }
+.outbox-list > div { grid-template-columns: minmax(130px,1fr) auto auto; }
+.outbox-list span { display: grid; gap: 4px; }
+.outbox-list time, .audit-list time { color: rgba(255,255,255,.4); font-size: .66rem; }
+.audit-list > div { grid-template-columns: minmax(130px,.8fr) 1fr auto; }
+.audit-list details { grid-column: 1 / -1; color: rgba(255,255,255,.55); font-size: .7rem; }
+.audit-list summary { cursor: pointer; }
+.audit-list pre { max-height: 240px; padding: 12px; overflow: auto; direction: ltr; color: #d9e6ef; background: rgba(0,0,0,.24); font-size: .65rem; text-align: left; white-space: pre-wrap; }
+.ops-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.ops-tabs button { padding: 7px 11px; color: rgba(255,255,255,.58); border: 1px solid rgba(255,255,255,.13); background: transparent; cursor: pointer; }
+.ops-tabs button.active { color: #17120a; border-color: #d9aa58; background: #d9aa58; }
+.control-feedback { position: sticky; z-index: 5; bottom: 16px; margin-top: 18px; box-shadow: 0 18px 55px rgba(0,0,0,.35); }
+.control-room button:disabled { cursor: not-allowed; opacity: .5; }
 
 /* Public race screen */
 .race-screen { position: relative; min-height: 100svh; padding: 30px; overflow: hidden; color: #fff; background: #07111c; isolation: isolate; }
@@ -164,6 +200,8 @@
   .control-header, .race-header { align-items: start; flex-direction: column; }
   .status-orb { width: 86px; height: 86px; }
   .team-control-row { grid-template-columns: 1fr 1fr; }
+  .team-control-row .row-actions { grid-column: 1 / -1; }
+  .ops-health-grid { grid-template-columns: repeat(2,1fr); }
   .podium { grid-template-columns: 1fr; align-items: stretch; }
   .podium-card, .podium-card:first-child { min-height: 230px; }
 }
@@ -186,6 +224,9 @@
   .share-row { grid-template-columns: 1fr; }
   .team-control-row { grid-template-columns: 1fr 1fr; }
   .team-control-row strong { grid-column: 1 / -1; }
+  .ops-inline-fields { grid-template-columns: 1fr; }
+  .checkpoint-health-list > div, .outbox-list > div, .audit-list > div { grid-template-columns: 1fr; }
+  .checkpoint-health-list em, .outbox-list em, .audit-list details { grid-column: auto; }
   .race-row { grid-template-columns: 42px 1fr 65px; }
   .race-row > :nth-child(4), .race-row > :nth-child(5) { display: none; }
 }

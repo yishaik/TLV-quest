@@ -25,6 +25,11 @@ type ParticipantState = {
   };
   team: { name: string; status: string; score: number; completedCount: number };
   members: Array<{ id: string; firstName: string }>;
+  banners?: Array<{
+    id: string;
+    body: string;
+    activeUntil: string;
+  }>;
   checkpoint: null | {
     slug: string;
     sequenceNo: number;
@@ -41,6 +46,30 @@ type ParticipantState = {
 };
 
 type Drawer = "team" | "map" | "board" | null;
+
+function ParticipantBanners({
+  banners,
+  isHebrew
+}: {
+  banners: ParticipantState["banners"];
+  isHebrew: boolean;
+}) {
+  if (!banners?.length) return null;
+  return (
+    <aside
+      className="quest-banner-stack"
+      aria-label={isHebrew ? "הודעות מהמארגן" : "Organizer announcements"}
+      aria-live="assertive"
+    >
+      {banners.map((banner) => (
+        <div className="quest-organizer-banner" key={banner.id}>
+          <span>{isHebrew ? "עדכון מהמארגן" : "Organizer update"}</span>
+          <strong>{banner.body}</strong>
+        </div>
+      ))}
+    </aside>
+  );
+}
 
 const contentFor = (
   checkpoint: NonNullable<ParticipantState["checkpoint"]>,
@@ -398,6 +427,10 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
     return (
       <main className="quest-experience" dir={isHebrew ? "rtl" : "ltr"}>
         <div className="quest-ambient" />
+        <ParticipantBanners
+          banners={state.banners}
+          isHebrew={isHebrew}
+        />
         <section className="quest-state-card">
           <img className="quest-state-mark" src="/visuals/quest-mark.svg" alt="" />
           <span className="quest-kicker">
@@ -429,6 +462,10 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
         dir={isHebrew ? "rtl" : "ltr"}
       >
         <div className="quest-ambient" />
+        <ParticipantBanners
+          banners={state.banners}
+          isHebrew={isHebrew}
+        />
         <section className="quest-state-card">
           <img className="quest-state-mark" src="/visuals/quest-mark.svg" alt="" />
           <span className="quest-kicker">
@@ -480,6 +517,11 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
       <div className="quest-progress" aria-label="Quest progress">
         <span style={{ width: `${progress}%` }} />
       </div>
+
+      <ParticipantBanners
+        banners={state.banners}
+        isHebrew={isHebrew}
+      />
 
       <section className="mission-panel">
         <div className="mission-index">

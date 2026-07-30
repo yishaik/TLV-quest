@@ -91,6 +91,10 @@ body:has(.page), body:has(.quest-shell) {
 .quest-stage small { color: rgba(255,255,255,.36); font-size: .82rem; }
 .quest-progress { width: min(820px, 100%); height: 2px; margin: 0 auto 24px; overflow: hidden; background: rgba(255,255,255,.14); }
 .quest-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--xp-copper), var(--xp-gold-light)); box-shadow: 0 0 16px var(--xp-gold); transition: width .5s ease; }
+.quest-banner-stack { position: relative; z-index: 2; display: grid; gap: 8px; width: min(820px,100%); margin: 0 auto 18px; }
+.quest-organizer-banner { display: grid; gap: 6px; padding: 15px 18px; color: #17120a; border: 1px solid rgba(255,236,184,.8); background: linear-gradient(135deg,#f4d68d,#d9aa58); box-shadow: 0 14px 35px rgba(0,0,0,.24); }
+.quest-organizer-banner span { font-size: .6rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.quest-organizer-banner strong { font-size: .92rem; line-height: 1.5; }
 
 .mission-panel {
   display: grid;

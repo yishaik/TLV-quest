@@ -2,8 +2,15 @@ import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashSecret } from "@/lib/crypto";
 import { skipCheckpointForTeam } from "@/lib/checkpoint-skip";
-import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import {
+  AppError,
+  handleRouteError,
+  jsonOk,
+  readJson,
+  requireIdempotencyKey
+} from "@/lib/http";
 import { processOutbox } from "@/lib/providers";
+import { enforceOrganizerRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -15,6 +22,53 @@ const CHECKPOINT_SKIP_ERRORS = new Set([
   "team_not_active",
   "team_not_found"
 ]);
+
+const SUPPORTED_OVERRIDES = new Set([
+  "pause",
+  "resume",
+  "end",
+  "score",
+  "force_complete",
+  "grant_hint",
+  "move_participant",
+  "disable_checkpoint"
+]);
+
+type Delivery = {
+  queued: number;
+  processing: number;
+  sent: number;
+  delivered: number;
+  failed: number;
+};
+
+const emptyDelivery = (queued = 0): Delivery => ({
+  queued,
+  processing: 0,
+  sent: 0,
+  delivered: 0,
+  failed: 0
+});
+
+const textField = (
+  body: Record<string, unknown>,
+  key: string,
+  maxLength = 800
+) => {
+  const value = typeof body[key] === "string" ? body[key].trim() : "";
+  return value.slice(0, maxLength);
+};
+
+const optionalText = (body: Record<string, unknown>, key: string) =>
+  textField(body, key) || null;
+
+const objectValue = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const isDuplicateResult = (value: unknown) =>
+  objectValue(value).duplicate === true;
 
 const checkpointSkipErrorCode = (error: unknown): string => {
   const message =
@@ -28,31 +82,87 @@ const checkpointSkipErrorCode = (error: unknown): string => {
   );
 };
 
+const escapeLikePattern = (value: string) =>
+  value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+
+const findOutboxIds = async ({
+  supabase,
+  runId,
+  idempotencyKey
+}: {
+  supabase: ReturnType<typeof createAdminClient>;
+  runId: string;
+  idempotencyKey: string;
+}) => {
+  const prefix = escapeLikePattern(`${idempotencyKey}:outbox:`);
+  const { data, error } = await supabase
+    .from("message_outbox")
+    .select("id")
+    .eq("run_id", runId)
+    .like("idempotency_key", `${prefix}%`);
+  if (error) throw error;
+  return (data ?? []).map((row) => row.id);
+};
+
+const kickOutbox = ({
+  outboxIds,
+  runId,
+  action
+}: {
+  outboxIds: string[];
+  runId: string;
+  action: string;
+}) => {
+  if (!outboxIds.length) return;
+  after(async () => {
+    try {
+      await processOutbox(outboxIds.length, { outboxIds });
+    } catch {
+      console.error("organizer.outbox_low_latency_kick_failed", {
+        runId,
+        action,
+        queued: outboxIds.length,
+        errorCode: "outbox_kick_failed"
+      });
+    }
+  });
+};
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ token: string }> }
 ) {
   try {
     const { token } = await context.params;
-    const body = await readJson<Record<string, unknown>>(request);
-    const action = typeof body.action === "string" ? body.action : "";
+    await enforceOrganizerRateLimit("organizerControl", token);
+
+    const tokenHash = hashSecret(token);
     const supabase = createAdminClient();
     const { data: run, error: runError } = await supabase
       .from("game_runs")
-      .select("*")
-      .eq("organizer_token_hash", hashSecret(token))
+      .select("id")
+      .eq("organizer_token_hash", tokenHash)
       .single();
-    if (runError || !run) throw new Error("Organizer link is invalid or expired");
+    if (runError || !run) {
+      throw new Error("Organizer link is invalid or expired");
+    }
 
-    let delivery:
-      | {
-          queued: number;
-          processing: number;
-          sent: number;
-          delivered: number;
-          failed: number;
-        }
-      | undefined;
+    const idempotencyKey = requireIdempotencyKey(request);
+    const body = await readJson<Record<string, unknown>>(request);
+    const action = textField(body, "action", 40);
+    const reason = textField(body, "reason", 500);
+    if (reason.length < 5) {
+      throw new AppError({
+        message:
+          "יש לציין סיבה קצרה להתערבות. / Add a short reason for this intervention.",
+        status: 400,
+        code: "override_reason_required"
+      });
+    }
+
+    const actor = `organizer:${tokenHash.slice(0, 12)}`;
+    let result: unknown;
+    let delivery: Delivery | undefined;
     let skip:
       | {
           attempted: number;
@@ -64,62 +174,96 @@ export async function POST(
         }
       | undefined;
 
-    if (action === "pause") {
-      const { error } = await supabase
-        .from("game_runs")
-        .update({ status: "paused" })
-        .eq("id", run.id)
-        .eq("status", "active");
+    if (action === "broadcast") {
+      const bodyHe =
+        textField(body, "bodyHe") || textField(body, "message");
+      const bodyEn = textField(body, "bodyEn") || bodyHe;
+      if (!bodyHe || !bodyEn) {
+        throw new AppError({
+          message:
+            "נדרש טקסט הודעה בעברית ובאנגלית. / Broadcast text is required in both languages.",
+          status: 400,
+          code: "broadcast_body_required"
+        });
+      }
+      const activeMinutes =
+        typeof body.activeMinutes === "number"
+          ? Math.max(1, Math.min(1440, Math.round(body.activeMinutes)))
+          : 60;
+      const { data, error } = await supabase.rpc(
+        "queue_organizer_broadcast",
+        {
+          p_run_id: run.id,
+          p_team_id: optionalText(body, "teamId"),
+          p_body_he: bodyHe,
+          p_body_en: bodyEn,
+          p_reason: reason,
+          p_actor: actor,
+          p_idempotency_key: idempotencyKey,
+          p_active_minutes: activeMinutes
+        }
+      );
       if (error) throw error;
-    } else if (action === "resume") {
-      const { error } = await supabase
-        .from("game_runs")
-        .update({ status: "active" })
-        .eq("id", run.id)
-        .eq("status", "paused");
+      result = data;
+
+      const outboxIds = await findOutboxIds({
+        supabase,
+        runId: run.id,
+        idempotencyKey
+      });
+      const queued = isDuplicateResult(data) ? 0 : outboxIds.length;
+      delivery = emptyDelivery(queued);
+      kickOutbox({ outboxIds, runId: run.id, action });
+    } else if (action === "retry_message") {
+      const messageId = textField(body, "messageId", 64);
+      if (!messageId) {
+        throw new AppError({
+          message: "Message id is required",
+          status: 400,
+          code: "message_id_required"
+        });
+      }
+      const { data, error } = await supabase.rpc("retry_outbox_message", {
+        p_run_id: run.id,
+        p_message_id: messageId,
+        p_reason: reason,
+        p_actor: actor,
+        p_idempotency_key: idempotencyKey
+      });
       if (error) throw error;
-    } else if (action === "end") {
-      const now = new Date();
-      const { error } = await supabase
-        .from("game_runs")
-        .update({
-          status: "finished",
-          finished_at: now.toISOString(),
-          retention_until: new Date(now.getTime() + 72 * 60 * 60 * 1000).toISOString()
-        })
-        .eq("id", run.id);
-      if (error) throw error;
-      await supabase
-        .from("teams")
-        .update({ status: "finished", finished_at: now.toISOString() })
-        .eq("run_id", run.id)
-        .neq("status", "disqualified");
+      result = data;
+      const duplicate = isDuplicateResult(data);
+      delivery = emptyDelivery(duplicate ? 0 : 1);
+      if (!duplicate) {
+        kickOutbox({
+          outboxIds: [messageId],
+          runId: run.id,
+          action
+        });
+      }
     } else if (action === "skip") {
       const { data: teams, error: teamError } = await supabase
         .from("teams")
-        .select("id")
+        .select(
+          "id,status,score,completed_count,current_checkpoint_slug,last_progress_at"
+        )
         .eq("run_id", run.id)
         .in("status", ["travelling", "solving"]);
       if (teamError) throw teamError;
 
-      const suppliedKey = request.headers.get("idempotency-key")?.trim();
-      const requestKey =
-        suppliedKey && suppliedKey.length <= 240
-          ? suppliedKey
-          : crypto.randomUUID();
       const outcomes = await Promise.all(
         (teams ?? []).map(async (team) => {
           try {
-            const result = await skipCheckpointForTeam({
+            const skipResult = await skipCheckpointForTeam({
               teamId: team.id,
               actor: { type: "organizer" },
               reason: "organizer_override",
               requireOptional: false,
               idempotencyKey: `organizer-skip:${hashSecret(
-                `${run.id}:${team.id}:${requestKey}`
+                `${run.id}:${team.id}:${idempotencyKey}`
               )}`
             });
-            return { teamId: team.id, result };
+            return { teamId: team.id, result: skipResult };
           } catch (error) {
             return {
               teamId: team.id,
@@ -148,9 +292,7 @@ export async function POST(
           errorCode: outcome.errorCode
         }));
       const outboxIds = [
-        ...new Set(
-          successes.flatMap((outcome) => outcome.result.outboxIds)
-        )
+        ...new Set(successes.flatMap((outcome) => outcome.result.outboxIds))
       ];
       skip = {
         attempted: outcomes.length,
@@ -169,116 +311,103 @@ export async function POST(
         queued: outboxIds.length,
         failures
       };
-      delivery = {
-        queued: outboxIds.length,
-        processing: 0,
-        sent: 0,
-        delivered: 0,
-        failed: 0
+      delivery = emptyDelivery(outboxIds.length);
+
+      const teamIds = (teams ?? []).map((team) => team.id);
+      const { data: afterTeams, error: afterTeamsError } = teamIds.length
+        ? await supabase
+            .from("teams")
+            .select(
+              "id,status,score,completed_count,current_checkpoint_slug,last_progress_at"
+            )
+            .in("id", teamIds)
+        : { data: [], error: null };
+      if (afterTeamsError) throw afterTeamsError;
+
+      const auditPayload = {
+        run_id: run.id,
+        action,
+        actor,
+        reason,
+        idempotency_key: idempotencyKey,
+        before_state: { teams: teams ?? [] },
+        after_state: { teams: afterTeams ?? [], result: skip }
       };
-      if (outboxIds.length) {
-        after(async () => {
-          try {
-            await processOutbox(outboxIds.length, { outboxIds });
-          } catch {
-            console.error("checkpoint_skip.low_latency_kick_failed", {
-              runId: run.id,
-              actorType: "organizer",
-              queued: outboxIds.length,
-              errorCode: "outbox_kick_failed"
-            });
-          }
+      const [{ error: auditError }, { error: eventError }] =
+        await Promise.all([
+          supabase
+            .from("organizer_audit_log")
+            .upsert(auditPayload, {
+              onConflict: "idempotency_key",
+              ignoreDuplicates: true
+            }),
+          supabase.from("game_events").upsert(
+            {
+              run_id: run.id,
+              event_type: "ORGANIZER_OVERRIDE",
+              idempotency_key: `${idempotencyKey}:audit`,
+              payload: {
+                action,
+                actor,
+                reason,
+                before: auditPayload.before_state,
+                after: auditPayload.after_state
+              }
+            },
+            {
+              onConflict: "idempotency_key",
+              ignoreDuplicates: true
+            }
+          )
+        ]);
+      if (auditError) throw auditError;
+      if (eventError) throw eventError;
+      result = skip;
+      kickOutbox({ outboxIds, runId: run.id, action });
+    } else {
+      if (!SUPPORTED_OVERRIDES.has(action)) {
+        throw new AppError({
+          message: "Unsupported organizer action",
+          status: 400,
+          code: "unsupported_organizer_action"
         });
       }
-    } else if (action === "broadcast") {
-      const message = typeof body.message === "string" ? body.message.trim() : "";
-      if (!message) throw new Error("Message is required");
-      const { data: participants, error } = await supabase
-        .from("participants")
-        .select("id,phone_ciphertext")
-        .eq("run_id", run.id)
-        .not("phone_ciphertext", "is", null);
-      if (error) throw error;
-      if (participants?.length) {
-        const { data: queuedRows, error: insertError } = await supabase
-          .from("message_outbox")
-          .insert(
-            participants.map((participant) => ({
-              run_id: run.id,
-              participant_id: participant.id,
-              channel: "whatsapp",
-              recipient_ciphertext: participant.phone_ciphertext,
-              payload: { body: message }
-            }))
-          )
-          .select("id");
-        if (insertError) throw insertError;
-
-        const outboxIds = (queuedRows ?? []).map((row) => row.id);
-        delivery = {
-          queued: outboxIds.length,
-          processing: 0,
-          sent: 0,
-          delivered: 0,
-          failed: 0
-        };
-        if (outboxIds.length) {
-          after(async () => {
-            try {
-              await processOutbox(outboxIds.length, { outboxIds });
-            } catch {
-              console.error("outbox.low_latency_kick_failed", {
-                runId: run.id,
-                queued: outboxIds.length,
-                errorCode: "outbox_kick_failed"
-              });
-            }
-          });
+      const scoreDelta =
+        typeof body.delta === "number" ? Math.round(body.delta) : null;
+      const { data, error } = await supabase.rpc(
+        "apply_organizer_override",
+        {
+          p_run_id: run.id,
+          p_action: action,
+          p_reason: reason,
+          p_actor: actor,
+          p_idempotency_key: idempotencyKey,
+          p_team_id: optionalText(body, "teamId"),
+          p_participant_id: optionalText(body, "participantId"),
+          p_target_team_id: optionalText(body, "targetTeamId"),
+          p_checkpoint_slug: optionalText(body, "checkpointSlug"),
+          p_score_delta: scoreDelta
         }
-      } else {
-        delivery = {
-          queued: 0,
-          processing: 0,
-          sent: 0,
-          delivered: 0,
-          failed: 0
-        };
+      );
+      if (error) throw error;
+      result = data;
+
+      if (action === "grant_hint") {
+        const outboxIds = await findOutboxIds({
+          supabase,
+          runId: run.id,
+          idempotencyKey
+        });
+        const queued = isDuplicateResult(data) ? 0 : outboxIds.length;
+        delivery = emptyDelivery(queued);
+        kickOutbox({ outboxIds, runId: run.id, action });
       }
-    } else if (action === "score") {
-      const teamId = typeof body.teamId === "string" ? body.teamId : "";
-      const delta = typeof body.delta === "number" ? Math.round(body.delta) : 0;
-      const { data: team, error: teamError } = await supabase
-        .from("teams")
-        .select("score")
-        .eq("id", teamId)
-        .eq("run_id", run.id)
-        .single();
-      if (teamError || !team) throw new Error("Team was not found");
-      const { error } = await supabase
-        .from("teams")
-        .update({ score: Math.max(0, team.score + delta) })
-        .eq("id", teamId);
-      if (error) throw error;
-    } else {
-      throw new Error("Unsupported organizer action");
-    }
-
-    if (action !== "skip") {
-      const { error: eventError } = await supabase.from("game_events").insert({
-        run_id: run.id,
-        event_type: "ORGANIZER_ACTION",
-        idempotency_key: `organizer:${action}:${crypto.randomUUID()}`,
-        payload: {
-          action,
-          ...(delivery ? { queuedCount: delivery.queued } : {})
-        }
-      });
-      if (eventError) throw eventError;
     }
 
     return jsonOk(
       {
         action,
+        result,
         status: skip?.failures.length ? "partial" : "accepted",
         ...(delivery ? { delivery } : {}),
         ...(skip ? { skip } : {})

@@ -132,8 +132,10 @@ const PHOTO_CONFLICT_CODES = new Set([
 
 const NOT_FOUND_CODES = new Set([
   "checkpoint_not_found",
+  "message_not_found",
   "participant_not_found",
   "run_not_found",
+  "target_team_not_found",
   "team_not_found"
 ]);
 
@@ -143,12 +145,18 @@ const CONFLICT_CODES = new Set([
   "checkpoint_not_optional",
   "game_not_active",
   "idempotency_key_conflict",
+  "message_not_retryable",
+  "no_more_hints",
   "run_cannot_start",
+  "run_cannot_pause",
+  "run_cannot_resume",
   "run_has_no_checkpoints",
+  "team_has_no_checkpoint",
   "team_not_active"
 ]);
 
 const INVALID_REQUEST_CODES = new Set([
+  "invalid_score_delta",
   "invalid_idempotency_key",
   "invalid_skip_actor",
   "invalid_skip_deliveries",
