@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:rls-remote": "node scripts/verify-supabase-public-access.mjs",
     "check": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {

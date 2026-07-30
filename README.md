@@ -11,3 +11,7 @@ there is deliberately no production-project fallback in source.
 Operational notes for Twilio's Public Beta typing indicator, including its
 read-receipt side effect and the long-running photo strategy, are in
 `docs/whatsapp-typing-indicators.md`.
+
+The Supabase browser-role allowlist, Realtime isolation model, credential
+handling, and production probe are documented in
+`docs/security-access-model.md`.
