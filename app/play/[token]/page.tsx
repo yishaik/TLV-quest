@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PremiumQuestPlayer } from "@/components/PremiumQuestPlayer";
+import { QuestRuntimeSafetyNet } from "@/components/QuestRuntimeSafetyNet";
 import { QuestStationVisual } from "@/components/QuestStationVisual";
 
 export const metadata: Metadata = { title: "המסע" };
@@ -14,6 +15,7 @@ export default async function PlayPage({
     <>
       <QuestStationVisual token={token} />
       <PremiumQuestPlayer token={token} />
+      <QuestRuntimeSafetyNet token={token} />
     </>
   );
 }
