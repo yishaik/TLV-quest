@@ -33,31 +33,41 @@ const checkpointSlugFromPayload = (value: unknown) => {
 export async function getParticipantExperienceState(token: string) {
   const state = await getParticipantState(token);
   const supabase = createAdminClient();
-  const [checkpointCount, teamRealtime, runRealtime, activityResult] =
-    await Promise.all([
-      supabase
-        .from("run_checkpoints")
-        .select("id", { count: "exact", head: true })
-        .eq("run_id", state.run.id)
-        .eq("is_disabled", false),
-      supabase
-        .from("teams")
-        .select("realtime_topic")
-        .eq("id", state.team.id)
-        .single(),
-      supabase
-        .from("game_runs")
-        .select("realtime_topic")
-        .eq("id", state.run.id)
-        .single(),
-      supabase
-        .from("game_events")
-        .select("id,event_type,participant_id,payload,created_at")
-        .eq("team_id", state.team.id)
-        .in("event_type", ACTIVITY_EVENT_TYPES)
-        .order("created_at", { ascending: false })
-        .limit(20)
-    ]);
+  const [
+    checkpointCount,
+    teamRealtime,
+    runRealtime,
+    activityResult,
+    presenceResult
+  ] = await Promise.all([
+    supabase
+      .from("run_checkpoints")
+      .select("id", { count: "exact", head: true })
+      .eq("run_id", state.run.id)
+      .eq("is_disabled", false),
+    supabase
+      .from("teams")
+      .select("realtime_topic")
+      .eq("id", state.team.id)
+      .single(),
+    supabase
+      .from("game_runs")
+      .select("realtime_topic")
+      .eq("id", state.run.id)
+      .single(),
+    supabase
+      .from("game_events")
+      .select("id,event_type,participant_id,payload,created_at")
+      .eq("team_id", state.team.id)
+      .in("event_type", ACTIVITY_EVENT_TYPES)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("quest_presence")
+      .select("participant_id,device_id,visible,online_at,expires_at")
+      .eq("team_id", state.team.id)
+      .gt("expires_at", new Date().toISOString())
+  ]);
   if (checkpointCount.error) throw checkpointCount.error;
   if (teamRealtime.error || !teamRealtime.data?.realtime_topic) {
     throw teamRealtime.error ?? new Error("Team realtime topic is unavailable");
@@ -66,6 +76,7 @@ export async function getParticipantExperienceState(token: string) {
     throw runRealtime.error ?? new Error("Run realtime topic is unavailable");
   }
   if (activityResult.error) throw activityResult.error;
+  if (presenceResult.error) throw presenceResult.error;
 
   const memberNames = new Map(
     state.members.map((member) => [member.id, member.firstName])
@@ -79,6 +90,13 @@ export async function getParticipantExperienceState(token: string) {
       : null,
     checkpointSlug: checkpointSlugFromPayload(event.payload),
     createdAt: event.created_at
+  }));
+  const presence = (presenceResult.data ?? []).map((device) => ({
+    participantId: device.participant_id,
+    deviceId: device.device_id,
+    visible: device.visible,
+    onlineAt: device.online_at,
+    expiresAt: device.expires_at
   }));
 
   let checkpoint = state.checkpoint
@@ -148,6 +166,7 @@ export async function getParticipantExperienceState(token: string) {
   return {
     ...state,
     activity,
+    presence,
     checkpoint,
     run: {
       ...state.run,
