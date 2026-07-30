@@ -18,6 +18,28 @@ const required = (name: string): string => {
 
 export const isProduction = process.env.VERCEL_ENV === "production";
 
+export const requirePublicEnvValue = (
+  name: string,
+  value: string | undefined,
+  production = isProduction
+): string => {
+  const trimmed = readPublic(value);
+  if (!trimmed) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  if (
+    production &&
+    (trimmed.includes("your-project-ref") ||
+      trimmed.includes("replace_me") ||
+      trimmed.endsWith("_test"))
+  ) {
+    throw new Error(
+      `Placeholder value is not allowed in production: ${name}`
+    );
+  }
+  return trimmed;
+};
+
 export const parseTwilioSignatureValidation = (
   value: string | undefined,
   production = isProduction
@@ -37,11 +59,14 @@ export const parseEnabledFeatureFlag = (value: string | undefined): boolean =>
 export const publicEnv = {
   appUrl:
     readPublic(process.env.NEXT_PUBLIC_APP_URL) ?? "http://localhost:3000",
-  supabaseUrl:
-    readPublic(process.env.NEXT_PUBLIC_SUPABASE_URL) ??
-    "https://vybivdkskrkafcuedvbg.supabase.co",
-  supabasePublishableKey:
-    readPublic(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ?? "",
+  supabaseUrl: requirePublicEnvValue(
+    "NEXT_PUBLIC_SUPABASE_URL",
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+  ),
+  supabasePublishableKey: requirePublicEnvValue(
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  ),
   twilioSandboxNumber:
     readPublic(process.env.NEXT_PUBLIC_TWILIO_SANDBOX_NUMBER) ?? "14155238886",
   twilioSandboxJoinCode:
@@ -62,7 +87,7 @@ export const getServerEnv = () => ({
     read("TWILIO_WHATSAPP_TYPING_INDICATORS")
   ),
   resendApiKey: read("RESEND_API_KEY"),
-  emailFrom: read("EMAIL_FROM") ?? "TLV Quest <quest@example.com>",
+  emailFrom: read("EMAIL_FROM"),
   geminiApiKey: read("GEMINI_API_KEY"),
   geminiVisionModel: read("GEMINI_VISION_MODEL") ?? "gemini-2.5-flash",
   adminEmails: new Set(

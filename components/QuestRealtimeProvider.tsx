@@ -34,6 +34,8 @@ type RealtimeAccess = {
   accessToken: string;
   expiresAt: number;
   participantId: string;
+  supabaseUrl: string;
+  supabasePublishableKey: string;
 };
 
 type PresenceRow = {
