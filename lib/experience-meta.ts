@@ -28,21 +28,22 @@ export async function getParticipantExperienceState(token: string) {
     : null;
 
   if (state.checkpoint) {
+    const currentCheckpoint = state.checkpoint;
     const { data: checkpointMeta, error: checkpointMetaError } = await supabase
       .from("run_checkpoints")
       .select("is_optional")
-      .eq("id", state.checkpoint.id)
+      .eq("id", currentCheckpoint.id)
       .single();
     if (checkpointMetaError) throw checkpointMetaError;
 
     let scanVerified = false;
-    if (state.checkpoint.kind === "hybrid") {
+    if (currentCheckpoint.kind === "hybrid") {
       const { data: scanEvent, error: scanError } = await supabase
         .from("game_events")
         .select("id")
         .eq("team_id", state.team.id)
         .eq("event_type", "STATION_SCANNED")
-        .contains("payload", { checkpoint_slug: state.checkpoint.slug })
+        .contains("payload", { checkpoint_slug: currentCheckpoint.slug })
         .limit(1)
         .maybeSingle();
       if (scanError) throw scanError;
@@ -50,19 +51,19 @@ export async function getParticipantExperienceState(token: string) {
     }
 
     let photoFallbackAvailable = false;
-    if (state.checkpoint.kind === "photo") {
+    if (currentCheckpoint.kind === "photo") {
       const { data: assets, error: assetsError } = await supabase
         .from("media_assets")
         .select("validation")
         .eq("team_id", state.team.id)
-        .eq("checkpoint_id", state.checkpoint.id)
+        .eq("checkpoint_id", currentCheckpoint.id)
         .order("created_at", { ascending: false })
         .limit(20);
       if (assetsError) throw assetsError;
 
       const threshold =
-        typeof state.checkpoint.validation.confidenceThreshold === "number"
-          ? state.checkpoint.validation.confidenceThreshold
+        typeof currentCheckpoint.validation.confidenceThreshold === "number"
+          ? currentCheckpoint.validation.confidenceThreshold
           : 0.86;
       photoFallbackAvailable = (assets ?? []).some((asset) => {
         const validation = objectValue(asset.validation);
@@ -74,7 +75,7 @@ export async function getParticipantExperienceState(token: string) {
     }
 
     checkpoint = {
-      ...checkpoint,
+      ...currentCheckpoint,
       isOptional: checkpointMeta.is_optional === true,
       scanVerified,
       photoFallbackAvailable
