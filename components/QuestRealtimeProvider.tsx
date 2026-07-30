@@ -127,7 +127,7 @@ export function QuestRealtimeProvider({
 
   useEffect(() => {
     localStorage.setItem("tlvQuestParticipantToken", token);
-    void refresh();
+    const initialRefresh = window.setTimeout(() => void refresh(), 0);
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
@@ -137,6 +137,7 @@ export function QuestRealtimeProvider({
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("online", onOnline);
     return () => {
+      window.clearTimeout(initialRefresh);
       window.clearTimeout(stateRefreshTimer.current);
       window.clearTimeout(boardRefreshTimer.current);
       document.removeEventListener("visibilitychange", onVisibility);
