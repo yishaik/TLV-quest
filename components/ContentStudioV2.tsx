@@ -9,7 +9,9 @@ import {
   useRef,
   useState
 } from "react";
+import { contentImportCsvTemplate } from "@/lib/content-import";
 import { getBrowserClient } from "@/lib/supabase/browser";
+import { RouteSafetyMap } from "@/components/RouteSafetyMap";
 import styles from "./ContentStudioV2.module.css";
 
 type Tab = "routes" | "stations" | "riddles";
@@ -121,6 +123,69 @@ type VersionDetail = {
     checkpointCount: number;
     unverifiedCount: number;
   };
+};
+type ContentImportResult = {
+  ok: boolean;
+  dryRun: boolean;
+  duplicate?: boolean;
+  batchId?: string;
+  status?: string;
+  rowCount: number;
+  stationsCreated?: number;
+  riddlesCreated?: number;
+  stopsCreated?: number;
+  errors: Array<{
+    row: number | null;
+    field: string;
+    code: string;
+    message: string;
+  }>;
+};
+type ContentImportBatch = {
+  id: string;
+  format: "csv" | "json";
+  status: "applied" | "rolled_back";
+  row_count: number;
+  summary: Record<string, unknown>;
+  actor: string;
+  created_at: string;
+  rolled_back_at: string | null;
+  rolled_back_by: string | null;
+};
+type RouteGenerationDraft = {
+  id: string;
+  proposed_route: {
+    publicationState: "draft";
+    stops: Array<{
+      sequence: number;
+      stationId: string;
+      stationSlug: string;
+      stationTitle: Localized;
+      riddleId: string;
+      riddleSlug: string;
+      kind: string;
+      healthStatus: string;
+      requiresFieldVerification: boolean;
+    }>;
+    analysis: {
+      totalDistanceMeters: number;
+      walkingMinutes: number;
+      estimatedExperienceMinutes: number;
+      flags: string[];
+    };
+    rationale: string;
+    requiresHumanReview: true;
+  };
+  provenance: {
+    provider: string;
+    model: string | null;
+    algorithm: string;
+    candidateCount: number;
+  };
+  confidence: number;
+  verification_requirements: string[];
+  status: "draft";
+  created_at: string;
 };
 type StationDraft = {
   id: string;
@@ -401,6 +466,25 @@ export function ContentStudioV2() {
   const [riddlePicker, setRiddlePicker] = useState<Record<string, string>>({});
   const [draggedStopId, setDraggedStopId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLocale, setPreviewLocale] = useState<"he" | "en">("he");
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
+  const [importContent, setImportContent] = useState("");
+  const [importKey, setImportKey] = useState("");
+  const [importResult, setImportResult] =
+    useState<ContentImportResult | null>(null);
+  const [importBatches, setImportBatches] = useState<ContentImportBatch[]>([]);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [generatorPolygon, setGeneratorPolygon] = useState("[]");
+  const [generatorAudience, setGeneratorAudience] = useState("families");
+  const [generatorDuration, setGeneratorDuration] = useState(90);
+  const [generatorLocale, setGeneratorLocale] = useState<"he" | "en">("he");
+  const [generatorWheelchair, setGeneratorWheelchair] = useState(false);
+  const [generatedRoute, setGeneratedRoute] =
+    useState<RouteGenerationDraft | null>(null);
 
   const selectedRoute = useMemo(
     () => catalog.find((route) => route.id === selectedTemplateId) ?? null,
@@ -416,6 +500,26 @@ export function ContentStudioV2() {
       .filter((stop) => stop.template_id === selectedTemplateId && stop.version === selectedVersion)
       .sort((left, right) => left.sequence_no - right.sequence_no),
     [routeStops, selectedTemplateId, selectedVersion]
+  );
+  const previewStops = useMemo(
+    () =>
+      activeStops
+        .filter((stop) => stop.is_active)
+        .map((stop) => ({
+          stop,
+          station: stations.find((station) => station.id === stop.station_id),
+          riddle: riddles.find((riddle) => riddle.id === stop.riddle_id)
+        }))
+        .filter(
+          (
+            item
+          ): item is {
+            stop: RouteStop;
+            station: Station;
+            riddle: Riddle;
+          } => Boolean(item.station && item.riddle)
+        ),
+    [activeStops, riddles, stations]
   );
   const riddlesByStation = useMemo(() => {
     const map = new Map<string, Riddle[]>();
@@ -641,6 +745,70 @@ export function ContentStudioV2() {
     return { type: "text", accepted: lines(draft.acceptedAnswers), fuzzyThreshold: draft.fuzzyThreshold };
   }
 
+  async function translateRiddleCopy(
+    sourceLocale: "he" | "en",
+    targetLocale: "he" | "en"
+  ) {
+    const mappings: Array<[keyof RiddleDraft, keyof RiddleDraft, string]> =
+      sourceLocale === "he"
+        ? [
+            ["titleHe", "titleEn", "riddle title"],
+            ["storyHe", "storyEn", "story"],
+            ["promptHe", "promptEn", "player task"],
+            ["locationHintHe", "locationHintEn", "location hint"],
+            ["successHe", "successEn", "success message"]
+          ]
+        : [
+            ["titleEn", "titleHe", "riddle title"],
+            ["storyEn", "storyHe", "story"],
+            ["promptEn", "promptHe", "player task"],
+            ["locationHintEn", "locationHintHe", "location hint"],
+            ["successEn", "successHe", "success message"]
+          ];
+    const populatedTargets = mappings.some(
+      ([, target]) => String(riddleDraft[target] ?? "").trim().length > 0
+    );
+    if (
+      populatedTargets &&
+      !window.confirm(
+        "התרגום המוצע יחליף את שדות שפת היעד בטיוטה. להמשיך?"
+      )
+    ) {
+      return;
+    }
+    await operation("translate-riddle", async () => {
+      const translated = await Promise.all(
+        mappings.map(async ([source, target, field]) => {
+          const sourceText = String(riddleDraft[source] ?? "").trim();
+          if (!sourceText) return [target, ""] as const;
+          const result = await requestJson<{
+            suggestion: string;
+            reviewRequired: boolean;
+          }>("/api/admin/content/translate", token, {
+            method: "POST",
+            body: JSON.stringify({
+              sourceText,
+              sourceLocale,
+              targetLocale,
+              context: `${field}; urban quest; preserve clues without revealing answers`
+            })
+          });
+          return [target, result.suggestion] as const;
+        })
+      );
+      setRiddleDraft((current) => {
+        const next = { ...current };
+        for (const [target, suggestion] of translated) {
+          (next[target] as string | number | HintDraft[]) = suggestion;
+        }
+        return next;
+      });
+      setMessage(
+        "הצעות התרגום נוספו לטיוטה בלבד. יש לעבור עליהן ולאשר בשמירה."
+      );
+    });
+  }
+
   async function saveRiddle(event: FormEvent) {
     event.preventDefault();
     await operation("save-riddle", async () => {
@@ -833,6 +1001,170 @@ export function ContentStudioV2() {
     });
   }
 
+  async function loadImportBatches() {
+    if (!selectedRoute || !selectedVersion) return;
+    const batches = await requestJson<ContentImportBatch[]>(
+      `/api/admin/content/templates/${selectedRoute.id}/versions/${selectedVersion}/imports`,
+      token
+    );
+    setImportBatches(batches);
+  }
+
+  async function openImportWorkspace() {
+    setImportOpen(true);
+    setImportResult(null);
+    await operation("load-imports", loadImportBatches);
+  }
+
+  async function selectImportFile(file: File) {
+    const extension = file.name.toLowerCase().split(".").at(-1);
+    const format = extension === "json" ? "json" : "csv";
+    const content = await file.text();
+    setImportFormat(format);
+    setImportContent(content);
+    setImportKey(`content-import:${crypto.randomUUID()}`);
+    setImportResult(null);
+  }
+
+  function downloadImportTemplate() {
+    const blob = new Blob([contentImportCsvTemplate], {
+      type: "text/csv;charset=utf-8"
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "tlv-quest-content-import.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function runBulkImport(dryRun: boolean) {
+    if (!selectedRoute || !selectedVersion || !importContent.trim()) return;
+    await operation(dryRun ? "import-dry-run" : "import-apply", async () => {
+      const key = importKey || `content-import:${crypto.randomUUID()}`;
+      if (!importKey) setImportKey(key);
+      const result = await requestJson<ContentImportResult>(
+        `/api/admin/content/templates/${selectedRoute.id}/versions/${selectedVersion}/imports`,
+        token,
+        {
+          method: "POST",
+          headers: { "idempotency-key": key },
+          body: JSON.stringify({
+            format: importFormat,
+            content: importContent,
+            dryRun
+          })
+        }
+      );
+      setImportResult(result);
+      if (!result.ok) return;
+      if (dryRun) {
+        setMessage(`בדיקת הייבוא עברה: ${result.rowCount} שורות ללא שינויים במסלול.`);
+        return;
+      }
+      await Promise.all([
+        loadAll(token, selectedRoute.id, selectedVersion),
+        loadImportBatches()
+      ]);
+      setMessage(
+        result.duplicate
+          ? "הבקשה כבר יושמה בעבר; לא נוצרו כפילויות."
+          : `הייבוא הוחל אטומית: ${result.rowCount} תחנות.`
+      );
+    });
+  }
+
+  async function rollbackImport(batch: ContentImportBatch) {
+    if (
+      !selectedRoute ||
+      !selectedVersion ||
+      !window.confirm(
+        "לבטל את הייבוא ולהחזיר את המסלול למצב שלפניו? הפעולה תיחסם אם נעשו מאז שינויים."
+      )
+    ) {
+      return;
+    }
+    await operation("import-rollback", async () => {
+      await requestJson(
+        `/api/admin/content/templates/${selectedRoute.id}/versions/${selectedVersion}/imports`,
+        token,
+        {
+          method: "DELETE",
+          headers: {
+            "idempotency-key": `content-import-rollback:${crypto.randomUUID()}`
+          },
+          body: JSON.stringify({ batchId: batch.id })
+        }
+      );
+      await Promise.all([
+        loadAll(token, selectedRoute.id, selectedVersion),
+        loadImportBatches()
+      ]);
+      setMessage("הייבוא בוטל והמסלול הקודם שוחזר.");
+    });
+  }
+
+  function openRouteGenerator() {
+    const located = stations.filter(
+      (station) =>
+        station.latitude !== null && station.longitude !== null
+    );
+    if (located.length >= 2) {
+      const latitudes = located.map((station) => station.latitude as number);
+      const longitudes = located.map((station) => station.longitude as number);
+      const padding = 0.0015;
+      const south = Math.min(...latitudes) - padding;
+      const north = Math.max(...latitudes) + padding;
+      const west = Math.min(...longitudes) - padding;
+      const east = Math.max(...longitudes) + padding;
+      setGeneratorPolygon(
+        JSON.stringify(
+          [
+            { latitude: south, longitude: west },
+            { latitude: south, longitude: east },
+            { latitude: north, longitude: east },
+            { latitude: north, longitude: west }
+          ],
+          null,
+          2
+        )
+      );
+    }
+    setGeneratedRoute(null);
+    setGeneratorOpen(true);
+  }
+
+  async function generateRouteDraft(event: FormEvent) {
+    event.preventDefault();
+    await operation("generate-route", async () => {
+      let polygon: unknown;
+      try {
+        polygon = JSON.parse(generatorPolygon);
+      } catch {
+        throw new Error("הפוליגון חייב להיות JSON תקין.");
+      }
+      const draft = await requestJson<RouteGenerationDraft>(
+        "/api/admin/content/route-generator",
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            templateId: selectedTemplateId || null,
+            polygon,
+            audience: generatorAudience,
+            durationMinutes: generatorDuration,
+            locale: generatorLocale,
+            constraints: { wheelchair: generatorWheelchair }
+          })
+        }
+      );
+      setGeneratedRoute(draft);
+      setMessage(
+        "נוצרה טיוטת מסלול בלבד. היא לא שינתה את הגרסה ולא ניתנת לפרסום ללא עריכה ובדיקות."
+      );
+    });
+  }
+
   async function addStationToRoute(station: Station) {
     if (!selectedRoute || !selectedVersion || !editable) return;
     const stationRiddles = riddlesByStation.get(station.id) ?? [];
@@ -953,6 +1285,20 @@ export function ContentStudioV2() {
       .toLowerCase()
       .includes(query);
   });
+  const previewStop =
+    previewStops[Math.min(previewIndex, Math.max(0, previewStops.length - 1))] ??
+    null;
+  const previewContent = previewStop
+    ? objectValue(previewStop.riddle.content[previewLocale])
+    : {};
+  const previewValidation = previewStop
+    ? objectValue(previewStop.riddle.validation)
+    : {};
+  const previewOptions = Array.isArray(previewValidation.options)
+    ? previewValidation.options.filter(
+        (option): option is string => typeof option === "string"
+      )
+    : [];
 
   if (!authChecked) {
     return <main className={styles.shell}><div className={styles.loading}>טוען את סביבת התוכן…</div></main>;
@@ -1052,6 +1398,9 @@ export function ContentStudioV2() {
                       <p>{textValue(selectedRoute.description.he) || textValue(selectedRoute.description.en)}</p>
                     </div>
                     <div className={styles.headerActions}>
+                      <button type="button" className={styles.quietButton} onClick={() => { setPreviewIndex(0); setPreviewOpen(true); }} disabled={!previewStops.length}>תצוגת שחקן</button>
+                      <button type="button" className={styles.quietButton} onClick={openRouteGenerator}>טיוטת מסלול AI</button>
+                      <button type="button" className={styles.quietButton} onClick={() => void openImportWorkspace()} disabled={!editable}>ייבוא CSV / JSON</button>
                       <button type="button" className={styles.quietButton} onClick={() => setRouteSettingsOpen(true)}>הגדרות</button>
                       <button type="button" className={styles.quietButton} onClick={cloneVersion} disabled={busy === "clone-version"}>שכפול גרסה</button>
                       <button type="button" className={styles.primaryButton} onClick={publishVersion} disabled={!editable || !detail.report.ok || busy === "publish"}>פרסום</button>
@@ -1071,12 +1420,55 @@ export function ContentStudioV2() {
                     ))}
                   </div>
 
+                  {generatorOpen && (
+                    <section className="route-generator-panel">
+                      <header>
+                        <div>
+                          <span>AI ROUTE DRAFT · NEVER AUTO-PUBLISHES</span>
+                          <h3>מחולל מסלול לפי אזור, קהל, זמן ואילוצים</h3>
+                          <p>המחולל משתמש רק בתחנות ובחידות פעילות, מאמת את פלט המודל ושומר provenance, confidence ורשימת בדיקות שטח.</p>
+                        </div>
+                        <button type="button" onClick={() => setGeneratorOpen(false)}>×</button>
+                      </header>
+                      <form onSubmit={generateRouteDraft}>
+                        <div className="route-generator-fields">
+                          <label><span>קהל</span><input value={generatorAudience} onChange={(event) => setGeneratorAudience(event.target.value)} /></label>
+                          <label><span>משך בדקות</span><input type="number" min="30" max="360" value={generatorDuration} onChange={(event) => setGeneratorDuration(Number(event.target.value))} /></label>
+                          <label><span>שפה</span><select value={generatorLocale} onChange={(event) => setGeneratorLocale(event.target.value === "en" ? "en" : "he")}><option value="he">עברית</option><option value="en">English</option></select></label>
+                          <label className="route-generator-check"><input type="checkbox" checked={generatorWheelchair} onChange={(event) => setGeneratorWheelchair(event.target.checked)} /> נגישות לכיסא גלגלים</label>
+                        </div>
+                        <label className="route-polygon-field"><span>פוליגון JSON</span><textarea value={generatorPolygon} onChange={(event) => setGeneratorPolygon(event.target.value)} rows={7} dir="ltr" /></label>
+                        <button className={styles.primaryButton} disabled={busy === "generate-route"}>{busy === "generate-route" ? "מייצר ובודק…" : "יצירת טיוטה לבדיקה"}</button>
+                      </form>
+                      {generatedRoute && (
+                        <div className="generated-route-result">
+                          <div className="generated-route-meta">
+                            <strong>Confidence {(generatedRoute.confidence * 100).toFixed(0)}%</strong>
+                            <span>{generatedRoute.provenance.provider} · {generatedRoute.provenance.model || generatedRoute.provenance.algorithm}</span>
+                            <span>{generatedRoute.proposed_route.analysis.totalDistanceMeters} מ׳ · {generatedRoute.proposed_route.analysis.walkingMinutes} דק׳ הליכה · {generatedRoute.proposed_route.analysis.estimatedExperienceMinutes} דק׳ כולל משימות</span>
+                          </div>
+                          <p>{generatedRoute.proposed_route.rationale}</p>
+                          <ol>{generatedRoute.proposed_route.stops.map((stop) => <li key={stop.stationId}><strong>{titleOf(stop.stationTitle, stop.stationSlug)}</strong><span>{stop.kind} · {stop.healthStatus}</span></li>)}</ol>
+                          <div className="generated-route-warning"><strong>טיוטה בלבד — לא בוצע שינוי במסלול</strong><span>{generatedRoute.verification_requirements.length ? generatedRoute.verification_requirements.join(" · ") : "נדרשת עדיין סקירה אנושית מלאה לפני העתקה לעורך."}</span></div>
+                        </div>
+                      )}
+                    </section>
+                  )}
+
                   {detail.report.errors.length > 0 && (
                     <details className={styles.qualityPanel} open>
                       <summary><strong>{detail.report.errors.length} דברים שחוסמים פרסום</strong><span>פתיחת פירוט</span></summary>
                       <div>{detail.report.errors.map((issue) => <p key={`${issue.code}-${issue.message}`}>• {issue.message}</p>)}</div>
                     </details>
                   )}
+
+                  <RouteSafetyMap
+                    stops={activeStops}
+                    stations={stations}
+                    wheelchairRequired={
+                      objectValue(detail.version.route_config).wheelchair === true
+                    }
+                  />
 
                   <div className={styles.builderGrid}>
                     <section className={styles.routeCanvas}>
@@ -1249,6 +1641,19 @@ export function ContentStudioV2() {
             <header className={styles.drawerHeader}><div><span className={styles.eyebrow}>Riddle editor</span><h2>{riddleDraft.id ? "עריכת חידה" : "חידה חדשה"}</h2></div><button type="button" onClick={() => setEditorOpen(false)}>×</button></header>
             <form className={styles.editorForm} onSubmit={saveRiddle}>
               <section className={styles.formSection}><div><span className={styles.eyebrow}>Placement</span><h3>לאיזו תחנה החידה שייכת?</h3><p>אפשר ליצור כמה חידות לכל תחנה. במסלול בוחרים אחת מהן.</p></div><div className={styles.formGrid}><label><span>תחנה</span><select required value={riddleDraft.stationId} disabled={Boolean(riddleDraft.id)} onChange={(event) => setRiddleDraft((current) => ({ ...current, stationId: event.target.value }))}><option value="">בחירת תחנה</option>{stations.map((station) => <option key={station.id} value={station.id}>{titleOf(station.title, station.slug)}</option>)}</select></label><label><span>סוג חידה</span><select value={riddleDraft.kind} onChange={(event) => setRiddleDraft((current) => ({ ...current, kind: event.target.value }))}>{riddleKinds.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>שם החידה בעברית</span><input required value={riddleDraft.titleHe} onChange={(event) => setRiddleDraft((current) => ({ ...current, titleHe: event.target.value }))} /></label><label><span>English riddle name</span><input value={riddleDraft.titleEn} onChange={(event) => setRiddleDraft((current) => ({ ...current, titleEn: event.target.value }))} /></label><label className={styles.fullField}><span>Slug</span><input required value={riddleDraft.slug} onChange={(event) => setRiddleDraft((current) => ({ ...current, slug: event.target.value }))} /></label></div></section>
+              <section className={styles.formSection}>
+                <div className={styles.sectionTitleRow}>
+                  <div>
+                    <span className={styles.eyebrow}>Assisted translation</span>
+                    <h3>טיוטת תרגום עם אישור אנושי</h3>
+                    <p>ההצעה ממלאת את הטיוטה בלבד, נשמרת עם provenance ואינה מפרסמת תוכן.</p>
+                  </div>
+                  <div>
+                    <button type="button" className={styles.quietButton} disabled={busy === "translate-riddle"} onClick={() => void translateRiddleCopy("he", "en")}>עברית ← English</button>
+                    <button type="button" className={styles.quietButton} disabled={busy === "translate-riddle"} onClick={() => void translateRiddleCopy("en", "he")}>English ← עברית</button>
+                  </div>
+                </div>
+              </section>
               <section className={styles.formSection}><div><span className={styles.eyebrow}>Player copy</span><h3>מה השחקנים רואים?</h3></div><div className={styles.languageColumns}><div><strong>עברית</strong><label><span>סיפור / הקשר</span><textarea value={riddleDraft.storyHe} onChange={(event) => setRiddleDraft((current) => ({ ...current, storyHe: event.target.value }))} /></label><label><span>המשימה</span><textarea required value={riddleDraft.promptHe} onChange={(event) => setRiddleDraft((current) => ({ ...current, promptHe: event.target.value }))} /></label><label><span>רמז מיקום</span><input value={riddleDraft.locationHintHe} onChange={(event) => setRiddleDraft((current) => ({ ...current, locationHintHe: event.target.value }))} /></label><label><span>הודעת הצלחה</span><input value={riddleDraft.successHe} onChange={(event) => setRiddleDraft((current) => ({ ...current, successHe: event.target.value }))} /></label></div><div dir="ltr"><strong>English</strong><label><span>Story / context</span><textarea value={riddleDraft.storyEn} onChange={(event) => setRiddleDraft((current) => ({ ...current, storyEn: event.target.value }))} /></label><label><span>Task</span><textarea required value={riddleDraft.promptEn} onChange={(event) => setRiddleDraft((current) => ({ ...current, promptEn: event.target.value }))} /></label><label><span>Location hint</span><input value={riddleDraft.locationHintEn} onChange={(event) => setRiddleDraft((current) => ({ ...current, locationHintEn: event.target.value }))} /></label><label><span>Success message</span><input value={riddleDraft.successEn} onChange={(event) => setRiddleDraft((current) => ({ ...current, successEn: event.target.value }))} /></label></div></div></section>
               <section className={styles.formSection}><div><span className={styles.eyebrow}>Validation</span><h3>איך פותרים?</h3></div>{riddleDraft.kind === "choice" ? <div className={styles.formGrid}><label><span>אפשרויות — שורה לכל אפשרות</span><textarea value={riddleDraft.choiceOptions} onChange={(event) => setRiddleDraft((current) => ({ ...current, choiceOptions: event.target.value }))} /></label><label><span>האפשרות הנכונה</span><input value={riddleDraft.acceptedOption} onChange={(event) => setRiddleDraft((current) => ({ ...current, acceptedOption: event.target.value }))} /></label></div> : riddleDraft.kind === "photo" ? <div className={styles.formGrid}><label className={styles.fullField}><span>קריטריונים לבדיקת התמונה</span><textarea value={riddleDraft.photoCriteria} onChange={(event) => setRiddleDraft((current) => ({ ...current, photoCriteria: event.target.value }))} /></label><label><span>סף ביטחון</span><input type="number" min="0" max="1" step="0.01" value={riddleDraft.confidenceThreshold} onChange={(event) => setRiddleDraft((current) => ({ ...current, confidenceThreshold: Number(event.target.value) }))} /></label></div> : riddleDraft.kind === "scan" ? <div className={styles.notice}>החידה תושלם בסריקת קישור התחנה. אין צורך בתשובה כתובה.</div> : <div className={styles.formGrid}><label><span>תשובות מתקבלות — שורה לכל תשובה</span><textarea value={riddleDraft.acceptedAnswers} onChange={(event) => setRiddleDraft((current) => ({ ...current, acceptedAnswers: event.target.value }))} /></label><label><span>סף התאמה גמישה</span><input type="number" min="0.5" max="1" step="0.01" value={riddleDraft.fuzzyThreshold} onChange={(event) => setRiddleDraft((current) => ({ ...current, fuzzyThreshold: Number(event.target.value) }))} /></label></div>}</section>
               <section className={styles.formSection}><div className={styles.sectionTitleRow}><div><span className={styles.eyebrow}>Hints</span><h3>רמזים מדורגים</h3></div><button type="button" className={styles.quietButton} onClick={() => setRiddleDraft((current) => ({ ...current, hints: [...current.hints, { he: "", en: "", penalty: 10 }] }))}>＋ רמז</button></div><div className={styles.hintList}>{riddleDraft.hints.map((hint, index) => <div key={index} className={styles.hintRow}><span>{index + 1}</span><input placeholder="רמז בעברית" value={hint.he} onChange={(event) => setRiddleDraft((current) => ({ ...current, hints: current.hints.map((item, itemIndex) => itemIndex === index ? { ...item, he: event.target.value } : item) }))} /><input dir="ltr" placeholder="English hint" value={hint.en} onChange={(event) => setRiddleDraft((current) => ({ ...current, hints: current.hints.map((item, itemIndex) => itemIndex === index ? { ...item, en: event.target.value } : item) }))} /><input type="number" min="0" value={hint.penalty} onChange={(event) => setRiddleDraft((current) => ({ ...current, hints: current.hints.map((item, itemIndex) => itemIndex === index ? { ...item, penalty: Number(event.target.value) } : item) }))} /><button type="button" onClick={() => setRiddleDraft((current) => ({ ...current, hints: current.hints.filter((_, itemIndex) => itemIndex !== index) }))}>×</button></div>)}</div></section>
@@ -1261,6 +1666,321 @@ export function ContentStudioV2() {
 
       {routeModalOpen && (
         <div className={styles.modalBackdrop} onMouseDown={() => setRouteModalOpen(false)}><form className={styles.modal} onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); void createRoute(); }}><header><div><span className={styles.eyebrow}>New route</span><h2>מסלול חדש</h2><p>המסלול יתחיל כטיוטה ריקה. לאחר היצירה בוחרים תחנות וחידות מהספרייה.</p></div><button type="button" onClick={() => setRouteModalOpen(false)}>×</button></header><div className={styles.formGrid}><label><span>שם בעברית</span><input required value={newRoute.titleHe} onChange={(event) => setNewRoute((current) => ({ ...current, titleHe: event.target.value }))} /></label><label><span>English title</span><input value={newRoute.titleEn} onChange={(event) => setNewRoute((current) => ({ ...current, titleEn: event.target.value }))} /></label><label className={styles.fullField}><span>Slug</span><input required value={newRoute.slug} onChange={(event) => setNewRoute((current) => ({ ...current, slug: event.target.value }))} /></label><label><span>תיאור בעברית</span><textarea value={newRoute.descriptionHe} onChange={(event) => setNewRoute((current) => ({ ...current, descriptionHe: event.target.value }))} /></label><label><span>English description</span><textarea value={newRoute.descriptionEn} onChange={(event) => setNewRoute((current) => ({ ...current, descriptionEn: event.target.value }))} /></label></div><footer><button type="button" className={styles.quietButton} onClick={() => setRouteModalOpen(false)}>ביטול</button><button type="submit" className={styles.primaryButton} disabled={busy === "create-route"}>יצירת מסלול</button></footer></form></div>
+      )}
+
+      {previewOpen && previewStop && (
+        <div
+          className={styles.previewBackdrop}
+          onMouseDown={() => setPreviewOpen(false)}
+        >
+          <section
+            className={styles.previewWorkspace}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className={styles.previewHeader}>
+              <div>
+                <span className={styles.eyebrow}>Production player preview</span>
+                <h2>תצוגת שחקן — ללא פתרונות</h2>
+              </div>
+              <div className={styles.previewActions}>
+                <div className={styles.localeSwitch}>
+                  <button
+                    type="button"
+                    className={previewLocale === "he" ? styles.selected : ""}
+                    onClick={() => setPreviewLocale("he")}
+                  >
+                    עברית
+                  </button>
+                  <button
+                    type="button"
+                    className={previewLocale === "en" ? styles.selected : ""}
+                    onClick={() => setPreviewLocale("en")}
+                  >
+                    English
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  onClick={() => setPreviewOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+            </header>
+            <div
+              className={`quest-experience ${styles.playerPreview}`}
+              dir={previewLocale === "he" ? "rtl" : "ltr"}
+            >
+              <div className="quest-ambient" />
+              <header className="quest-experience-header">
+                <div className="quest-team">
+                  <img src="/visuals/quest-mark.svg" alt="" />
+                  <div>
+                    <strong>
+                      {previewLocale === "he" ? "צוות תצוגה" : "Preview team"}
+                    </strong>
+                    <span>240 {previewLocale === "he" ? "נקודות" : "points"}</span>
+                  </div>
+                </div>
+                <div className="quest-stage">
+                  {previewIndex + 1}
+                  <small>/ {previewStops.length}</small>
+                </div>
+              </header>
+              <div className="quest-progress">
+                <span
+                  style={{
+                    width: `${((previewIndex + 1) / previewStops.length) * 100}%`
+                  }}
+                />
+              </div>
+              <section
+                className="mission-panel mission-arrive"
+                key={`${previewLocale}-${previewStop.stop.id}`}
+              >
+                <div className="mission-index">
+                  <span>
+                    {previewLocale === "he" ? "תחנה" : "Checkpoint"}
+                  </span>
+                  <strong>{String(previewIndex + 1).padStart(2, "0")}</strong>
+                </div>
+                <div className="mission-copy">
+                  <span className="quest-kicker">
+                    {kindLabel(previewStop.riddle.kind)}
+                  </span>
+                  <h1>
+                    {textValue(previewContent.title) ||
+                      titleOf(previewStop.riddle.title, previewStop.riddle.slug)}
+                  </h1>
+                  <p className="mission-story">
+                    {textValue(previewContent.story)}
+                  </p>
+                  {textValue(previewContent.locationHint) && (
+                    <div className="mission-location">
+                      <span>⌖</span>
+                      <p>{textValue(previewContent.locationHint)}</p>
+                    </div>
+                  )}
+                  <div className="mission-divider" />
+                  <h2>{textValue(previewContent.prompt)}</h2>
+                  {previewStop.riddle.kind === "choice" ? (
+                    <div className="mission-form">
+                      {previewOptions.map((option) => (
+                        <button
+                          type="button"
+                          className="button button-secondary"
+                          key={option}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  ) : previewStop.riddle.kind === "photo" ? (
+                    <div className="photo-drop">
+                      <span>＋</span>
+                      <strong>
+                        {previewLocale === "he"
+                          ? "צילום או בחירת תמונה"
+                          : "Take or choose a photo"}
+                      </strong>
+                    </div>
+                  ) : (
+                    <div className="mission-form">
+                      <label>
+                        <span>
+                          {previewLocale === "he" ? "המפתח שלכם" : "Your key"}
+                        </span>
+                        <input disabled placeholder="••••••" />
+                      </label>
+                      <button
+                        type="button"
+                        className="button quest-gold-button"
+                        disabled
+                      >
+                        {previewLocale === "he"
+                          ? "פתיחת התחנה"
+                          : "Unlock checkpoint"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+            <footer className={styles.previewFooter}>
+              <button
+                type="button"
+                className={styles.quietButton}
+                disabled={previewIndex === 0}
+                onClick={() => setPreviewIndex((index) => Math.max(0, index - 1))}
+              >
+                הקודמת
+              </button>
+              <span>
+                {previewIndex + 1} / {previewStops.length}
+              </span>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={previewIndex === previewStops.length - 1}
+                onClick={() =>
+                  setPreviewIndex((index) =>
+                    Math.min(previewStops.length - 1, index + 1)
+                  )
+                }
+              >
+                הבאה
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {importOpen && selectedRoute && selectedVersion && (
+        <div
+          className={styles.modalBackdrop}
+          onMouseDown={() => setImportOpen(false)}
+        >
+          <section
+            className={`${styles.modal} ${styles.bulkModal}`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <span className={styles.eyebrow}>Transactional bulk import</span>
+                <h2>ייבוא CSV / JSON</h2>
+                <p>
+                  בדיקה יבשה מציגה שגיאות לפי שורה. החלה מתבצעת בעסקה אחת,
+                  ניתנת להפעלה חוזרת ללא כפילויות וכוללת נקודת חזרה.
+                </p>
+              </div>
+              <button type="button" onClick={() => setImportOpen(false)}>
+                ×
+              </button>
+            </header>
+
+            <div className={styles.importToolbar}>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".csv,.json,text/csv,application/json"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void selectImportFile(file);
+                }}
+              />
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => importFileRef.current?.click()}
+              >
+                בחירת קובץ
+              </button>
+              <button
+                type="button"
+                className={styles.quietButton}
+                onClick={downloadImportTemplate}
+              >
+                הורדת תבנית CSV
+              </button>
+              <select
+                value={importFormat}
+                onChange={(event) =>
+                  setImportFormat(event.target.value === "json" ? "json" : "csv")
+                }
+              >
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+              </select>
+            </div>
+            <label className={styles.importSource}>
+              <span>תוכן הקובץ</span>
+              <textarea
+                dir="ltr"
+                value={importContent}
+                onChange={(event) => {
+                  setImportContent(event.target.value);
+                  setImportKey(`content-import:${crypto.randomUUID()}`);
+                  setImportResult(null);
+                }}
+                placeholder="Paste CSV or a JSON array here…"
+              />
+            </label>
+            <div className={styles.importActions}>
+              <button
+                type="button"
+                className={styles.quietButton}
+                disabled={!importContent.trim() || busy === "import-dry-run"}
+                onClick={() => void runBulkImport(true)}
+              >
+                {busy === "import-dry-run" ? "בודק…" : "בדיקה יבשה"}
+              </button>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={
+                  !importContent.trim() ||
+                  !importResult?.ok ||
+                  !importResult.dryRun ||
+                  busy === "import-apply"
+                }
+                onClick={() => void runBulkImport(false)}
+              >
+                {busy === "import-apply" ? "מחיל…" : "החלה אטומית"}
+              </button>
+            </div>
+
+            {importResult && (
+              <section
+                className={
+                  importResult.ok ? styles.importSuccess : styles.importErrors
+                }
+              >
+                <strong>
+                  {importResult.ok
+                    ? `✓ ${importResult.rowCount} שורות תקינות`
+                    : `${importResult.errors.length} שגיאות נמצאו`}
+                </strong>
+                {importResult.errors.map((item, index) => (
+                  <div key={`${item.code}-${item.row}-${index}`}>
+                    <span>{item.row ? `שורה ${item.row}` : "קובץ"}</span>
+                    <code>{item.field}</code>
+                    <p>{item.message}</p>
+                  </div>
+                ))}
+              </section>
+            )}
+
+            <section className={styles.importHistory}>
+              <h3>היסטוריית ייבוא לגרסה</h3>
+              {importBatches.map((batch) => (
+                <div key={batch.id}>
+                  <span>
+                    <strong>
+                      {batch.row_count} שורות · {batch.format.toUpperCase()}
+                    </strong>
+                    <small>
+                      {new Date(batch.created_at).toLocaleString("he-IL")} ·{" "}
+                      {batch.status}
+                    </small>
+                  </span>
+                  {batch.status === "applied" && (
+                    <button
+                      type="button"
+                      className={styles.textDanger}
+                      disabled={busy === "import-rollback"}
+                      onClick={() => void rollbackImport(batch)}
+                    >
+                      ביטול ייבוא
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!importBatches.length && <p>אין עדיין ייבואים בגרסה הזו.</p>}
+            </section>
+          </section>
+        </div>
       )}
 
       {routeSettingsOpen && selectedRoute && detail && (

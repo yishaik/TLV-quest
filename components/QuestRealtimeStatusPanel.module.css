@@ -10,12 +10,43 @@
 }
 
 .connection,
-.details {
+.details,
+.banners {
   pointer-events: auto;
   border: 1px solid rgba(255, 255, 255, 0.13);
   background: rgba(10, 15, 26, 0.88);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(18px);
+}
+
+.banners {
+  display: grid;
+  gap: 1px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border-color: rgba(244, 214, 141, 0.48);
+  border-radius: 16px;
+  color: #fff6d9;
+}
+
+.banners p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 14px;
+  background: rgba(117, 74, 23, 0.42);
+}
+
+.banners strong {
+  color: #f4d68d;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.banners span {
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .connection {

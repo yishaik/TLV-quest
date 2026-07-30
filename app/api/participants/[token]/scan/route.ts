@@ -1,6 +1,11 @@
-import { randomUUID } from "node:crypto";
 import { recordStationScan } from "@/lib/station-scan";
-import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import {
+  handleRouteError,
+  jsonOk,
+  readJson,
+  requireIdempotencyKey
+} from "@/lib/http";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -10,6 +15,12 @@ export async function POST(
 ) {
   try {
     const { token } = await context.params;
+    await enforceRateLimit({
+      scope: "participant-scan",
+      identifier: token,
+      limit: 12,
+      windowSeconds: 60
+    });
     const body = await readJson<Record<string, unknown>>(request);
     const stationSlug =
       typeof body.stationSlug === "string" ? body.stationSlug : "";
@@ -19,8 +30,7 @@ export async function POST(
       await recordStationScan({
         token,
         stationSlug,
-        idempotencyKey:
-          request.headers.get("idempotency-key") ?? `scan:${randomUUID()}`
+        idempotencyKey: requireIdempotencyKey(request)
       })
     );
   } catch (error) {

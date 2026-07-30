@@ -11,6 +11,185 @@ export type SendResult = {
   status: "sent" | "mocked";
 };
 
+type GeminiTextResult = {
+  text: string;
+  provider: "gemini" | "deterministic";
+  model: string | null;
+};
+
+const geminiText = async ({
+  prompt,
+  temperature = 0.2
+}: {
+  prompt: string;
+  temperature?: number;
+}): Promise<GeminiTextResult | null> => {
+  const env = getServerEnv();
+  if (!env.geminiApiKey) return null;
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.geminiVisionModel)}:generateContent?key=${encodeURIComponent(env.geminiApiKey)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "text/plain",
+          temperature,
+          maxOutputTokens: 900
+        }
+      }),
+      signal: AbortSignal.timeout(15_000)
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Gemini generation failed with ${response.status}`);
+  }
+  const payload = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = payload.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!text) throw new Error("Gemini returned an empty response");
+  return {
+    text: text.slice(0, 4000),
+    provider: "gemini",
+    model: env.geminiVisionModel
+  };
+};
+
+export const suggestTranslation = async ({
+  sourceText,
+  sourceLocale,
+  targetLocale,
+  context
+}: {
+  sourceText: string;
+  sourceLocale: "he" | "en";
+  targetLocale: "he" | "en";
+  context?: string;
+}): Promise<GeminiTextResult> => {
+  const generated = await geminiText({
+    prompt: [
+      "Translate urban quest player copy.",
+      `Source language: ${sourceLocale}. Target language: ${targetLocale}.`,
+      "Preserve tone, clues, line breaks, place names and numbers.",
+      "Do not add answers, explanations or facts not present in the source.",
+      "Return only the translated copy.",
+      context ? `Context: ${context.slice(0, 500)}` : "",
+      `Source:\n${sourceText.slice(0, 4000)}`
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+    temperature: 0.1
+  });
+  if (generated) return generated;
+  return {
+    text: sourceText,
+    provider: "deterministic",
+    model: null
+  };
+};
+
+export const generateQuestEpilogue = async ({
+  locale,
+  teamName,
+  score,
+  completedCount,
+  wrongAttempts,
+  hintsUsed
+}: {
+  locale: "he" | "en";
+  teamName: string;
+  score: number;
+  completedCount: number;
+  wrongAttempts: number;
+  hintsUsed: number;
+}): Promise<GeminiTextResult> => {
+  const generated = await geminiText({
+    prompt: [
+      `Write a cinematic 120–180 word urban quest epilogue in ${locale === "he" ? "Hebrew" : "English"}.`,
+      "Address the team, celebrate collaboration, and use only the supplied aggregate statistics.",
+      "Do not invent real-world events, names, answers, private details, or completed locations.",
+      `Team: ${teamName.slice(0, 100)}`,
+      `Score: ${score}; checkpoints: ${completedCount}; wrong attempts: ${wrongAttempts}; hints: ${hintsUsed}.`,
+      "Return only the epilogue."
+    ].join("\n"),
+    temperature: 0.6
+  });
+  if (generated) return generated;
+  return {
+    text:
+      locale === "he"
+        ? `${teamName}, האות האחרון דעך — אבל המסע שלכם נשאר חי. יחד השלמתם ${completedCount} תחנות וצברתם ${score} נקודות. גם ${wrongAttempts} ניסיונות שלא צלחו ו־${hintsUsed} רמזים הפכו לחלק מהסיפור: עקבות של סקרנות, התמדה ועבודת צוות. העיר חוזרת לשגרה, ואתם יוצאים ממנה עם מפה שאי אפשר לקפל — הזיכרון של הדרך שעברתם יחד.`
+        : `${teamName}, the final signal has faded, but your quest remains alive. Together you completed ${completedCount} checkpoints and earned ${score} points. Even ${wrongAttempts} wrong turns and ${hintsUsed} hints became part of the story: traces of curiosity, persistence, and teamwork. The city returns to its rhythm, and you leave with a map that cannot be folded—the memory of the route you shared.`,
+    provider: "deterministic",
+    model: null
+  };
+};
+
+export const generateRouteOrdering = async ({
+  locale,
+  audience,
+  durationMinutes,
+  constraints,
+  candidates
+}: {
+  locale: "he" | "en";
+  audience: string;
+  durationMinutes: number;
+  constraints: Record<string, unknown>;
+  candidates: Array<{
+    stationId: string;
+    title: string;
+    tags: string[];
+    healthStatus: string;
+    latitude: number;
+    longitude: number;
+  }>;
+}): Promise<{
+  stationIds: string[];
+  rationale: string;
+  provider: "gemini" | "deterministic";
+  model: string | null;
+} | null> => {
+  const generated = await geminiText({
+    prompt: [
+      "You are a route-planning assistant. Produce a safe editorial draft, never a published route.",
+      `Language: ${locale}; audience: ${audience}; duration: ${durationMinutes} minutes.`,
+      `Constraints: ${JSON.stringify(constraints).slice(0, 1500)}`,
+      "Choose only stationId values from the candidate list. Prefer verified stations, a coherent nearby sequence, and accessibility constraints.",
+      "Return compact JSON only: {\"stationIds\":[\"...\"],\"rationale\":\"...\"}.",
+      `Candidates: ${JSON.stringify(candidates).slice(0, 9000)}`
+    ].join("\n\n"),
+    temperature: 0.2
+  });
+  if (!generated) return null;
+  try {
+    const cleaned = generated.text
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "");
+    const parsed = JSON.parse(cleaned) as {
+      stationIds?: unknown;
+      rationale?: unknown;
+    };
+    return {
+      stationIds: Array.isArray(parsed.stationIds)
+        ? parsed.stationIds.filter(
+            (value): value is string => typeof value === "string"
+          )
+        : [],
+      rationale:
+        typeof parsed.rationale === "string"
+          ? parsed.rationale.slice(0, 1200)
+          : "",
+      provider: generated.provider,
+      model: generated.model
+    };
+  } catch {
+    return null;
+  }
+};
+
 const externalDeliveryAllowed = (recipient: string): boolean => {
   const env = getServerEnv();
   const isTwilioSandbox = env.twilioWhatsappFrom === "whatsapp:+14155238886";

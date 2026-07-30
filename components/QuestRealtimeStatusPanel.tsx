@@ -73,6 +73,20 @@ export function QuestRealtimeStatusPanel() {
 
   return (
     <aside className={styles.shell} dir={he ? "rtl" : "ltr"}>
+      {(state.banners?.length ?? 0) > 0 && (
+        <section
+          className={styles.banners}
+          aria-label={he ? "הודעות מהמארגן" : "Organizer messages"}
+          aria-live="polite"
+        >
+          {state.banners.map((banner) => (
+            <p key={banner.id}>
+              <strong>{he ? "הודעת מארגן" : "Organizer update"}</strong>
+              <span>{banner.body}</span>
+            </p>
+          ))}
+        </section>
+      )}
       <div className={`${styles.connection} ${styles[connectionState]}`}>
         <i aria-hidden="true" />
         <span>{connectionCopy[connectionState][he ? "he" : "en"]}</span>

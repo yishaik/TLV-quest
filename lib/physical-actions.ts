@@ -239,11 +239,17 @@ export const submitPhoto = async ({
   if (mediaError || !media) throw mediaError ?? new Error("Failed to save photo");
 
   if (!assessment.approved || assessment.confidence < threshold) {
+    const localizedFallback =
+      state.checkpoint.fallback?.[state.participant.language];
+    const fallback =
+      typeof localizedFallback === "string"
+        ? localizedFallback.trim()
+        : "";
     return {
       approved: false,
       confidence: assessment.confidence,
       reason: assessment.reason,
-      fallback: state.checkpoint.fallback
+      fallback: fallback || null
     };
   }
 

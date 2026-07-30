@@ -3,6 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hashSecret, randomToken } from "@/lib/crypto";
 import { getServerEnv, publicEnv } from "@/lib/env";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import {
+  LEGACY_TENANT_ID,
+  resolveAdminTenant
+} from "@/lib/tenant-admin";
 
 export const runtime = "nodejs";
 
@@ -11,17 +15,34 @@ const authorizeInviteCreation = async (request: Request) => {
   const apiSecret = process.env.ADMIN_API_SECRET?.trim();
 
   if (apiSecret && authorization === `Bearer ${apiSecret}`) {
-    return createAdminClient();
+    return {
+      supabase: createAdminClient(),
+      email: null as string | null
+    };
   }
 
-  const { supabase } = await requireAdmin(request);
-  return supabase;
+  const { supabase, email } = await requireAdmin(request);
+  return { supabase, email };
 };
 
 export async function POST(request: Request) {
   try {
-    const supabase = await authorizeInviteCreation(request);
-    const body = await readJson<{ expiresInHours?: unknown }>(request);
+    const authorization = await authorizeInviteCreation(request);
+    const { supabase, email } = authorization;
+    const body = await readJson<{
+      expiresInHours?: unknown;
+      tenantId?: unknown;
+    }>(request);
+    const tenantId = email
+      ? (
+          await resolveAdminTenant({
+            supabase,
+            email,
+            requestedTenantId:
+              typeof body.tenantId === "string" ? body.tenantId : null
+          })
+        ).tenantId
+      : LEGACY_TENANT_ID;
     const expiresInHours =
       typeof body.expiresInHours === "number"
         ? Math.max(1, Math.min(168, body.expiresInHours))
@@ -33,7 +54,11 @@ export async function POST(request: Request) {
     ).toISOString();
     const { data, error } = await supabase
       .from("organizer_invites")
-      .insert({ token_hash: hashSecret(token), expires_at: expiresAt })
+      .insert({
+        token_hash: hashSecret(token),
+        expires_at: expiresAt,
+        tenant_id: tenantId
+      })
       .select("id,expires_at")
       .single();
 

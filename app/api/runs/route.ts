@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const { data: invite, error: inviteError } = await supabase
       .from("organizer_invites")
-      .select("id,expires_at,used_at")
+      .select("id,tenant_id,expires_at,used_at")
       .eq("token_hash", hashSecret(inviteToken))
       .maybeSingle();
 
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     reservedInviteId = reserved.id;
 
     const run = await createRouteRun({
+      tenantId: invite.tenant_id,
       templateSlug,
       scheduledAt:
         typeof body.scheduledAt === "string" ? body.scheduledAt : null,

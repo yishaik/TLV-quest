@@ -22,6 +22,7 @@ const arrayValue = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
 
 export type CreateRouteRunInput = {
+  tenantId: string;
   templateSlug: string;
   scheduledAt?: string | null;
   routeMode?: "linear" | "circular" | "free";
@@ -45,8 +46,9 @@ export const createRouteRun = async (input: CreateRouteRunInput) => {
 
   const { data: template, error: templateError } = await supabase
     .from("game_templates")
-    .select("id,slug,title,active_version")
+    .select("id,tenant_id,slug,title,active_version")
     .eq("slug", templateSlug)
+    .eq("tenant_id", input.tenantId)
     .eq("is_active", true)
     .single();
 
@@ -98,6 +100,7 @@ export const createRouteRun = async (input: CreateRouteRunInput) => {
     .from("game_runs")
     .insert({
       template_id: template.id,
+      tenant_id: template.tenant_id,
       template_version: template.active_version,
       public_code: publicCode,
       organizer_token_hash: hashSecret(organizerToken),

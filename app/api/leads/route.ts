@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import { enforceRateLimit, requestIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,12 @@ const text = (value: unknown, max: number) =>
 
 export async function POST(request: Request) {
   try {
+    await enforceRateLimit({
+      scope: "marketing-lead",
+      identifier: requestIp(request),
+      limit: 3,
+      windowSeconds: 3600
+    });
     const contentLength = Number(request.headers.get("content-length") ?? "0");
     if (contentLength > 12_000) throw new Error("Request is too large");
 

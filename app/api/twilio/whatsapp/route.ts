@@ -8,6 +8,7 @@ import {
   handleWhatsappPhoto
 } from "@/lib/whatsapp-attachments";
 import { verifyTwilioWebhook } from "@/lib/providers";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -66,6 +67,12 @@ export async function POST(request: Request) {
   const messageSid = params.MessageSid ?? crypto.randomUUID();
 
   try {
+    await enforceRateLimit({
+      scope: "twilio-whatsapp",
+      identifier: from,
+      limit: 30,
+      windowSeconds: 60
+    });
     const linked = await linkWhatsappParticipant({ from, body });
     if (linked) {
       const webAppUrl = participantResumeUrl(linked.participantId);
