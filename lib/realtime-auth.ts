@@ -153,6 +153,8 @@ export async function issueParticipantRealtimeAccess(token: string) {
   return {
     accessToken: verified.session.access_token,
     expiresAt: expiresAtMs,
-    participantId: state.participant.id
+    participantId: state.participant.id,
+    supabaseUrl: publicEnv.supabaseUrl,
+    supabasePublishableKey: publicEnv.supabasePublishableKey
   };
 }
