@@ -1,8 +1,12 @@
 name: Realtime production smoke
 
 on:
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_code:
+        description: Active production run reserved for the smoke test
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -12,18 +16,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v4
+
       - name: Test authenticated realtime flow
         shell: bash
         env:
           APP_URL: https://play.yishaik.com
+          RUN_CODE: ${{ inputs.run_code }}
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
+          smoke_name="Realtime Smoke ${GITHUB_RUN_ID}"
 
           join_status=$(curl -sS -o "$work/join.json" -w '%{http_code}' \
-            -X POST "$APP_URL/api/runs/Z2PVWF/join" \
+            -X POST "$APP_URL/api/runs/$RUN_CODE/join" \
             -H 'content-type: application/json' \
-            --data '{"firstName":"Realtime Smoke","publicAlias":"Realtime Smoke","language":"en","consent":true}')
+            --data "$(jq -nc --arg name "$smoke_name" \
+              '{firstName:$name,publicAlias:$name,language:"en",consent:true}')")
           test "$join_status" = "201"
           test "$(jq -r '.ok' "$work/join.json")" = "true"
           participant_id=$(jq -r '.data.participantId' "$work/join.json")
@@ -47,6 +56,10 @@ jobs:
           test -n "$supabase_url"
           test -n "$supabase_publishable_key"
           test "$(jq -r '.data | has("refreshToken")' "$work/auth.json")" = "false"
+
+          SUPABASE_URL="$supabase_url" \
+            SUPABASE_PUBLISHABLE_KEY="$supabase_publishable_key" \
+            node scripts/verify-supabase-public-access.mjs
 
           read_status=$(curl -sS -o "$work/events.json" -w '%{http_code}' \
             "$supabase_url/rest/v1/quest_realtime_events?select=id,run_id,team_id,source,operation&order=id.desc&limit=100" \
