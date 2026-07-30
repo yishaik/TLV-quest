@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processOutbox } from "@/lib/providers";
 import { sendDueHints, startDueRuns } from "@/lib/automation";
+import { cleanupAbandonedPhotoUploads } from "@/lib/photo-uploads";
 
 export const purgeExpiredRunsWithStorage = async () => {
   const supabase = createAdminClient();
@@ -45,6 +46,7 @@ export const runMaintenanceWorker = async () => {
   const starts = await startDueRuns();
   const hints = await sendDueHints();
   const outbox = await processOutbox(30);
+  const photoUploads = await cleanupAbandonedPhotoUploads(50);
   const purge = await purgeExpiredRunsWithStorage();
 
   return {
@@ -54,6 +56,7 @@ export const runMaintenanceWorker = async () => {
       processed: outbox.length,
       failed: outbox.filter((result) => result.status === "failed").length
     },
+    photoUploads,
     purge
   };
 };

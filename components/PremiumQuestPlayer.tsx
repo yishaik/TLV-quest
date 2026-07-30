@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useQuestRealtime } from "@/components/QuestRealtimeProvider";
+import { uploadParticipantPhoto } from "@/lib/photo-upload-client";
 
 type Locale = "he" | "en";
 type ParticipantState = {
@@ -253,21 +254,12 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
     setError("");
     setMessage("");
     try {
-      const form = new FormData();
-      form.set("photo", photo);
-      const response = await fetch(
-        `/api/participants/${encodeURIComponent(token)}/photo`,
-        {
-          method: "POST",
-          headers: { "idempotency-key": `web-photo:${crypto.randomUUID()}` },
-          body: form
-        }
-      );
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error?.message ?? "Photo validation failed");
-      }
-      if (payload.data.approved) {
+      const result = await uploadParticipantPhoto({
+        token,
+        file: photo,
+        locale: language
+      });
+      if (result.approved) {
         setMessage(
           mission?.success ||
             (isHebrew
@@ -278,9 +270,9 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
         window.setTimeout(() => void refresh(), 850);
       } else {
         const fallbackText =
-          typeof payload.data.fallbackPrompt === "string" &&
-          payload.data.fallbackPrompt.trim()
-            ? payload.data.fallbackPrompt
+          typeof result.fallbackPrompt === "string" &&
+          result.fallbackPrompt.trim()
+            ? result.fallbackPrompt
             : isHebrew
               ? "לא הצלחנו לזהות את הרגע. נסו צילום נוסף או השתמשו בשאלת הגיבוי."
               : "We could not verify the moment. Try another photo or use the fallback question.";
@@ -456,6 +448,11 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
                       ? "צלמו או בחרו תמונה"
                       : "Take or choose a photo"}
                 </strong>
+                <small>
+                  {isHebrew
+                    ? "JPG, PNG או WebP · עד 10MB"
+                    : "JPG, PNG, or WebP · up to 10MB"}
+                </small>
               </label>
               <button className="button quest-gold-button" disabled={busy || !photo}>
                 {busy

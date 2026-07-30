@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { uploadParticipantPhoto } from "@/lib/photo-upload-client";
 
 type ParticipantState = {
   participant: {
@@ -240,26 +241,20 @@ export function QuestPlayer({ token }: { token: string }) {
     setError("");
     setMessage("");
     try {
-      const form = new FormData();
-      form.set("photo", photo);
-      const response = await fetch(`/api/participants/${encodeURIComponent(token)}/photo`, {
-        method: "POST",
-        headers: { "idempotency-key": `web-photo:${crypto.randomUUID()}` },
-        body: form
+      const result = await uploadParticipantPhoto({
+        token,
+        file: photo,
+        locale: isHebrew ? "he" : "en"
       });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error?.message ?? "Photo validation failed");
-      }
-      if (payload.data.approved) {
+      if (result.approved) {
         setMessage(mission?.success || (isHebrew ? "התמונה אושרה." : "Photo approved."));
         setPhoto(null);
         await loadState();
       } else {
         const fallbackText =
-          typeof payload.data.fallbackPrompt === "string" &&
-          payload.data.fallbackPrompt.trim()
-            ? payload.data.fallbackPrompt
+          typeof result.fallbackPrompt === "string" &&
+          result.fallbackPrompt.trim()
+            ? result.fallbackPrompt
             : isHebrew
               ? "לא ניתן לאמת את התמונה. השתמשו בשאלת הגיבוי."
               : "The photo could not be verified. Use the fallback question.";
@@ -372,6 +367,11 @@ export function QuestPlayer({ token }: { token: string }) {
                 capture="environment"
                 onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
               />
+              <small>
+                {isHebrew
+                  ? "JPG, PNG או WebP · עד 10MB"
+                  : "JPG, PNG, or WebP · up to 10MB"}
+              </small>
             </div>
             <button className="button button-primary" disabled={busy || !photo}>
               {busy ? (isHebrew ? "בודק…" : "Checking…") : (isHebrew ? "שליחת תמונה" : "Submit photo")}

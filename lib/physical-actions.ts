@@ -9,11 +9,37 @@ import {
   type ScoringConfig
 } from "@/lib/game-engine";
 import { validatePhotoWithGemini } from "@/lib/providers";
+import {
+  isPhotoUploadMimeType,
+  PHOTO_UPLOAD_MAX_BYTES
+} from "@/lib/photo-upload-shared";
 
 const asObject = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+
+type PhotoAssessment = {
+  approved: boolean;
+  confidence: number;
+  reason: string;
+};
+
+const asPhotoAssessment = (value: unknown): PhotoAssessment | null => {
+  const assessment = asObject(value);
+  if (
+    typeof assessment.approved !== "boolean" ||
+    typeof assessment.confidence !== "number" ||
+    typeof assessment.reason !== "string"
+  ) {
+    return null;
+  }
+  return {
+    approved: assessment.approved,
+    confidence: Math.max(0, Math.min(1, assessment.confidence)),
+    reason: assessment.reason
+  };
+};
 
 const completeCheckpoint = async ({
   token,
@@ -175,28 +201,79 @@ export const verifyLocation = async ({
   };
 };
 
-export const submitPhoto = async ({
+export const submitStoredPhoto = async ({
   token,
   bytes,
   mimeType,
+  storagePath,
+  checkpointId,
   idempotencyKey
 }: {
   token: string;
   bytes: Uint8Array;
   mimeType: string;
+  storagePath: string;
+  checkpointId: string;
   idempotencyKey: string;
 }) => {
   const state = await getParticipantState(token);
+  const supabase = createAdminClient();
+  const [
+    { data: existingEvent, error: eventError },
+    { data: existingMedia, error: mediaLookupError }
+  ] = await Promise.all([
+    supabase
+      .from("game_events")
+      .select("id")
+      .eq("idempotency_key", idempotencyKey)
+      .eq("event_type", "ANSWER_ACCEPTED")
+      .eq("run_id", state.run.id)
+      .eq("team_id", state.team.id)
+      .eq("participant_id", state.participant.id)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("media_assets")
+      .select("id,validation")
+      .eq("storage_path", storagePath)
+      .eq("participant_id", state.participant.id)
+      .eq("team_id", state.team.id)
+      .eq("checkpoint_id", checkpointId)
+      .limit(1)
+      .maybeSingle()
+  ]);
+  if (eventError) throw eventError;
+  if (mediaLookupError) throw mediaLookupError;
+
+  const recoveredAssessment = asPhotoAssessment(existingMedia?.validation);
+  if (existingEvent) {
+    if (!recoveredAssessment) throw new Error("photo_upload_recovery_failed");
+    return {
+      approved: true,
+      confidence: recoveredAssessment.confidence,
+      reason: recoveredAssessment.reason,
+      recovered: true
+    };
+  }
+
   if (state.run.status !== "active" || !state.checkpoint) {
-    throw new Error("No active checkpoint");
+    throw new Error("photo_checkpoint_changed");
   }
-  if (state.checkpoint.kind !== "photo") {
-    throw new Error("This checkpoint does not accept a photo");
+  if (
+    state.checkpoint.id !== checkpointId ||
+    state.checkpoint.kind !== "photo"
+  ) {
+    throw new Error("photo_checkpoint_changed");
   }
-  if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
-    throw new Error("Unsupported image format");
+  if (!isPhotoUploadMimeType(mimeType)) {
+    throw new Error("photo_upload_unsupported_format");
   }
-  if (bytes.byteLength > 10 * 1024 * 1024) throw new Error("Image is too large");
+  if (
+    bytes.byteLength <= 0 ||
+    bytes.byteLength > PHOTO_UPLOAD_MAX_BYTES
+  ) {
+    throw new Error("photo_upload_too_large");
+  }
 
   const validation = asObject(state.checkpoint.validation);
   const criteria =
@@ -208,36 +285,43 @@ export const submitPhoto = async ({
       ? validation.confidenceThreshold
       : 0.86;
 
-  const supabase = createAdminClient();
-  const extension =
-    mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
-  const path = `${state.run.id}/${state.team.id}/${state.checkpoint.slug}/${crypto.randomUUID()}.${extension}`;
-  const { error: uploadError } = await supabase.storage
-    .from("game-media")
-    .upload(path, bytes, { contentType: mimeType, upsert: false });
-  if (uploadError) throw uploadError;
+  let assessment = recoveredAssessment;
+  let mediaId = existingMedia?.id ?? null;
+  if (!assessment) {
+    assessment = await validatePhotoWithGemini({
+      base64: Buffer.from(bytes).toString("base64"),
+      mimeType,
+      criteria
+    });
 
-  const assessment = await validatePhotoWithGemini({
-    base64: Buffer.from(bytes).toString("base64"),
-    mimeType,
-    criteria
-  });
-
-  const { data: media, error: mediaError } = await supabase
-    .from("media_assets")
-    .insert({
-      run_id: state.run.id,
-      team_id: state.team.id,
-      participant_id: state.participant.id,
-      checkpoint_id: state.checkpoint.id,
-      storage_path: path,
-      mime_type: mimeType,
-      source: "web",
-      validation: assessment
-    })
-    .select("id")
-    .single();
-  if (mediaError || !media) throw mediaError ?? new Error("Failed to save photo");
+    if (mediaId) {
+      const { error: mediaUpdateError } = await supabase
+        .from("media_assets")
+        .update({ validation: assessment, mime_type: mimeType })
+        .eq("id", mediaId);
+      if (mediaUpdateError) throw mediaUpdateError;
+    } else {
+      const { data: media, error: mediaError } = await supabase
+        .from("media_assets")
+        .insert({
+          run_id: state.run.id,
+          team_id: state.team.id,
+          participant_id: state.participant.id,
+          checkpoint_id: state.checkpoint.id,
+          storage_path: storagePath,
+          mime_type: mimeType,
+          source: "web",
+          validation: assessment
+        })
+        .select("id")
+        .single();
+      if (mediaError || !media) {
+        throw mediaError ?? new Error("Failed to save photo");
+      }
+      mediaId = media.id;
+    }
+  }
+  if (!mediaId) throw new Error("Failed to save photo");
 
   if (!assessment.approved || assessment.confidence < threshold) {
     const fallback = publicFallbackSummary(
@@ -258,7 +342,7 @@ export const submitPhoto = async ({
     submissionType: "photo",
     idempotencyKey,
     payload: {
-      mediaAssetId: media.id,
+      mediaAssetId: mediaId,
       confidence: assessment.confidence
     },
     validationReason: "gemini_photo_approved"
@@ -268,6 +352,6 @@ export const submitPhoto = async ({
     approved: true,
     confidence: assessment.confidence,
     reason: assessment.reason,
-    completion
+    completion: completion.result
   };
 };
