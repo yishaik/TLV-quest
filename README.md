@@ -3,3 +3,7 @@
 Autonomous urban quest platform. The first route is a teen-focused time-capsule adventure in the Tel Aviv Port.
 
 Development happens through short-lived feature branches and pull requests. See `docs/product-spec.md` for the current MVP scope.
+
+Operational notes for Twilio's Public Beta typing indicator, including its
+read-receipt side effect and the long-running photo strategy, are in
+`docs/whatsapp-typing-indicators.md`.
