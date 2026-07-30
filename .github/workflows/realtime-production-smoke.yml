@@ -1,8 +1,18 @@
 name: Realtime production smoke
 
 on:
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: Approved production URL
+        required: true
+        default: https://play.yishaik.com
+        type: string
+      run_code:
+        description: Disposable active production smoke run
+        required: true
+        default: Z2PVWF
+        type: string
 
 permissions:
   contents: read
@@ -15,15 +25,24 @@ jobs:
       - name: Test authenticated realtime flow
         shell: bash
         env:
-          APP_URL: https://play.yishaik.com
+          APP_URL: ${{ inputs.app_url }}
+          RUN_CODE: ${{ inputs.run_code }}
           SUPABASE_URL: ${{ secrets.PRODUCTION_SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           set -euo pipefail
+          test -n "$SUPABASE_URL" || {
+            echo "PRODUCTION_SUPABASE_URL is not configured."
+            exit 1
+          }
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || {
+            echo "PRODUCTION_SUPABASE_PUBLISHABLE_KEY is not configured."
+            exit 1
+          }
           work="$(mktemp -d)"
 
           join_status=$(curl -sS -o "$work/join.json" -w '%{http_code}' \
-            -X POST "$APP_URL/api/runs/Z2PVWF/join" \
+            -X POST "$APP_URL/api/runs/$RUN_CODE/join" \
             -H 'content-type: application/json' \
             --data '{"firstName":"Realtime Smoke","publicAlias":"Realtime Smoke","language":"en","consent":true}')
           test "$join_status" = "201"
