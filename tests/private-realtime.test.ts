@@ -17,7 +17,7 @@ const authRoute = readFileSync(
 );
 const experienceMeta = readFileSync("lib/experience-meta.ts", "utf8");
 
- describe("private quest realtime", () => {
+describe("private quest realtime", () => {
   it("authorizes participant-bound private Broadcast and Presence topics", () => {
     expect(migration).toContain("realtime_participant_authorizations");
     expect(migration).toContain("quest_realtime_topic_allowed");
@@ -34,7 +34,7 @@ const experienceMeta = readFileSync("lib/experience-meta.ts", "utf8");
     expect(authService).toContain("verifyOtp");
     expect(authService).toContain("accessToken");
     expect(authService).not.toContain("refreshToken");
-    expect(authRoute).toContain('method: "POST"').not;
+    expect(authRoute).toContain("export async function POST");
     expect(authRoute).toContain("issueParticipantRealtimeAccess");
   });
 
