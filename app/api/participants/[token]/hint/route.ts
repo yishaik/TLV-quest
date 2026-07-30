@@ -1,6 +1,9 @@
-import { randomUUID } from "node:crypto";
 import { requestHint } from "@/lib/repository";
-import { handleRouteError, jsonOk } from "@/lib/http";
+import {
+  handleRouteError,
+  jsonOk,
+  requireIdempotencyKey
+} from "@/lib/http";
 import { enforceParticipantRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -12,8 +15,7 @@ export async function POST(
   try {
     const { token } = await context.params;
     await enforceParticipantRateLimit("hint", token);
-    const idempotencyKey =
-      request.headers.get("idempotency-key") ?? `web-hint:${randomUUID()}`;
+    const idempotencyKey = requireIdempotencyKey(request);
     return jsonOk(await requestHint({ token, idempotencyKey }));
   } catch (error) {
     return handleRouteError(error);

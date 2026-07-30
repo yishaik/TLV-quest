@@ -1,5 +1,9 @@
-import { randomUUID } from "node:crypto";
-import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import {
+  handleRouteError,
+  jsonOk,
+  readJson,
+  requireIdempotencyKey
+} from "@/lib/http";
 import { issuePhotoUpload } from "@/lib/photo-uploads";
 
 export const runtime = "nodejs";
@@ -19,9 +23,7 @@ export async function POST(
         token,
         mimeType: body.mimeType,
         size: body.size,
-        idempotencyKey:
-          request.headers.get("idempotency-key") ??
-          `photo-upload:${randomUUID()}`
+        idempotencyKey: requireIdempotencyKey(request)
       })
     );
   } catch (error) {

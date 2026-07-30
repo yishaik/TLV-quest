@@ -1,6 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { recordStationScan } from "@/lib/station-scan";
-import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import {
+  handleRouteError,
+  jsonOk,
+  readJson,
+  requireIdempotencyKey
+} from "@/lib/http";
 
 export const runtime = "nodejs";
 
@@ -19,8 +23,7 @@ export async function POST(
       await recordStationScan({
         token,
         stationSlug,
-        idempotencyKey:
-          request.headers.get("idempotency-key") ?? `scan:${randomUUID()}`
+        idempotencyKey: requireIdempotencyKey(request)
       })
     );
   } catch (error) {

@@ -98,6 +98,16 @@ const authorizeRow = async (row: PhotoUploadRow) => {
   };
 };
 
+const resumeUploadedRow = (row: PhotoUploadRow) => ({
+  uploadId: row.id,
+  bucket: PHOTO_UPLOAD_BUCKET,
+  path: row.storage_path,
+  uploadToken: "",
+  expiresAt: row.expires_at,
+  maxBytes: PHOTO_UPLOAD_MAX_BYTES,
+  uploaded: true
+});
+
 export const issuePhotoUpload = async ({
   token,
   mimeType,
@@ -128,14 +138,6 @@ export const issuePhotoUpload = async ({
   }
 
   const state = await getParticipantState(token);
-  if (
-    state.run.status !== "active" ||
-    !state.checkpoint ||
-    state.checkpoint.kind !== "photo"
-  ) {
-    throw new Error("photo_checkpoint_changed");
-  }
-
   const supabase = createAdminClient();
   const { data: existing, error: existingError } = await supabase
     .from("photo_uploads")
@@ -149,15 +151,35 @@ export const issuePhotoUpload = async ({
   if (existing) {
     const row = existing as PhotoUploadRow;
     if (
-      row.status !== "pending" ||
-      isExpired(row.expires_at) ||
-      row.checkpoint_id !== state.checkpoint.id ||
+      row.run_id !== state.run.id ||
+      row.team_id !== state.team.id ||
       row.expected_mime_type !== mimeType ||
       Number(row.expected_size) !== size
     ) {
       throw new Error("photo_upload_idempotency_conflict");
     }
+    if (row.status === "completed" || row.status === "processing") {
+      return resumeUploadedRow(row);
+    }
+    if (
+      row.status !== "pending" ||
+      isExpired(row.expires_at) ||
+      state.run.status !== "active" ||
+      !state.checkpoint ||
+      state.checkpoint.kind !== "photo" ||
+      row.checkpoint_id !== state.checkpoint.id
+    ) {
+      throw new Error("photo_upload_idempotency_conflict");
+    }
     return authorizeRow(row);
+  }
+
+  if (
+    state.run.status !== "active" ||
+    !state.checkpoint ||
+    state.checkpoint.kind !== "photo"
+  ) {
+    throw new Error("photo_checkpoint_changed");
   }
 
   const expiresAt = new Date(

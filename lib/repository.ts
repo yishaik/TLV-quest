@@ -18,6 +18,11 @@ import {
   type ScoringConfig,
   type TextValidation
 } from "@/lib/game-engine";
+import {
+  findParticipantIdempotencyEvent,
+  isIdempotencyReplay,
+  throwIdempotencyConflict
+} from "@/lib/idempotency";
 import { publicEnv } from "@/lib/env";
 import {
   resolveWhatsappContextCandidates,
@@ -682,7 +687,8 @@ export const submitTextAnswer = async ({
   });
   if (error) throw error;
 
-  if (evaluation.correct) {
+  const replayed = isIdempotencyReplay(result);
+  if (evaluation.correct && !replayed) {
     const locale = state.participant.language;
     const contentForLocale = objectValue(state.checkpoint.content[locale]);
     const success = textValue(contentForLocale.success, locale === "he" ? "נכון!" : "Correct!");
@@ -697,7 +703,38 @@ export const submitTextAnswer = async ({
   return {
     evaluation,
     scoreDelta,
-    result
+    result,
+    replayed
+  };
+};
+
+const replayHintRequest = async ({
+  state,
+  idempotencyKey
+}: {
+  state: ParticipantState;
+  idempotencyKey: string;
+}) => {
+  const event = await findParticipantIdempotencyEvent({
+    idempotencyKey,
+    teamId: state.team.id,
+    participantId: state.participant.id,
+    eventTypes: ["HINT_REQUESTED"]
+  });
+  if (!event) return null;
+
+  const hint = textValue(event.payload.hint_text);
+  if (!hint) throwIdempotencyConflict();
+
+  return {
+    hint,
+    penalty: numberValue(event.payload.penalty, 10),
+    result: {
+      duplicate: true,
+      score: state.team.score,
+      hints_used: state.team.hintsUsed
+    },
+    replayed: true
   };
 };
 
@@ -709,6 +746,9 @@ export const requestHint = async ({
   idempotencyKey: string;
 }) => {
   const state = await getParticipantState(token);
+  const previous = await replayHintRequest({ state, idempotencyKey });
+  if (previous) return previous;
+
   if (state.run.status !== "active" || !state.checkpoint) {
     throw new Error("No active checkpoint");
   }
@@ -740,6 +780,12 @@ export const requestHint = async ({
   });
   if (error) throw error;
 
+  if (isIdempotencyReplay(result)) {
+    const replay = await replayHintRequest({ state, idempotencyKey });
+    if (replay) return replay;
+    throwIdempotencyConflict();
+  }
+
   await queueTeamMessage({
     runId: state.run.id,
     teamId: state.team.id,
@@ -747,7 +793,7 @@ export const requestHint = async ({
     body: `${state.participant.language === "he" ? "רמז" : "Hint"}: ${hintText}`
   });
 
-  return { hint: hintText, penalty, result };
+  return { hint: hintText, penalty, result, replayed: false };
 };
 
 export const startRunByOrganizerToken = async (organizerToken: string) => {

@@ -4,9 +4,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   calculateScoreDelta,
   evaluateTextAnswer,
+  type AnswerEvaluation,
   type ScoringConfig,
   type TextValidation
 } from "@/lib/game-engine";
+import {
+  findParticipantIdempotencyEvent,
+  isIdempotencyReplay,
+  throwIdempotencyConflict
+} from "@/lib/idempotency";
 import { getParticipantState, type ParticipantState } from "@/lib/repository";
 
 type UnknownRecord = Record<string, unknown>;
@@ -18,6 +24,74 @@ const objectValue = (value: unknown): UnknownRecord =>
 
 const textValue = (value: unknown, fallback = "") =>
   typeof value === "string" ? value : fallback;
+
+const numberValue = (value: unknown, fallback = 0) =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const answerReason = (
+  value: unknown,
+  correct: boolean
+): AnswerEvaluation["reason"] =>
+  value === "exact" || value === "fuzzy" || value === "wrong"
+    ? value
+    : correct
+      ? "exact"
+      : "wrong";
+
+const replayAnswerSubmission = async ({
+  state,
+  idempotencyKey
+}: {
+  state: ParticipantState;
+  idempotencyKey: string;
+}) => {
+  const event = await findParticipantIdempotencyEvent({
+    idempotencyKey,
+    teamId: state.team.id,
+    participantId: state.participant.id,
+    eventTypes: ["ANSWER_ACCEPTED", "ANSWER_REJECTED"]
+  });
+  if (!event) return null;
+
+  const submissionId = textValue(event.payload.submission_id);
+  if (!submissionId) throwIdempotencyConflict();
+
+  const supabase = createAdminClient();
+  const { data: submission, error } = await supabase
+    .from("submissions")
+    .select(
+      "is_correct,normalized_answer,score_delta,validation_reason"
+    )
+    .eq("id", submissionId)
+    .eq("team_id", state.team.id)
+    .eq("participant_id", state.participant.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!submission) throwIdempotencyConflict();
+
+  const replaySubmission = submission!;
+  const correct = replaySubmission.is_correct === true;
+  const evaluation: AnswerEvaluation = {
+    correct,
+    normalizedAnswer: textValue(replaySubmission.normalized_answer),
+    reason: answerReason(replaySubmission.validation_reason, correct)
+  };
+  const scoreDelta = numberValue(replaySubmission.score_delta);
+
+  return {
+    evaluation,
+    scoreDelta,
+    result: {
+      duplicate: true,
+      correct,
+      score: state.team.score,
+      completed_count: state.team.completedCount,
+      current_checkpoint_slug: state.team.currentCheckpointSlug,
+      status: state.team.status
+    },
+    replayed: true
+  };
+};
 
 const validationForCheckpoint = (state: ParticipantState): TextValidation => {
   const checkpoint = state.checkpoint;
@@ -145,6 +219,9 @@ export const submitCheckpointAnswer = async ({
   idempotencyKey: string;
 }) => {
   const state = await getParticipantState(token);
+  const previous = await replayAnswerSubmission({ state, idempotencyKey });
+  if (previous) return previous;
+
   if (state.run.status !== "active") throw new Error("Game is not active");
   if (!state.checkpoint) throw new Error("No active checkpoint");
 
@@ -205,6 +282,12 @@ export const submitCheckpointAnswer = async ({
   });
   if (error) throw error;
 
+  if (isIdempotencyReplay(result)) {
+    const replay = await replayAnswerSubmission({ state, idempotencyKey });
+    if (replay) return replay;
+    throwIdempotencyConflict();
+  }
+
   if (evaluation.correct) {
     const locale = state.participant.language;
     const contentForLocale = objectValue(state.checkpoint.content[locale]);
@@ -215,5 +298,5 @@ export const submitCheckpointAnswer = async ({
     await queueSuccessMessage({ state, success });
   }
 
-  return { evaluation, scoreDelta, result };
+  return { evaluation, scoreDelta, result, replayed: false };
 };

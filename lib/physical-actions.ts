@@ -1,6 +1,11 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  findParticipantIdempotencyEvent,
+  idempotencyObject,
+  throwIdempotencyConflict
+} from "@/lib/idempotency";
 import { getParticipantState } from "@/lib/repository";
 import { publicFallbackSummary } from "@/lib/public-checkpoint";
 import {
@@ -43,6 +48,7 @@ const asPhotoAssessment = (value: unknown): PhotoAssessment | null => {
 
 const completeCheckpoint = async ({
   token,
+  participantState,
   submissionType,
   idempotencyKey,
   payload,
@@ -50,13 +56,14 @@ const completeCheckpoint = async ({
   scoreMultiplier = 1
 }: {
   token: string;
+  participantState?: Awaited<ReturnType<typeof getParticipantState>>;
   submissionType: string;
   idempotencyKey: string;
   payload: Record<string, unknown>;
   validationReason: string;
   scoreMultiplier?: number;
 }) => {
-  const state = await getParticipantState(token);
+  const state = participantState ?? (await getParticipantState(token));
   if (state.run.status !== "active") throw new Error("Game is not active");
   if (!state.checkpoint) throw new Error("No active checkpoint");
 
@@ -126,6 +133,7 @@ export const verifyStationScan = async ({
 
   return completeCheckpoint({
     token,
+    participantState: state,
     submissionType: "scan",
     idempotencyKey,
     payload: { stationSlug },
@@ -145,6 +153,28 @@ export const verifyLocation = async ({
   idempotencyKey: string;
 }) => {
   const state = await getParticipantState(token);
+  const previous = await findParticipantIdempotencyEvent({
+    idempotencyKey,
+    teamId: state.team.id,
+    participantId: state.participant.id,
+    eventTypes: ["LOCATION_VERIFIED"]
+  });
+  if (previous) {
+    const payload = idempotencyObject(previous.payload);
+    return {
+      verified: true,
+      distanceMeters:
+        typeof payload.distance_meters === "number"
+          ? payload.distance_meters
+          : typeof payload.distance_bucket_meters === "number"
+            ? payload.distance_bucket_meters
+            : 0,
+      allowedRadiusMeters:
+        state.checkpoint?.radiusMeters ?? 0,
+      replayed: true
+    };
+  }
+
   if (state.run.status !== "active" || !state.checkpoint) {
     throw new Error("No active checkpoint");
   }
@@ -172,32 +202,50 @@ export const verifyLocation = async ({
   }
 
   const supabase = createAdminClient();
-  const { error } = await supabase.from("game_events").upsert(
-    {
-      run_id: state.run.id,
-      team_id: state.team.id,
-      participant_id: state.participant.id,
-      event_type: "LOCATION_VERIFIED",
-      idempotency_key: idempotencyKey,
-      payload: {
-        checkpoint_slug: state.checkpoint.slug,
-        verified: true,
-        distance_bucket_meters: Math.ceil(distance / 10) * 10
-      }
-    },
-    { onConflict: "idempotency_key", ignoreDuplicates: true }
-  );
-  if (error) throw error;
+  const { error } = await supabase.from("game_events").insert({
+    run_id: state.run.id,
+    team_id: state.team.id,
+    participant_id: state.participant.id,
+    event_type: "LOCATION_VERIFIED",
+    idempotency_key: idempotencyKey,
+    payload: {
+      checkpoint_slug: state.checkpoint.slug,
+      verified: true,
+      distance_bucket_meters: Math.ceil(distance / 10) * 10
+    }
+  });
+  const inserted = !error;
+  if (error && error.code !== "23505") throw error;
 
-  await supabase
-    .from("teams")
-    .update({ status: "solving", last_progress_at: new Date().toISOString() })
-    .eq("id", state.team.id);
+  const recorded = await findParticipantIdempotencyEvent({
+    idempotencyKey,
+    teamId: state.team.id,
+    participantId: state.participant.id,
+    eventTypes: ["LOCATION_VERIFIED"]
+  });
+  if (!recorded) throwIdempotencyConflict();
+  const recordedEvent = recorded!;
+
+  if (inserted) {
+    const { error: teamError } = await supabase
+      .from("teams")
+      .update({ status: "solving", last_progress_at: new Date().toISOString() })
+      .eq("id", state.team.id);
+    if (teamError) throw teamError;
+  }
+
+  const recordedDistance =
+    inserted
+      ? Math.round(distance)
+      : typeof recordedEvent.payload.distance_bucket_meters === "number"
+        ? recordedEvent.payload.distance_bucket_meters
+        : Math.round(distance);
 
   return {
     verified: true,
-    distanceMeters: Math.round(distance),
-    allowedRadiusMeters: state.checkpoint.radiusMeters
+    distanceMeters: recordedDistance,
+    allowedRadiusMeters: state.checkpoint.radiusMeters,
+    replayed: !inserted
   };
 };
 
@@ -339,6 +387,7 @@ export const submitStoredPhoto = async ({
 
   const completion = await completeCheckpoint({
     token,
+    participantState: state,
     submissionType: "photo",
     idempotencyKey,
     payload: {
