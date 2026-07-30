@@ -90,6 +90,8 @@ export async function POST(
             current_checkpoint_slug: next?.slug ?? null,
             completed_count: team.completed_count + 1,
             status: next ? "travelling" : "finished",
+            wrong_attempts: 0,
+            last_wrong_attempt_at: null,
             last_progress_at: new Date().toISOString(),
             finished_at: next ? null : new Date().toISOString()
           })

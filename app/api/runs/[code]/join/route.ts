@@ -1,5 +1,6 @@
 import { joinRun } from "@/lib/repository";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import { enforceIpRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,7 @@ export async function POST(
   context: { params: Promise<{ code: string }> }
 ) {
   try {
+    await enforceIpRateLimit("join", request);
     const { code } = await context.params;
     const body = await readJson<Record<string, unknown>>(request);
     const result = await joinRun({

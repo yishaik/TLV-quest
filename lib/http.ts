@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { RateLimitExceededError } from "./rate-limit-core";
 
 export const jsonOk = <T>(data: T, init?: ResponseInit) =>
   NextResponse.json({ ok: true, data }, init);
@@ -6,11 +7,12 @@ export const jsonOk = <T>(data: T, init?: ResponseInit) =>
 export const jsonError = (
   message: string,
   status = 400,
-  details?: unknown
+  details?: unknown,
+  headers?: HeadersInit
 ) =>
   NextResponse.json(
     { ok: false, error: { message, details } },
-    { status }
+    { status, headers }
   );
 
 export const handleRouteError = (error: unknown) => {
@@ -20,6 +22,33 @@ export const handleRouteError = (error: unknown) => {
       : typeof error === "object" && error && "message" in error
         ? String((error as { message?: unknown }).message ?? "Unexpected error")
         : "Unexpected error";
+
+  const cooldownMatch = rawMessage.match(
+    /answer_cooldown_active(?::(\d+))?/i
+  );
+  const rateLimited =
+    error instanceof RateLimitExceededError || Boolean(cooldownMatch);
+  if (rateLimited) {
+    const retryAfterSeconds =
+      error instanceof RateLimitExceededError
+        ? error.retryAfterSeconds
+        : Math.max(1, Number(cooldownMatch?.[1] ?? 30));
+    const code =
+      cooldownMatch ? "answer_cooldown_active" : "rate_limit_exceeded";
+    const message =
+      code === "answer_cooldown_active"
+        ? `יותר מדי ניסיונות שגויים. נסו שוב בעוד ${retryAfterSeconds} שניות. Too many wrong attempts. Try again in ${retryAfterSeconds} seconds.`
+        : `יותר מדי בקשות. נסו שוב בעוד ${retryAfterSeconds} שניות. Too many requests. Try again in ${retryAfterSeconds} seconds.`;
+    return jsonError(
+      message,
+      429,
+      { code, retryAfterSeconds },
+      {
+        "cache-control": "no-store",
+        "retry-after": String(retryAfterSeconds)
+      }
+    );
+  }
 
   if (/photo_upload_too_large/i.test(rawMessage)) {
     return jsonError(

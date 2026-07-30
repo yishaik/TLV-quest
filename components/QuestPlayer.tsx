@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { uploadParticipantPhoto } from "@/lib/photo-upload-client";
+import { readRetryAfterSeconds } from "@/lib/rate-limit-client";
 
 type ParticipantState = {
   participant: {
@@ -72,6 +73,21 @@ export function QuestPlayer({ token }: { token: string }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [locationVerified, setLocationVerified] = useState(false);
+  const [answerCooldownSeconds, setAnswerCooldownSeconds] = useState(0);
+
+  useEffect(() => {
+    if (answerCooldownSeconds <= 0) return;
+    const timeout = window.setTimeout(
+      () =>
+        setAnswerCooldownSeconds((seconds) => Math.max(0, seconds - 1)),
+      1_000
+    );
+    return () => window.clearTimeout(timeout);
+  }, [answerCooldownSeconds]);
+
+  useEffect(() => {
+    setAnswerCooldownSeconds(0);
+  }, [state?.checkpoint?.slug]);
 
   const loadState = useCallback(async () => {
     const response = await fetch(`/api/participants/${encodeURIComponent(token)}/state`, {
@@ -126,7 +142,7 @@ export function QuestPlayer({ token }: { token: string }) {
 
   async function submitAnswer(event: FormEvent) {
     event.preventDefault();
-    if (!answer.trim()) return;
+    if (!answer.trim() || answerCooldownSeconds > 0) return;
     setBusy(true);
     setError("");
     setMessage("");
@@ -141,9 +157,14 @@ export function QuestPlayer({ token }: { token: string }) {
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
+        const retryAfterSeconds = readRetryAfterSeconds(response, payload);
+        if (retryAfterSeconds) {
+          setAnswerCooldownSeconds(retryAfterSeconds);
+        }
         throw new Error(payload.error?.message ?? "Answer failed");
       }
       if (payload.data.evaluation.correct) {
+        setAnswerCooldownSeconds(0);
         setMessage(mission?.success || (isHebrew ? "נכון!" : "Correct!"));
         setAnswer("");
         await loadState();
@@ -387,10 +408,26 @@ export function QuestPlayer({ token }: { token: string }) {
                 onChange={(event) => setAnswer(event.target.value)}
                 autoComplete="off"
                 inputMode="text"
+                disabled={answerCooldownSeconds > 0}
               />
             </div>
-            <button className="button button-primary" disabled={busy || !answer.trim()}>
-              {busy ? (isHebrew ? "שולח…" : "Sending…") : (isHebrew ? "שליחת תשובה" : "Submit answer")}
+            <button
+              className="button button-primary"
+              disabled={
+                busy || answerCooldownSeconds > 0 || !answer.trim()
+              }
+            >
+              {answerCooldownSeconds > 0
+                ? isHebrew
+                  ? `נסו שוב בעוד ${answerCooldownSeconds} שנ׳`
+                  : `Try again in ${answerCooldownSeconds}s`
+                : busy
+                  ? isHebrew
+                    ? "שולח…"
+                    : "Sending…"
+                  : isHebrew
+                    ? "שליחת תשובה"
+                    : "Submit answer"}
             </button>
           </form>
         )}

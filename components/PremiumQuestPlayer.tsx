@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useQuestRealtime } from "@/components/QuestRealtimeProvider";
 import { uploadParticipantPhoto } from "@/lib/photo-upload-client";
+import { readRetryAfterSeconds } from "@/lib/rate-limit-client";
 
 type Locale = "he" | "en";
 type ParticipantState = {
@@ -88,13 +89,25 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [locationVerified, setLocationVerified] = useState(false);
+  const [answerCooldownSeconds, setAnswerCooldownSeconds] = useState(0);
 
   useEffect(() => {
     setLocationVerified(false);
     setMessage("");
     setError("");
     setAnswer("");
+    setAnswerCooldownSeconds(0);
   }, [state?.checkpoint?.slug]);
+
+  useEffect(() => {
+    if (answerCooldownSeconds <= 0) return;
+    const timeout = window.setTimeout(
+      () =>
+        setAnswerCooldownSeconds((seconds) => Math.max(0, seconds - 1)),
+      1_000
+    );
+    return () => window.clearTimeout(timeout);
+  }, [answerCooldownSeconds]);
 
   const language = state?.participant.language ?? "he";
   const isHebrew = language === "he";
@@ -109,7 +122,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
 
   async function sendAnswer(value: string) {
     const submitted = value.trim();
-    if (!submitted) return;
+    if (!submitted || answerCooldownSeconds > 0) return;
     setBusy(true);
     setError("");
     setMessage("");
@@ -127,9 +140,14 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
       );
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
+        const retryAfterSeconds = readRetryAfterSeconds(response, payload);
+        if (retryAfterSeconds) {
+          setAnswerCooldownSeconds(retryAfterSeconds);
+        }
         throw new Error(payload.error?.message ?? "Answer failed");
       }
       if (payload.data.evaluation.correct) {
+        setAnswerCooldownSeconds(0);
         setMessage(
           mission?.success ||
             (isHebrew
@@ -471,7 +489,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
                   type="button"
                   className="button button-secondary"
                   key={choice}
-                  disabled={busy}
+                  disabled={busy || answerCooldownSeconds > 0}
                   onClick={() => void sendAnswer(choice)}
                 >
                   {choice}
@@ -487,13 +505,20 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
                   onChange={(event) => setAnswer(event.target.value)}
                   autoComplete="off"
                   enterKeyHint="send"
+                  disabled={answerCooldownSeconds > 0}
                 />
               </label>
               <button
                 className="button quest-gold-button"
-                disabled={busy || !answer.trim()}
+                disabled={
+                  busy || answerCooldownSeconds > 0 || !answer.trim()
+                }
               >
-                {busy
+                {answerCooldownSeconds > 0
+                  ? isHebrew
+                    ? `נסו שוב בעוד ${answerCooldownSeconds} שנ׳`
+                    : `Try again in ${answerCooldownSeconds}s`
+                  : busy
                   ? isHebrew
                     ? "בודק…"
                     : "Checking…"
