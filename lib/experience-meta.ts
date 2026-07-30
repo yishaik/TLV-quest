@@ -11,12 +11,30 @@ const objectValue = (value: unknown): Record<string, unknown> =>
 export async function getParticipantExperienceState(token: string) {
   const state = await getParticipantState(token);
   const supabase = createAdminClient();
-  const { count, error } = await supabase
-    .from("run_checkpoints")
-    .select("id", { count: "exact", head: true })
-    .eq("run_id", state.run.id)
-    .eq("is_disabled", false);
-  if (error) throw error;
+  const [checkpointCount, teamRealtime, runRealtime] = await Promise.all([
+    supabase
+      .from("run_checkpoints")
+      .select("id", { count: "exact", head: true })
+      .eq("run_id", state.run.id)
+      .eq("is_disabled", false),
+    supabase
+      .from("teams")
+      .select("realtime_topic")
+      .eq("id", state.team.id)
+      .single(),
+    supabase
+      .from("game_runs")
+      .select("realtime_topic")
+      .eq("id", state.run.id)
+      .single()
+  ]);
+  if (checkpointCount.error) throw checkpointCount.error;
+  if (teamRealtime.error || !teamRealtime.data?.realtime_topic) {
+    throw teamRealtime.error ?? new Error("Team realtime topic is unavailable");
+  }
+  if (runRealtime.error || !runRealtime.data?.realtime_topic) {
+    throw runRealtime.error ?? new Error("Run realtime topic is unavailable");
+  }
 
   let checkpoint = state.checkpoint
     ? {
@@ -87,7 +105,11 @@ export async function getParticipantExperienceState(token: string) {
     checkpoint,
     run: {
       ...state.run,
-      totalCheckpoints: count ?? 0
+      totalCheckpoints: checkpointCount.count ?? 0
+    },
+    realtime: {
+      teamTopic: `team:${teamRealtime.data.realtime_topic}`,
+      runTopic: `run:${runRealtime.data.realtime_topic}`
     }
   };
 }
