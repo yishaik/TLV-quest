@@ -158,7 +158,6 @@ begin
      'TLV נקלט. הקרב התחיל.','TLV captured. The battle begins.',
      '{"type":"photo","criteria":"A safe group pose clearly suggesting the letters TLV without obstructing a walkway","confidenceThreshold":0.72}',
      'חלקו את הקבוצה לשלוש אותיות.','Split the team into three letters.',
-     'Divide the group into three letters.',
      '{"type":"text","accepted":["TLV","תל אביב"],"he":"אם אי אפשר לצלם, שלחו TLV.","en":"If a photo is not possible, send TLV."}'),
     ('creative',2,'warehouse-echo','frame-02-past-present','photo',
      'פריים 02: עבר והווה','Frame 02: Past and present',
