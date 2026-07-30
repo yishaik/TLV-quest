@@ -101,7 +101,6 @@ export function QuestRealtimeProvider({
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unexpected error");
-      throw cause;
     } finally {
       setLoading(false);
     }

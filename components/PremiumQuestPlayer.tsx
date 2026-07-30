@@ -27,14 +27,6 @@ type ParticipantState = {
   };
 };
 
-type LeaderboardEntry = {
-  team_name: string;
-  score: number;
-  completed_count: number;
-  status: string;
-  last_progress_at: string | null;
-};
-
 type Drawer = "team" | "map" | "board" | null;
 
 const contentFor = (
