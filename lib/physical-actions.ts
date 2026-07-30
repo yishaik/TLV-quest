@@ -93,7 +93,7 @@ export const verifyStationScan = async ({
   const state = await getParticipantState(token);
   if (!state.checkpoint) throw new Error("No active checkpoint");
   if (state.checkpoint.slug !== stationSlug) throw new Error("Checkpoint is locked");
-  if (!["scan", "hybrid"].includes(state.checkpoint.kind)) {
+  if (state.checkpoint.kind !== "scan") {
     throw new Error("This checkpoint is not completed by scanning alone");
   }
 
