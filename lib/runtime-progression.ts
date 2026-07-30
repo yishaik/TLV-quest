@@ -21,9 +21,6 @@ export const skipOptionalCheckpoint = async ({
   idempotencyKey: string;
 }) => {
   const state = await getParticipantState(token);
-  if (state.run.status !== "active") throw new Error("Game is not active");
-  if (!state.checkpoint) throw new Error("No active checkpoint");
-
   const transition = await skipCheckpointForTeam({
     teamId: state.team.id,
     actor: {
@@ -37,7 +34,8 @@ export const skipOptionalCheckpoint = async ({
 
   return {
     skipped: true,
-    checkpointSlug: state.checkpoint.slug,
+    checkpointSlug:
+      transition.previousCheckpointSlug ?? state.team.currentCheckpointSlug,
     transition,
     delivery: {
       queued: transition.queued,

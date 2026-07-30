@@ -1,8 +1,12 @@
-import { randomUUID } from "node:crypto";
 import { deliverCheckpointToTeam } from "@/lib/checkpoint-delivery";
 import { finalizePhotoUpload } from "@/lib/photo-uploads";
 import { getParticipantState } from "@/lib/repository";
-import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import {
+  handleRouteError,
+  jsonOk,
+  readJson,
+  requireIdempotencyKey
+} from "@/lib/http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,8 +21,7 @@ export async function POST(
     const finalized = await finalizePhotoUpload({
       token,
       uploadId: body.uploadId,
-      idempotencyKey:
-        request.headers.get("idempotency-key") ?? `photo:${randomUUID()}`
+      idempotencyKey: requireIdempotencyKey(request)
     });
 
     if (finalized.result.approved && !finalized.replayed) {

@@ -1,8 +1,12 @@
-import { randomUUID } from "node:crypto";
 import { deliverCheckpointToTeam } from "@/lib/checkpoint-delivery";
 import { submitCheckpointAnswer } from "@/lib/answer-submission";
 import { getParticipantState } from "@/lib/repository";
-import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import {
+  handleRouteError,
+  jsonOk,
+  readJson,
+  requireIdempotencyKey
+} from "@/lib/http";
 import { enforceParticipantRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -18,11 +22,10 @@ export async function POST(
     const answer = typeof body.answer === "string" ? body.answer.trim() : "";
     if (!answer) throw new Error("Answer is required");
 
-    const idempotencyKey =
-      request.headers.get("idempotency-key") ?? `web-answer:${randomUUID()}`;
+    const idempotencyKey = requireIdempotencyKey(request);
     const result = await submitCheckpointAnswer({ token, answer, idempotencyKey });
 
-    if (result.evaluation.correct) {
+    if (result.evaluation.correct && !result.replayed) {
       const state = await getParticipantState(token);
       if (state.checkpoint) {
         await deliverCheckpointToTeam({

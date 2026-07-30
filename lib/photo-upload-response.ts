@@ -10,12 +10,22 @@ type ApiEnvelope<T> = {
 };
 
 export class PhotoUploadClientError extends Error {
+  readonly retryable: boolean;
+
   constructor(
     message: string,
-    readonly status?: number
+    readonly status?: number,
+    readonly code?: string
   ) {
     super(message);
     this.name = "PhotoUploadClientError";
+    this.retryable =
+      status === undefined ||
+      status < 400 ||
+      status === 408 ||
+      status === 429 ||
+      status >= 500 ||
+      code === "photo_upload_not_ready";
   }
 }
 
@@ -73,11 +83,20 @@ export const readPhotoApiData = async <T>(
       payload?.error && typeof payload.error.message === "string"
         ? payload.error.message.trim()
         : "";
+    const serverCode =
+      payload?.error &&
+      payload.error.details &&
+      typeof payload.error.details === "object" &&
+      !Array.isArray(payload.error.details) &&
+      typeof (payload.error.details as { code?: unknown }).code === "string"
+        ? String((payload.error.details as { code: string }).code)
+        : undefined;
     throw new PhotoUploadClientError(
       response.status === 413 || response.status === 415
         ? messageForStatus(response.status, locale)
         : serverMessage || messageForStatus(response.status, locale),
-      response.status
+      response.status,
+      serverCode
     );
   }
 

@@ -21,6 +21,7 @@ type UploadAuthorization = {
   uploadToken: string;
   expiresAt: string;
   maxBytes: number;
+  uploaded?: boolean;
 };
 
 export type PhotoUploadResult = {
@@ -62,17 +63,20 @@ const storageStatus = (error: unknown) => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-export const uploadParticipantPhoto = async ({
-  token,
-  file,
-  locale
-}: {
+type ParticipantPhotoUploadInput = {
   token: string;
   file: File;
   locale: Locale;
-}): Promise<PhotoUploadResult> => {
+  idempotencyKey: string;
+};
+
+const performParticipantPhotoUpload = async ({
+  token,
+  file,
+  locale,
+  idempotencyKey
+}: ParticipantPhotoUploadInput): Promise<PhotoUploadResult> => {
   const mimeType = validateFile(file, locale);
-  const idempotencyKey = `web-photo:${crypto.randomUUID()}`;
   const endpoint = `/api/participants/${encodeURIComponent(token)}/photo`;
 
   try {
@@ -89,30 +93,34 @@ export const uploadParticipantPhoto = async ({
       locale
     );
 
-    const { error: uploadError } = await getBrowserClient()
-      .storage
-      .from(authorization.bucket)
-      .uploadToSignedUrl(
-        authorization.path,
-        authorization.uploadToken,
-        file,
-        {
-          cacheControl: "0",
-          contentType: mimeType,
-          upsert: false
-        }
-      );
+    if (!authorization.uploaded) {
+      const { error: uploadError } = await getBrowserClient()
+        .storage
+        .from(authorization.bucket)
+        .uploadToSignedUrl(
+          authorization.path,
+          authorization.uploadToken,
+          file,
+          {
+            cacheControl: "0",
+            contentType: mimeType,
+            upsert: false
+          }
+        );
 
-    if (uploadError) {
-      const status = storageStatus(uploadError);
-      throw new PhotoUploadClientError(
-        status === 413
-          ? photoUploadCopy(locale, "tooLarge")
-          : status === 415
-            ? photoUploadCopy(locale, "unsupported")
-            : photoUploadCopy(locale, "network"),
-        status
-      );
+      if (uploadError) {
+        const status = storageStatus(uploadError);
+        if (status !== 409) {
+          throw new PhotoUploadClientError(
+            status === 413
+              ? photoUploadCopy(locale, "tooLarge")
+              : status === 415
+                ? photoUploadCopy(locale, "unsupported")
+                : photoUploadCopy(locale, "network"),
+            status
+          );
+        }
+      }
     }
 
     const finalizeResponse = await fetch(endpoint, {
@@ -130,5 +138,27 @@ export const uploadParticipantPhoto = async ({
   } catch (error) {
     if (error instanceof PhotoUploadClientError) throw error;
     throw new PhotoUploadClientError(photoUploadCopy(locale, "network"));
+  }
+};
+
+const activePhotoUploads = new Map<
+  string,
+  Promise<PhotoUploadResult>
+>();
+
+export const uploadParticipantPhoto = async (
+  input: ParticipantPhotoUploadInput
+): Promise<PhotoUploadResult> => {
+  const active = activePhotoUploads.get(input.idempotencyKey);
+  if (active) return active;
+
+  const operation = performParticipantPhotoUpload(input);
+  activePhotoUploads.set(input.idempotencyKey, operation);
+  try {
+    return await operation;
+  } finally {
+    if (activePhotoUploads.get(input.idempotencyKey) === operation) {
+      activePhotoUploads.delete(input.idempotencyKey);
+    }
   }
 };

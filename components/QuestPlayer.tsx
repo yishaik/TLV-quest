@@ -1,6 +1,11 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ClientIdempotencyKeys,
+  idempotencyAnswerScope,
+  idempotencyPhotoScope
+} from "@/lib/idempotency-client";
 import { uploadParticipantPhoto } from "@/lib/photo-upload-client";
 import { readRetryAfterSeconds } from "@/lib/rate-limit-client";
 
@@ -74,6 +79,7 @@ export function QuestPlayer({ token }: { token: string }) {
   const [error, setError] = useState("");
   const [locationVerified, setLocationVerified] = useState(false);
   const [answerCooldownSeconds, setAnswerCooldownSeconds] = useState(0);
+  const [idempotencyKeys] = useState(() => new ClientIdempotencyKeys());
 
   useEffect(() => {
     if (answerCooldownSeconds <= 0) return;
@@ -142,7 +148,18 @@ export function QuestPlayer({ token }: { token: string }) {
 
   async function submitAnswer(event: FormEvent) {
     event.preventDefault();
-    if (!answer.trim() || answerCooldownSeconds > 0) return;
+    const submitted = answer.trim();
+    const checkpointSlug = state?.checkpoint?.slug;
+    if (!submitted || !checkpointSlug || answerCooldownSeconds > 0) return;
+    const actionScope = idempotencyAnswerScope(
+      `${token}:${checkpointSlug}`,
+      submitted
+    );
+    const idempotencyKey = idempotencyKeys.acquire(
+      actionScope,
+      "web-answer"
+    );
+    let requestSettled = false;
     setBusy(true);
     setError("");
     setMessage("");
@@ -151,11 +168,13 @@ export function QuestPlayer({ token }: { token: string }) {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "idempotency-key": `web-answer:${crypto.randomUUID()}`
+          "idempotency-key": idempotencyKey
         },
-        body: JSON.stringify({ answer })
+        body: JSON.stringify({ answer: submitted })
       });
       const payload = await response.json();
+      idempotencyKeys.settle(actionScope, idempotencyKey, response.status);
+      requestSettled = true;
       if (!response.ok || !payload.ok) {
         const retryAfterSeconds = readRetryAfterSeconds(response, payload);
         if (retryAfterSeconds) {
@@ -172,6 +191,9 @@ export function QuestPlayer({ token }: { token: string }) {
         setError(isHebrew ? "לא בדיוק. נסו שוב." : "Not quite. Try again.");
       }
     } catch (errorValue) {
+      if (!requestSettled) {
+        idempotencyKeys.settle(actionScope, idempotencyKey, undefined);
+      }
       setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
     } finally {
       setBusy(false);
@@ -179,20 +201,33 @@ export function QuestPlayer({ token }: { token: string }) {
   }
 
   async function requestHint() {
+    const checkpointSlug = state?.checkpoint?.slug;
+    if (!checkpointSlug) return;
+    const actionScope = `hint:${token}:${checkpointSlug}`;
+    const idempotencyKey = idempotencyKeys.acquire(
+      actionScope,
+      "web-hint"
+    );
+    let requestSettled = false;
     setBusy(true);
     setError("");
     try {
       const response = await fetch(`/api/participants/${encodeURIComponent(token)}/hint`, {
         method: "POST",
-        headers: { "idempotency-key": `web-hint:${crypto.randomUUID()}` }
+        headers: { "idempotency-key": idempotencyKey }
       });
       const payload = await response.json();
+      idempotencyKeys.settle(actionScope, idempotencyKey, response.status);
+      requestSettled = true;
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Hint failed");
       }
       setMessage(`${isHebrew ? "רמז" : "Hint"}: ${payload.data.hint}`);
       await loadState();
     } catch (errorValue) {
+      if (!requestSettled) {
+        idempotencyKeys.settle(actionScope, idempotencyKey, undefined);
+      }
       setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
     } finally {
       setBusy(false);
@@ -208,6 +243,17 @@ export function QuestPlayer({ token }: { token: string }) {
     setError("");
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        const checkpointSlug = state?.checkpoint?.slug;
+        if (!checkpointSlug) {
+          setBusy(false);
+          return;
+        }
+        const actionScope = `location:${token}:${checkpointSlug}`;
+        const idempotencyKey = idempotencyKeys.acquire(
+          actionScope,
+          "web-location"
+        );
+        let requestSettled = false;
         try {
           const response = await fetch(
             `/api/participants/${encodeURIComponent(token)}/location`,
@@ -215,7 +261,7 @@ export function QuestPlayer({ token }: { token: string }) {
               method: "POST",
               headers: {
                 "content-type": "application/json",
-                "idempotency-key": `web-location:${crypto.randomUUID()}`
+                "idempotency-key": idempotencyKey
               },
               body: JSON.stringify({
                 latitude: position.coords.latitude,
@@ -224,6 +270,12 @@ export function QuestPlayer({ token }: { token: string }) {
             }
           );
           const payload = await response.json();
+          idempotencyKeys.settle(
+            actionScope,
+            idempotencyKey,
+            response.status
+          );
+          requestSettled = true;
           if (!response.ok || !payload.ok) {
             throw new Error(payload.error?.message ?? "Location verification failed");
           }
@@ -242,6 +294,13 @@ export function QuestPlayer({ token }: { token: string }) {
             );
           }
         } catch (errorValue) {
+          if (!requestSettled) {
+            idempotencyKeys.settle(
+              actionScope,
+              idempotencyKey,
+              undefined
+            );
+          }
           setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
         } finally {
           setBusy(false);
@@ -258,6 +317,16 @@ export function QuestPlayer({ token }: { token: string }) {
   async function submitPhoto(event: FormEvent) {
     event.preventDefault();
     if (!photo) return;
+    const checkpointSlug = state?.checkpoint?.slug;
+    if (!checkpointSlug) return;
+    const actionScope = idempotencyPhotoScope(
+      `${token}:${checkpointSlug}`,
+      photo
+    );
+    const idempotencyKey = idempotencyKeys.acquire(
+      actionScope,
+      "web-photo"
+    );
     setBusy(true);
     setError("");
     setMessage("");
@@ -265,8 +334,10 @@ export function QuestPlayer({ token }: { token: string }) {
       const result = await uploadParticipantPhoto({
         token,
         file: photo,
-        locale: isHebrew ? "he" : "en"
+        locale: isHebrew ? "he" : "en",
+        idempotencyKey
       });
+      idempotencyKeys.settle(actionScope, idempotencyKey, 200);
       if (result.approved) {
         setMessage(mission?.success || (isHebrew ? "התמונה אושרה." : "Photo approved."));
         setPhoto(null);
@@ -282,6 +353,11 @@ export function QuestPlayer({ token }: { token: string }) {
         setError(fallbackText);
       }
     } catch (errorValue) {
+      idempotencyKeys.settleError(
+        actionScope,
+        idempotencyKey,
+        errorValue
+      );
       setError(errorValue instanceof Error ? errorValue.message : "Unexpected error");
     } finally {
       setBusy(false);

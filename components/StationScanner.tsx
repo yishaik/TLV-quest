@@ -16,6 +16,11 @@ export function StationScanner({ stationSlug }: { stationSlug: string }) {
           "לא נמצא קישור אישי במכשיר. פתחו קודם את קישור המשחק האישי ואז סרקו שוב."
         );
       }
+      const storageKey = `tlvQuest:stationScan:${stationSlug}:${token}`;
+      const idempotencyKey =
+        sessionStorage.getItem(storageKey) ??
+        `web-station-scan:${crypto.randomUUID()}`;
+      sessionStorage.setItem(storageKey, idempotencyKey);
 
       const response = await fetch(
         `/api/participants/${encodeURIComponent(token)}/scan`,
@@ -23,7 +28,7 @@ export function StationScanner({ stationSlug }: { stationSlug: string }) {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "idempotency-key": `station:${stationSlug}:${token}`
+            "idempotency-key": idempotencyKey
           },
           body: JSON.stringify({ stationSlug })
         }

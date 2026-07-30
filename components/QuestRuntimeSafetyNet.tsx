@@ -10,6 +10,10 @@ import {
 } from "react";
 import { useQuestRealtime } from "@/components/QuestRealtimeProvider";
 import {
+  ClientIdempotencyKeys,
+  idempotencyAnswerScope
+} from "@/lib/idempotency-client";
+import {
   QUEST_PHOTO_APPROVED_EVENT,
   QUEST_PHOTO_RETRY_EVENT,
   type QuestPhotoEventDetail
@@ -78,6 +82,7 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
   }>({ slug: "", mode: "minimized" });
   const [resolvedFallbackSlug, setResolvedFallbackSlug] = useState("");
   const [fallbackSuccess, setFallbackSuccess] = useState("");
+  const [idempotencyKeys] = useState(() => new ClientIdempotencyKeys());
   const answerInputRef = useRef<HTMLInputElement>(null);
   const minimizedButtonRef = useRef<HTMLButtonElement>(null);
   const launcherButtonRef = useRef<HTMLButtonElement>(null);
@@ -221,6 +226,12 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
         : "Skip this optional checkpoint? No points will be awarded for it."
     );
     if (!confirmed) return;
+    const actionScope = `skip:${token}:${checkpoint.slug}`;
+    const idempotencyKey = idempotencyKeys.acquire(
+      actionScope,
+      `web-optional-skip:${checkpoint.slug}`
+    );
+    let requestSettled = false;
 
     setBusy("skip");
     setError("");
@@ -231,11 +242,13 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
         {
           method: "POST",
           headers: {
-            "idempotency-key": `web-optional-skip:${checkpoint.slug}:${crypto.randomUUID()}`
+            "idempotency-key": idempotencyKey
           }
         }
       );
       const payload = await response.json();
+      idempotencyKeys.settle(actionScope, idempotencyKey, response.status);
+      requestSettled = true;
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error?.message ?? "Skip failed");
       }
@@ -246,6 +259,9 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
       );
       window.setTimeout(() => void refresh(), 250);
     } catch (cause) {
+      if (!requestSettled) {
+        idempotencyKeys.settle(actionScope, idempotencyKey, undefined);
+      }
       setError(cause instanceof Error ? cause.message : "Unexpected error");
     } finally {
       setBusy("");
@@ -256,6 +272,15 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
     event.preventDefault();
     const submitted = answer.trim();
     if (!submitted || !checkpoint) return;
+    const actionScope = idempotencyAnswerScope(
+      `${token}:${checkpoint.slug}`,
+      submitted
+    );
+    const idempotencyKey = idempotencyKeys.acquire(
+      actionScope,
+      "web-photo-fallback"
+    );
+    let requestSettled = false;
 
     setBusy("fallback");
     setError("");
@@ -268,12 +293,20 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "idempotency-key": `web-photo-fallback:${crypto.randomUUID()}`
+            "idempotency-key": idempotencyKey
           },
           body: JSON.stringify({ answer: submitted })
         }
       );
       const payload = await response.json().catch(() => null);
+      if (payload !== null) {
+        idempotencyKeys.settle(
+          actionScope,
+          idempotencyKey,
+          response.status
+        );
+        requestSettled = true;
+      }
       if (!response.ok || !payload.ok) {
         const code = errorDetailsCode(payload);
         if (code === "location_verification_required") {
@@ -309,6 +342,9 @@ export function QuestRuntimeSafetyNet({ token }: { token: string }) {
       );
       window.setTimeout(() => void refresh(), 250);
     } catch (cause) {
+      if (!requestSettled) {
+        idempotencyKeys.settle(actionScope, idempotencyKey, undefined);
+      }
       setError(cause instanceof Error ? cause.message : "Unexpected error");
     } finally {
       setBusy("");

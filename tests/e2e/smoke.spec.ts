@@ -693,12 +693,16 @@ for (const scenario of [
     let authorizationBodyBytes = 0;
     let finalizeBodyBytes = 0;
     let storageBodyBytes = 0;
+    let photoIdempotencyKey = "";
     const path =
       "22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333/11111111-1111-4111-8111-111111111111/44444444-4444-4444-8444-444444444444/photo.jpg";
 
     await page.route(
       "**/api/participants/photo-e2e/photo/upload",
       async (route) => {
+        photoIdempotencyKey =
+          route.request().headers()["idempotency-key"] ?? "";
+        expect(photoIdempotencyKey).toMatch(/^web-photo:/);
         authorizationBodyBytes =
           route.request().postDataBuffer()?.byteLength ?? 0;
         expect(route.request().postDataJSON()).toEqual({
@@ -736,6 +740,9 @@ for (const scenario of [
     await page.route(
       "**/api/participants/photo-e2e/photo",
       async (route) => {
+        expect(route.request().headers()["idempotency-key"]).toBe(
+          photoIdempotencyKey
+        );
         finalizeBodyBytes = route.request().postDataBuffer()?.byteLength ?? 0;
         expect(route.request().postDataJSON()).toEqual({
           uploadId: "55555555-5555-4555-8555-555555555555"

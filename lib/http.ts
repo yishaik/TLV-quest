@@ -461,6 +461,30 @@ export const readJson = async <T extends Record<string, unknown>>(
   }
 };
 
+const IDEMPOTENCY_KEY_PATTERN =
+  /^[A-Za-z0-9][A-Za-z0-9:._-]{11,199}$/;
+
+export const requireIdempotencyKey = (request: Request): string => {
+  const key = request.headers.get("idempotency-key")?.trim() ?? "";
+  if (!key) {
+    throw new AppError({
+      message:
+        "חסר מזהה פעולה. רעננו את הדף ונסו שוב. / The action identifier is missing. Refresh and try again.",
+      status: 400,
+      code: "missing_idempotency_key"
+    });
+  }
+  if (!IDEMPOTENCY_KEY_PATTERN.test(key)) {
+    throw new AppError({
+      message:
+        "מזהה הפעולה אינו תקין. רעננו את הדף ונסו שוב. / The action identifier is invalid. Refresh and try again.",
+      status: 400,
+      code: "invalid_idempotency_key"
+    });
+  }
+  return key;
+};
+
 export const requireBearer = (request: Request, expected?: string) => {
   if (!expected) {
     throw new AppError({

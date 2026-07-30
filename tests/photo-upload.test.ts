@@ -19,6 +19,8 @@ const premiumPlayer = readFileSync(
   "utf8"
 );
 const legacyPlayer = readFileSync("components/QuestPlayer.tsx", "utf8");
+const photoUploadClient = readFileSync("lib/photo-upload-client.ts", "utf8");
+const photoUploadService = readFileSync("lib/photo-uploads.ts", "utf8");
 
 describe("direct participant photo uploads", () => {
   it("detects supported image signatures instead of trusting the MIME header", () => {
@@ -74,13 +76,58 @@ describe("direct participant photo uploads", () => {
     });
   });
 
+  it("keeps processing conflicts retryable with the same upload key", async () => {
+    await expect(
+      readPhotoApiData(
+        new Response(
+          JSON.stringify({
+            ok: false,
+            error: {
+              message: "Still processing",
+              details: { code: "photo_upload_not_ready" }
+            }
+          }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json" }
+          }
+        ),
+        "en"
+      )
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "photo_upload_not_ready",
+      retryable: true
+    });
+  });
+
   it("uses small JSON finalize requests and direct browser storage uploads", () => {
     expect(finalizeRoute).not.toContain("request.formData()");
     expect(premiumPlayer).toContain("uploadParticipantPhoto");
     expect(legacyPlayer).toContain("uploadParticipantPhoto");
     expect(premiumPlayer).not.toContain('form.set("photo"');
     expect(legacyPlayer).not.toContain('form.set("photo"');
+    expect(photoUploadClient).toContain("activePhotoUploads");
+    expect(photoUploadClient).toContain("authorization.uploaded");
+    expect(photoUploadClient).not.toContain("crypto.randomUUID()");
     expect(PHOTO_UPLOAD_MAX_BYTES).toBe(10 * 1024 * 1024);
+  });
+
+  it("can resume finalization after the checkpoint already advanced", () => {
+    const existingLookup = photoUploadService.indexOf(
+      '.eq("idempotency_key", idempotencyKey)'
+    );
+    const activeCheckpointGuard = photoUploadService.indexOf(
+      'state.run.status !== "active"',
+      existingLookup
+    );
+
+    expect(existingLookup).toBeGreaterThan(0);
+    expect(photoUploadService).toContain(
+      'row.status === "completed" || row.status === "processing"'
+    );
+    expect(photoUploadService).toContain("uploaded: true");
+    expect(existingLookup).toBeLessThan(activeCheckpointGuard);
   });
 
   it("keeps grants service-role-only and excludes attached media from cleanup", () => {

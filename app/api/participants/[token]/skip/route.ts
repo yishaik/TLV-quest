@@ -1,7 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { after } from "next/server";
 import { skipOptionalCheckpoint } from "@/lib/runtime-progression";
-import { handleRouteError, jsonOk } from "@/lib/http";
+import {
+  handleRouteError,
+  jsonOk,
+  requireIdempotencyKey
+} from "@/lib/http";
 import { processOutbox } from "@/lib/providers";
 
 export const runtime = "nodejs";
@@ -15,8 +18,7 @@ export async function POST(
     const { token } = await context.params;
     const result = await skipOptionalCheckpoint({
       token,
-      idempotencyKey:
-        request.headers.get("idempotency-key") ?? `optional-skip:${randomUUID()}`
+      idempotencyKey: requireIdempotencyKey(request)
     });
     const outboxIds = result.delivery.outboxIds;
     if (outboxIds.length) {

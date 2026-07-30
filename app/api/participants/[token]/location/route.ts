@@ -1,6 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { verifyLocation } from "@/lib/physical-actions";
-import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import {
+  handleRouteError,
+  jsonOk,
+  readJson,
+  requireIdempotencyKey
+} from "@/lib/http";
 
 export const runtime = "nodejs";
 
@@ -20,9 +24,7 @@ export async function POST(
         token,
         latitude: body.latitude,
         longitude: body.longitude,
-        idempotencyKey:
-          request.headers.get("idempotency-key") ??
-          `location:${token}:${Date.now()}:${randomUUID()}`
+        idempotencyKey: requireIdempotencyKey(request)
       })
     );
   } catch (error) {
