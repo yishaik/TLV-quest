@@ -125,7 +125,7 @@ describe("transactional checkpoint skipping", () => {
     expect(organizerRoute).toContain("Promise.all");
     expect(organizerRoute).toContain("failures");
     expect(organizerRoute).toContain('status: skip?.failures.length ? "partial"');
-    expect(organizerRoute).toContain('"idempotency-key"');
+    expect(organizerRoute).toContain("requireIdempotencyKey(request)");
     expect(migration).toContain(
       "return jsonb_build_object('duplicate', true)"
     );

@@ -8,6 +8,16 @@ export const RATE_LIMIT_POLICIES = {
     limit: 60,
     windowSeconds: 60
   },
+  organizerControl: {
+    scope: "organizer-control",
+    limit: 30,
+    windowSeconds: 60
+  },
+  organizerState: {
+    scope: "organizer-state",
+    limit: 60,
+    windowSeconds: 60
+  },
   join: { scope: "join", limit: 5, windowSeconds: 60 },
   leads: { scope: "leads", limit: 3, windowSeconds: 60 * 60 },
   worker: { scope: "worker", limit: 10, windowSeconds: 60 }

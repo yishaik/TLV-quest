@@ -29,6 +29,12 @@ import {
   type WhatsappContextResolution,
   type WhatsappGameContext
 } from "@/lib/whatsapp-status";
+import {
+  deriveCheckpointHealth,
+  deriveTeamTelemetry,
+  stuckThresholdFromSettings,
+  type CheckpointFieldHealth
+} from "@/lib/live-ops";
 
 const TEMPLATE_SLUG = "tel-aviv-port-time-capsule";
 const DEFAULT_TEAM_SIZE = 4;
@@ -821,48 +827,181 @@ export const getOrganizerRun = async (organizerToken: string) => {
     .single();
   if (error || !run) throw new Error("Organizer link is invalid or expired");
 
+  const now = new Date();
   const [
-    { data: teams, error: teamsError },
-    { data: participants, error: participantsError },
-    { data: checkpoints, error: checkpointsError },
-    { data: deliveryRows, error: deliveryError }
+    teamsResult,
+    participantsResult,
+    checkpointsResult,
+    presenceResult,
+    outboxResult,
+    auditResult,
+    deliveryResult
   ] = await Promise.all([
-      supabase
-        .from("teams")
-        .select("id,public_name,status,score,completed_count,last_progress_at")
-        .eq("run_id", run.id)
-        .order("score", { ascending: false }),
-      supabase
-        .from("participants")
-        .select("id,team_id,public_alias,language,whatsapp_connected_at")
-        .eq("run_id", run.id),
-      supabase
-        .from("run_checkpoints")
-        .select("slug,sequence_no,kind,is_disabled")
-        .eq("run_id", run.id)
-        .order("sequence_no"),
-      supabase.rpc("get_outbox_status_counts", { p_run_id: run.id })
-    ]);
-  if (teamsError) throw teamsError;
-  if (participantsError) throw participantsError;
-  if (checkpointsError) throw checkpointsError;
-  if (deliveryError) throw deliveryError;
+    supabase
+      .from("teams")
+      .select(
+        "id,public_name,status,score,completed_count,current_checkpoint_slug,wrong_attempts,hints_used,last_progress_at,started_at,finished_at"
+      )
+      .eq("run_id", run.id)
+      .order("score", { ascending: false }),
+    supabase
+      .from("participants")
+      .select(
+        "id,team_id,public_alias,language,whatsapp_connected_at,last_seen_at"
+      )
+      .eq("run_id", run.id),
+    supabase
+      .from("run_checkpoints")
+      .select(
+        "id,source_checkpoint_id,slug,sequence_no,kind,is_disabled,is_optional,fallback_checkpoint,validation"
+      )
+      .eq("run_id", run.id)
+      .order("sequence_no"),
+    supabase
+      .from("quest_presence")
+      .select("team_id,participant_id,visible,online_at,expires_at")
+      .eq("run_id", run.id)
+      .gt("expires_at", now.toISOString()),
+    supabase
+      .from("message_outbox")
+      .select(
+        "id,participant_id,status,attempts,last_error,provider_status,provider_error_code,created_at,sent_at,delivered_at,send_after,target_scope"
+      )
+      .eq("run_id", run.id)
+      .order("created_at", { ascending: false })
+      .limit(250),
+    supabase
+      .from("organizer_audit_log")
+      .select(
+        "id,action,actor,reason,before_state,after_state,created_at"
+      )
+      .eq("run_id", run.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase.rpc("get_outbox_status_counts", { p_run_id: run.id })
+  ]);
 
-  const rawDelivery = Array.isArray(deliveryRows) ? deliveryRows[0] : null;
-  const delivery = {
+  for (const result of [
+    teamsResult,
+    participantsResult,
+    checkpointsResult,
+    presenceResult,
+    outboxResult,
+    auditResult,
+    deliveryResult
+  ]) {
+    if (result.error) throw result.error;
+  }
+
+  const checkpointRows = checkpointsResult.data ?? [];
+  const sourceIds = checkpointRows
+    .map((checkpoint) => checkpoint.source_checkpoint_id)
+    .filter((sourceId): sourceId is string => Boolean(sourceId));
+  const sourceActiveById = new Map<string, boolean>();
+  const fieldHealthById = new Map<string, CheckpointFieldHealth>();
+  if (sourceIds.length) {
+    const [sourcesResult, healthResult] = await Promise.all([
+      supabase
+        .from("template_checkpoints")
+        .select("id,is_active")
+        .in("id", sourceIds),
+      supabase
+        .from("checkpoint_health")
+        .select("checkpoint_id,status,notes,last_checked_at")
+        .in("checkpoint_id", sourceIds)
+    ]);
+    if (sourcesResult.error) throw sourcesResult.error;
+    if (healthResult.error) throw healthResult.error;
+    for (const source of sourcesResult.data ?? []) {
+      sourceActiveById.set(source.id, source.is_active);
+    }
+    for (const health of healthResult.data ?? []) {
+      fieldHealthById.set(health.checkpoint_id, {
+        status: health.status,
+        notes: health.notes,
+        lastCheckedAt: health.last_checked_at
+      });
+    }
+  }
+
+  const stuckThresholdMinutes = stuckThresholdFromSettings(run.settings);
+  const teams = deriveTeamTelemetry(
+    teamsResult.data ?? [],
+    presenceResult.data ?? [],
+    now,
+    stuckThresholdMinutes
+  );
+  const checkpoints = deriveCheckpointHealth(
+    checkpointRows,
+    sourceActiveById,
+    fieldHealthById
+  );
+  const outbox = outboxResult.data ?? [];
+  const rawDelivery = Array.isArray(deliveryResult.data)
+    ? deliveryResult.data[0]
+    : null;
+  const outboxSummary = {
     queued: Number(rawDelivery?.queued ?? 0),
     processing: Number(rawDelivery?.processing ?? 0),
     sent: Number(rawDelivery?.sent ?? 0),
     delivered: Number(rawDelivery?.delivered ?? 0),
-    failed: Number(rawDelivery?.failed ?? 0)
+    failed: Number(rawDelivery?.failed ?? 0),
+    total:
+      Number(rawDelivery?.queued ?? 0) +
+      Number(rawDelivery?.processing ?? 0) +
+      Number(rawDelivery?.sent ?? 0) +
+      Number(rawDelivery?.delivered ?? 0) +
+      Number(rawDelivery?.failed ?? 0)
   };
+  const activeCheckpoints = checkpoints.filter(
+    (checkpoint) => !checkpoint.is_disabled
+  );
+  const unhealthyCheckpoints = activeCheckpoints.filter(
+    (checkpoint) => !checkpoint.healthy
+  );
+  const blockedCheckpoints = activeCheckpoints.filter(
+    (checkpoint) =>
+      !checkpoint.source_active ||
+      ["blocked", "needs_attention"].includes(
+        checkpoint.field_health_status
+      )
+  );
+  const pendingCheckpoints = activeCheckpoints.filter(
+    (checkpoint) => checkpoint.field_health_status === "pending"
+  );
+  const missingFallbacks = activeCheckpoints.filter(
+    (checkpoint) =>
+      ["photo", "hybrid"].includes(checkpoint.kind) &&
+      !checkpoint.fallback_ready
+  );
 
   return {
     run,
-    teams: teams ?? [],
-    participants: participants ?? [],
-    checkpoints: checkpoints ?? [],
-    delivery,
+    teams,
+    participants: participantsResult.data ?? [],
+    checkpoints,
+    presence: presenceResult.data ?? [],
+    outbox,
+    outboxSummary,
+    audit: auditResult.data ?? [],
+    goNoGo: {
+      ready:
+        activeCheckpoints.length > 0 &&
+        unhealthyCheckpoints.length === 0 &&
+        outboxSummary.failed === 0,
+      activeCheckpoints: activeCheckpoints.length,
+      verifiedCheckpoints: activeCheckpoints.filter((checkpoint) =>
+        ["verified", "not_required"].includes(
+          checkpoint.field_health_status
+        )
+      ).length,
+      pendingCheckpoints: pendingCheckpoints.length,
+      blockedCheckpoints: blockedCheckpoints.length,
+      unhealthyCheckpoints: unhealthyCheckpoints.length,
+      missingFallbacks: missingFallbacks.length,
+      failedMessages: outboxSummary.failed,
+      stuckThresholdMinutes
+    },
     joinUrl: `${publicEnv.appUrl}/join/${run.public_code}`,
     liveUrl: `${publicEnv.appUrl}/live/${run.public_code}`
   };

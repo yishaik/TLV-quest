@@ -24,6 +24,9 @@ const objectValue = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
+const textValue = (value: unknown, fallback = "") =>
+  typeof value === "string" ? value : fallback;
+
 const checkpointSlugFromPayload = (value: unknown) => {
   const payload = objectValue(value);
   const candidate = payload.checkpoint_slug ?? payload.checkpointSlug;
@@ -40,7 +43,8 @@ export async function getParticipantExperienceState(token: string) {
     teamRealtime,
     runRealtime,
     activityResult,
-    presenceResult
+    presenceResult,
+    bannersResult
   ] = await Promise.all([
     supabase
       .from("run_checkpoints")
@@ -68,7 +72,16 @@ export async function getParticipantExperienceState(token: string) {
       .from("quest_presence")
       .select("participant_id,device_id,visible,online_at,expires_at")
       .eq("team_id", state.team.id)
-      .gt("expires_at", new Date().toISOString())
+      .gt("expires_at", new Date().toISOString()),
+    supabase
+      .from("in_app_banners")
+      .select("id,team_id,body,active_until,created_at")
+      .eq("run_id", state.run.id)
+      .is("revoked_at", null)
+      .gt("active_until", new Date().toISOString())
+      .or(`team_id.is.null,team_id.eq.${state.team.id}`)
+      .order("created_at", { ascending: false })
+      .limit(5)
   ]);
   if (checkpointCount.error) throw checkpointCount.error;
   if (teamRealtime.error || !teamRealtime.data?.realtime_topic) {
@@ -79,6 +92,7 @@ export async function getParticipantExperienceState(token: string) {
   }
   if (activityResult.error) throw activityResult.error;
   if (presenceResult.error) throw presenceResult.error;
+  if (bannersResult.error) throw bannersResult.error;
 
   const memberNames = new Map(
     state.members.map((member) => [member.id, member.firstName])
@@ -100,6 +114,19 @@ export async function getParticipantExperienceState(token: string) {
     onlineAt: device.online_at,
     expiresAt: device.expires_at
   }));
+  const banners = (bannersResult.data ?? []).map((banner) => {
+    const body = objectValue(banner.body);
+    return {
+      id: banner.id,
+      teamId: banner.team_id,
+      body: textValue(
+        body[state.participant.language],
+        textValue(body.he, textValue(body.en))
+      ),
+      activeUntil: banner.active_until,
+      createdAt: banner.created_at
+    };
+  });
 
   let checkpoint = state.checkpoint
     ? toPublicCheckpoint(state.checkpoint, {
@@ -169,6 +196,7 @@ export async function getParticipantExperienceState(token: string) {
     ...state,
     activity,
     presence,
+    banners,
     checkpoint,
     run: {
       ...state.run,
