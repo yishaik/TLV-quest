@@ -34,14 +34,14 @@ set search_path = public, auth, realtime, pg_temp
 as $$
   select exists (
     select 1
-    from public.realtime_participant_authorizations authorization
+    from public.realtime_participant_authorizations binding
     join public.teams team
-      on team.id = authorization.team_id
-     and team.run_id = authorization.run_id
+      on team.id = binding.team_id
+     and team.run_id = binding.run_id
     join public.game_runs run
-      on run.id = authorization.run_id
-    where authorization.user_id = auth.uid()
-      and authorization.expires_at > now()
+      on run.id = binding.run_id
+    where binding.user_id = auth.uid()
+      and binding.expires_at > now()
       and run.status <> 'cancelled'::public.game_status
       and p_topic in (
         'team:' || team.realtime_topic,
