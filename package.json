@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:load": "node scripts/quest-load-test.mjs",
     "test:rls-remote": "node scripts/verify-supabase-public-access.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "check": "npm run lint && npm run test && npm run build"
