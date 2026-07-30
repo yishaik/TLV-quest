@@ -8,30 +8,55 @@ export type QuestLeaderboardEntry = {
   last_progress_at: string | null;
 };
 
+export type QuestActivityEntry = {
+  id: string;
+  eventType: string;
+  actorId: string | null;
+  actorName: string | null;
+  checkpointSlug: string | null;
+  createdAt: string;
+};
+
+export type QuestPresenceMember = {
+  participantId: string;
+  firstName: string;
+  deviceCount: number;
+  visible: boolean;
+  onlineAt: string | null;
+};
+
+export type QuestConnectionState =
+  | "connecting"
+  | "live"
+  | "reconnecting"
+  | "offline"
+  | "stale";
+
 export type QuestParticipantState = {
   participant: {
-    id?: string;
+    id: string;
     firstName: string;
     language: QuestLocale;
     whatsappConnected: boolean;
   };
   run: {
-    id?: string;
+    id: string;
     publicCode: string;
     status: string;
     scheduledAt: string | null;
     totalCheckpoints: number;
   };
   team: {
-    id?: string;
+    id: string;
     name: string;
     status: string;
     score: number;
     completedCount: number;
   };
   members: Array<{ id: string; firstName: string }>;
+  activity: QuestActivityEntry[];
   checkpoint: null | {
-    id?: string;
+    id: string;
     slug: string;
     sequenceNo: number;
     kind: string;
