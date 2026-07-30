@@ -21,6 +21,54 @@ export const handleRouteError = (error: unknown) => {
         ? String((error as { message?: unknown }).message ?? "Unexpected error")
         : "Unexpected error";
 
+  if (/photo_upload_too_large/i.test(rawMessage)) {
+    return jsonError(
+      "התמונה גדולה מדי. ניתן להעלות תמונה בגודל של עד 10MB.",
+      413,
+      { code: "photo_upload_too_large" }
+    );
+  }
+
+  if (
+    /photo_upload_unsupported_format|photo_upload_mime_mismatch|photo_upload_invalid_signature/i.test(
+      rawMessage
+    )
+  ) {
+    return jsonError(
+      "אפשר להעלות תמונה בפורמט JPG, PNG או WebP בלבד.",
+      415,
+      { code: "photo_upload_unsupported_format" }
+    );
+  }
+
+  if (/photo_upload_expired/i.test(rawMessage)) {
+    return jsonError(
+      "תוקף העלאת התמונה פג. בחרו את התמונה מחדש ונסו שוב.",
+      410,
+      { code: "photo_upload_expired" }
+    );
+  }
+
+  if (
+    /photo_upload_not_ready|photo_upload_idempotency_conflict|photo_upload_path_mismatch|photo_upload_size_mismatch|photo_checkpoint_changed/i.test(
+      rawMessage
+    )
+  ) {
+    return jsonError(
+      "לא ניתן להשלים את העלאת התמונה. בחרו אותה מחדש ונסו שוב.",
+      409,
+      { code: "photo_upload_not_ready" }
+    );
+  }
+
+  if (/photo_upload_not_found/i.test(rawMessage)) {
+    return jsonError(
+      "העלאת התמונה לא נמצאה או שפג תוקפה.",
+      404,
+      { code: "photo_upload_not_found" }
+    );
+  }
+
   if (/location_verification_required/i.test(rawMessage)) {
     return jsonError(
       "יש לאמת את המיקום בתחנה לפני שליחת התשובה. לחצו על ‘אימות מיקום’ ונסו שוב.",

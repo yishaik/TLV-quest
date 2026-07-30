@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { deliverCheckpointToTeam } from "@/lib/checkpoint-delivery";
-import { submitPhoto } from "@/lib/physical-actions";
+import { finalizePhotoUpload } from "@/lib/photo-uploads";
 import { getParticipantState } from "@/lib/repository";
-import { handleRouteError, jsonOk } from "@/lib/http";
+import { handleRouteError, jsonOk, readJson } from "@/lib/http";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(
   request: Request,
@@ -12,20 +13,15 @@ export async function POST(
 ) {
   try {
     const { token } = await context.params;
-    const form = await request.formData();
-    const file = form.get("photo");
-    if (!(file instanceof File)) throw new Error("Photo is required");
-
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const result = await submitPhoto({
+    const body = await readJson<{ uploadId?: unknown }>(request);
+    const finalized = await finalizePhotoUpload({
       token,
-      bytes,
-      mimeType: file.type,
+      uploadId: body.uploadId,
       idempotencyKey:
         request.headers.get("idempotency-key") ?? `photo:${randomUUID()}`
     });
 
-    if (result.approved) {
+    if (finalized.result.approved && !finalized.replayed) {
       const state = await getParticipantState(token);
       if (state.checkpoint) {
         await deliverCheckpointToTeam({
@@ -36,7 +32,7 @@ export async function POST(
       }
     }
 
-    return jsonOk(result);
+    return jsonOk(finalized.result);
   } catch (error) {
     return handleRouteError(error);
   }
