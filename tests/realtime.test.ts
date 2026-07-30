@@ -1,8 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const migration = readFileSync(
+const initialMigration = readFileSync(
   "supabase/migrations/20260730054500_quest_realtime_topics.sql",
+  "utf8"
+);
+const privateMigration = readFileSync(
+  "supabase/migrations/20260730063500_private_realtime_presence.sql",
   "utf8"
 );
 const provider = readFileSync("components/QuestRealtimeProvider.tsx", "utf8");
@@ -13,18 +17,25 @@ const liveBoard = readFileSync("components/PremiumLiveLeaderboard.tsx", "utf8");
 const experienceMeta = readFileSync("lib/experience-meta.ts", "utf8");
 
 describe("quest realtime architecture", () => {
-  it("uses random wake-up topics and minimal public broadcasts", () => {
-    expect(migration).toContain("realtime_topic");
-    expect(migration).toContain("realtime.send");
-    expect(migration).toContain("'state_changed'");
-    expect(migration).toContain("false");
-    expect(migration).not.toContain("alter publication supabase_realtime add table public.teams");
-    expect(migration).not.toContain("alter publication supabase_realtime add table public.participants");
+  it("keeps private gameplay tables outside direct Postgres Changes", () => {
+    expect(initialMigration).toContain("realtime_topic");
+    expect(initialMigration).not.toContain(
+      "alter publication supabase_realtime add table public.teams"
+    );
+    expect(initialMigration).not.toContain(
+      "alter publication supabase_realtime add table public.participants"
+    );
+    expect(privateMigration).toContain("quest_realtime_events");
+    expect(privateMigration).toContain("quest_presence");
+    expect(privateMigration).not.toContain(
+      "alter publication supabase_realtime add table public.game_events"
+    );
   });
 
   it("keeps one shared player state source without interval polling", () => {
     expect(provider).toContain("QuestRealtimeContext.Provider");
-    expect(provider).toContain('.on("broadcast", { event: "state_changed" }');
+    expect(provider).toContain('table: "quest_realtime_events"');
+    expect(provider).toContain('table: "quest_presence"');
     expect(provider).toContain('table: "leaderboard_entries"');
     expect(provider).not.toContain("setInterval");
     expect(player).not.toContain("setInterval");
@@ -37,9 +48,10 @@ describe("quest realtime architecture", () => {
     expect(liveBoard).not.toContain("setInterval");
   });
 
-  it("returns only opaque realtime topics through the protected state API", () => {
-    expect(experienceMeta).toContain("teamTopic");
-    expect(experienceMeta).toContain("runTopic");
-    expect(experienceMeta).toContain("realtime_topic");
+  it("returns safe activity and current presence through the protected API", () => {
+    expect(experienceMeta).toContain("activity");
+    expect(experienceMeta).toContain("presence");
+    expect(experienceMeta).toContain('from("quest_presence")');
+    expect(experienceMeta).not.toContain("normalized_answer");
   });
 });
