@@ -16,8 +16,6 @@ jobs:
         shell: bash
         env:
           APP_URL: https://play.yishaik.com
-          SUPABASE_URL: https://vybivdkskrkafcuedvbg.supabase.co
-          SUPABASE_PUBLISHABLE_KEY: sb_publishable_grXh4GXsoiFworQI6LNtgw_Ib_ac_e4
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
@@ -43,12 +41,16 @@ jobs:
           test "$auth_status" = "200"
           test "$(jq -r '.ok' "$work/auth.json")" = "true"
           access_token=$(jq -r '.data.accessToken' "$work/auth.json")
+          supabase_url=$(jq -r '.data.supabaseUrl // empty' "$work/auth.json")
+          supabase_publishable_key=$(jq -r '.data.supabasePublishableKey // empty' "$work/auth.json")
           test -n "$access_token"
+          test -n "$supabase_url"
+          test -n "$supabase_publishable_key"
           test "$(jq -r '.data | has("refreshToken")' "$work/auth.json")" = "false"
 
           read_status=$(curl -sS -o "$work/events.json" -w '%{http_code}' \
-            "$SUPABASE_URL/rest/v1/quest_realtime_events?select=id,run_id,team_id,source,operation&order=id.desc&limit=100" \
-            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            "$supabase_url/rest/v1/quest_realtime_events?select=id,run_id,team_id,source,operation&order=id.desc&limit=100" \
+            -H "apikey: $supabase_publishable_key" \
             -H "authorization: Bearer $access_token")
           test "$read_status" = "200"
           jq -e --arg run "$run_id" --arg team "$team_id" \
@@ -59,8 +61,8 @@ jobs:
           now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           expires=$(date -u -d '+60 seconds' +%Y-%m-%dT%H:%M:%SZ)
           presence_status=$(curl -sS -o "$work/presence.txt" -w '%{http_code}' \
-            -X POST "$SUPABASE_URL/rest/v1/quest_presence?on_conflict=participant_id,device_id" \
-            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -X POST "$supabase_url/rest/v1/quest_presence?on_conflict=participant_id,device_id" \
+            -H "apikey: $supabase_publishable_key" \
             -H "authorization: Bearer $access_token" \
             -H 'content-type: application/json' \
             -H 'prefer: resolution=merge-duplicates,return=minimal' \
@@ -68,8 +70,8 @@ jobs:
           test "$presence_status" = "201" -o "$presence_status" = "204"
 
           foreign_status=$(curl -sS -o "$work/foreign.json" -w '%{http_code}' \
-            -X POST "$SUPABASE_URL/rest/v1/quest_presence" \
-            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -X POST "$supabase_url/rest/v1/quest_presence" \
+            -H "apikey: $supabase_publishable_key" \
             -H "authorization: Bearer $access_token" \
             -H 'content-type: application/json' \
             -H 'prefer: return=minimal' \

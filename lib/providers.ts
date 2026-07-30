@@ -93,6 +93,7 @@ export const sendEmail = async ({
     };
   }
   if (!env.resendApiKey) throw new Error("RESEND_API_KEY is not configured");
+  if (!env.emailFrom) throw new Error("EMAIL_FROM is not configured");
 
   const resend = new Resend(env.resendApiKey);
   const { data, error } = await resend.emails.send({
