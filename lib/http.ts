@@ -29,12 +29,24 @@ export const handleRouteError = (error: unknown) => {
     );
   }
 
+  if (/scan_verification_required/i.test(rawMessage)) {
+    return jsonError(
+      "יש לסרוק את קוד התחנה לפני שליחת התשובה.",
+      409,
+      { code: "scan_verification_required" }
+    );
+  }
+
   const status =
-    /not found|invalid|expired/i.test(rawMessage)
-      ? 404
-      : /closed|full|not active|locked|cannot/i.test(rawMessage)
-        ? 409
-        : 400;
+    /unauthorized/i.test(rawMessage)
+      ? 401
+      : /access is not allowed|forbidden/i.test(rawMessage)
+        ? 403
+        : /not found|invalid|expired/i.test(rawMessage)
+          ? 404
+          : /closed|full|not active|locked|cannot|not optional/i.test(rawMessage)
+            ? 409
+            : 400;
   return jsonError(rawMessage, status);
 };
 
