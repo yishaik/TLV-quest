@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AppChrome } from "@/components/AppChrome";
+import { PwaRegistration } from "@/components/PwaRegistration";
 import "./globals.css";
 import "./marketing.css";
 import "./experience.css";
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="he" dir="rtl">
       <body>
+        <PwaRegistration />
         <AppChrome />
         {children}
       </body>
