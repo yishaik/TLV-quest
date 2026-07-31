@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashSecret } from "@/lib/crypto";
+import { publicEnv } from "@/lib/env";
 import { skipCheckpointForTeam } from "@/lib/checkpoint-skip";
 import {
   AppError,
@@ -364,6 +365,47 @@ export async function POST(
       if (eventError) throw eventError;
       result = skip;
       kickOutbox({ outboxIds, runId: run.id, action });
+    } else if (action === "create_recap_share") {
+      // The recap token IS the idempotency key: retrying the same request
+      // returns the same share instead of minting a second public link.
+      const activeHours =
+        typeof body.activeHours === "number"
+          ? Math.max(1, Math.min(168, Math.round(body.activeHours)))
+          : 72;
+      const { data, error } = await supabase.rpc("create_recap_share", {
+        p_run_id: run.id,
+        p_team_id: optionalText(body, "teamId"),
+        p_actor: actor,
+        p_reason: reason,
+        p_idempotency_key: idempotencyKey,
+        p_active_hours: activeHours
+      });
+      if (error) throw error;
+      result = {
+        ...(data && typeof data === "object" && !Array.isArray(data)
+          ? data
+          : {}),
+        recapUrl: `${publicEnv.appUrl}/recap/${encodeURIComponent(
+          idempotencyKey
+        )}`
+      };
+    } else if (action === "revoke_recap_share") {
+      const shareId = textField(body, "shareId", 64);
+      if (!shareId) {
+        throw new AppError({
+          message: "Recap share id is required",
+          code: "recap_share_id_required"
+        });
+      }
+      const { data, error } = await supabase.rpc("revoke_recap_share", {
+        p_run_id: run.id,
+        p_share_id: shareId,
+        p_actor: actor,
+        p_reason: reason,
+        p_idempotency_key: idempotencyKey
+      });
+      if (error) throw error;
+      result = data;
     } else {
       if (!SUPPORTED_OVERRIDES.has(action)) {
         throw new AppError({

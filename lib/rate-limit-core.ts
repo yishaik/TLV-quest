@@ -29,7 +29,18 @@ export const RATE_LIMIT_POLICIES = {
     scope: "content-translate",
     limit: 20,
     windowSeconds: 60
-  }
+  },
+  // 3 per day, not per minute: an epilogue is generated once per finished run,
+  // retries exist only for flaky networks, and each call reaches a paid model.
+  epilogue: { scope: "participant-epilogue", limit: 3, windowSeconds: 86_400 },
+  routeGenerator: {
+    scope: "route-generator",
+    limit: 10,
+    windowSeconds: 60
+  },
+  // Public, token-keyed: recap links get shared in group chats, so allow a
+  // burst of curious teammates without letting one link hammer the database.
+  recap: { scope: "public-recap", limit: 30, windowSeconds: 60 }
 } as const;
 
 export type RateLimitPolicyName = keyof typeof RATE_LIMIT_POLICIES;

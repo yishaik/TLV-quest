@@ -65,7 +65,7 @@ export const enforceRateLimit = async ({
 };
 
 export const enforceParticipantRateLimit = (
-  policyName: "answer" | "hint" | "participantState",
+  policyName: "answer" | "hint" | "participantState" | "epilogue",
   token: string
 ) => enforceRateLimit({ policyName, subject: `participant:${token}` });
 
@@ -78,7 +78,7 @@ export const enforceOrganizerRateLimit = (
 // IP: admins share office/mobile NATs, and an IP subject would let one editor's
 // bulk import lock out everyone else on the same network.
 export const enforceAdminRateLimit = (
-  policyName: "contentImport" | "contentTranslate",
+  policyName: "contentImport" | "contentTranslate" | "routeGenerator",
   email: string
 ) => enforceRateLimit({ policyName, subject: `admin:${email}` });
 
