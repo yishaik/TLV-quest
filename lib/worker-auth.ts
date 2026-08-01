@@ -18,7 +18,18 @@ const equalSecret = (left: string, right: string): boolean => {
   );
 };
 
-export const authorizeOutboxWorker = async (
+/**
+ * Authorizes a background worker request from either credential:
+ *
+ *   - the configured `WORKER_SECRET`, for manual and external invocation;
+ *   - a single-use token minted inside Postgres, for pg_cron schedules.
+ *
+ * The minted-token path is what lets `pg_cron` drive the workers without a
+ * long-lived secret being stored in the database. The token table is still
+ * named `outbox_worker_tokens` for historical reasons; it backs every
+ * scheduled worker, not just the outbox.
+ */
+export const authorizeWorkerRequest = async (
   request: Request
 ): Promise<boolean> => {
   const token = bearerToken(request);
@@ -32,7 +43,7 @@ export const authorizeOutboxWorker = async (
     p_token: token
   });
   if (error) {
-    console.error("outbox.worker_auth_failed", {
+    console.error("worker.auth_failed", {
       errorCode: "worker_token_validation_failed"
     });
     return false;

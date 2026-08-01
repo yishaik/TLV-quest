@@ -50,8 +50,9 @@ margin, reports a timeout after two minutes, opens an issue on the first
 failure, and resolves after the next successful check-in.
 
 The monitor detects missing or failed invocations; it does not schedule the
-worker. A production scheduler must invoke `/api/internal/worker` with
-`Authorization: Bearer $WORKER_SECRET` every five minutes.
+worker. The schedule itself is the `maintenance-worker-every-five-minutes`
+pg_cron job, documented in `docs/scheduled-workers.md`. The endpoint also
+accepts `Authorization: Bearer $WORKER_SECRET` for manual invocation.
 
 ## Verification
 

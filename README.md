@@ -27,3 +27,7 @@ verify:schema` rebuilds it from those files alone and fails if application code
 references a table or RPC no migration creates; it runs on every pull request.
 The drift this gate was built to close is documented in
 `docs/schema-integrity.md`.
+
+The outbox and maintenance workers are scheduled by pg_cron inside Supabase,
+with single-use tokens rather than a stored secret. See
+`docs/scheduled-workers.md`.
