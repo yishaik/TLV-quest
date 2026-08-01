@@ -1,4 +1,4 @@
-import { authorizeOutboxWorker } from "@/lib/outbox-worker-auth";
+import { authorizeWorkerRequest } from "@/lib/worker-auth";
 import { handleRouteError, jsonError, jsonOk } from "@/lib/http";
 import { cleanupAbandonedPhotoUploads } from "@/lib/photo-uploads";
 import { processOutbox } from "@/lib/providers";
@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
-    if (!(await authorizeOutboxWorker(request))) {
+    if (!(await authorizeWorkerRequest(request))) {
       return jsonError("Unauthorized", 401);
     }
 
