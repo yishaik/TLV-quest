@@ -25,3 +25,6 @@ dependency overrides are documented in `docs/dependency-security.md`.
 The outbox and maintenance workers are scheduled by pg_cron inside Supabase,
 with single-use tokens rather than a stored secret. See
 `docs/scheduled-workers.md`.
+
+The go/no-go checklist, live incident response, retention behaviour, and
+required production configuration are in `docs/production-runbook.md`.
