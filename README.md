@@ -21,3 +21,9 @@ workflow are documented in `docs/error-handling.md`.
 
 The production audit gate, Dependabot policy, and reviewed transitive
 dependency overrides are documented in `docs/dependency-security.md`.
+
+`supabase/migrations/` is the source of truth for the database. `npm run
+verify:schema` rebuilds it from those files alone and fails if application code
+references a table or RPC no migration creates; it runs on every pull request.
+The drift this gate was built to close is documented in
+`docs/schema-integrity.md`.
