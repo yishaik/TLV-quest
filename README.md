@@ -32,5 +32,9 @@ The outbox and maintenance workers are scheduled by pg_cron inside Supabase,
 with single-use tokens rather than a stored secret. See
 `docs/scheduled-workers.md`.
 
+Route content is verified in the field from `/admin/field`, which records
+coordinates, checklists, calibration photos and answer edits directly. See
+`docs/field-verification.md`.
+
 The go/no-go checklist, live incident response, retention behaviour, and
 required production configuration are in `docs/production-runbook.md`.

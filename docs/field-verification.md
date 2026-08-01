@@ -2,6 +2,34 @@
 
 Complete this checklist once before inviting external pilot participants.
 
+## Do it from the phone: `/admin/field`
+
+The checklist below is the *what*. `/admin/field` is the *how* — a mobile
+verification mode that writes straight into the content tables, so nothing has
+to be transcribed twice.
+
+Per station it lets you:
+
+- **measure and save the coordinate.** It shows GPS accuracy and the drift from
+  the stored value, and warns before saving a fix worse than 25 m. A bad
+  coordinate silently breaks location verification for every future player and
+  would not surface until a live run.
+- tick the field checks, set the verification radius, leave notes, and move the
+  station between `pending` / `verified` / `needs_attention` / `blocked`.
+- **capture calibration photos**, each labelled with the verdict a human expects
+  from it. The screen tracks accepts and rejects separately and refuses to call
+  a station calibration-ready without both — a pile of good photos cannot tell
+  you where the threshold is.
+- read and edit the question text, the accepted answers, and for photo
+  checkpoints the approval criteria and confidence threshold. Signage wording
+  is what drives the answers, so it is edited where the signage is read.
+
+Stations are listed south to north, which is the order the port is walked.
+
+Sign in with an address on the admin allowlist; the link must be opened on the
+same device.
+
+
 ## General route
 
 - [ ] Confirm the short route is safe and walkable in both directions.
