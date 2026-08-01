@@ -10,6 +10,26 @@ permissions:
   contents: read
 
 jobs:
+  schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Schema gate
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run verify:schema 2>&1 | tee schema.log
+      - name: Upload schema log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-log-${{ github.run_id }}
+          path: schema.log
+          if-no-files-found: ignore
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 25
