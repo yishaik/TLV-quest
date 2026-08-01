@@ -21,6 +21,10 @@ export const MAINTENANCE_MONITOR_CONFIG = {
   recoveryThreshold: 1
 };
 
+// Long enough for the closing check-in to reach Sentry, short enough that a
+// Sentry outage cannot hold the worker past its 60s route budget.
+export const MAINTENANCE_FLUSH_TIMEOUT_MS = 2000;
+
 export const purgeExpiredRunsWithStorage = async () => {
   const supabase = createAdminClient();
   const { data: runs, error: runError } = await supabase
@@ -110,5 +114,13 @@ export const runMaintenanceWorker = async () => {
       duration: (Date.now() - startedAt) / 1000
     });
     throw error;
+  } finally {
+    // `captureCheckIn` only buffers. On Vercel the function is frozen as soon
+    // as the response is returned, so the closing check-in never leaves the
+    // process and the monitor records a timeout on every otherwise-healthy
+    // run — which pages on-call every five minutes once alerting is live.
+    // Flushing here costs a few hundred milliseconds and is the difference
+    // between a monitor that reports the truth and one that cries wolf.
+    await Sentry.flush(MAINTENANCE_FLUSH_TIMEOUT_MS);
   }
 };
