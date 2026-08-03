@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore
+} from "react";
 import { getBrowserClient } from "@/lib/supabase/browser";
 import {
   GALLERY_MAX_BYTES,
@@ -51,6 +58,18 @@ const BADGE: Record<string, string> = {
 };
 
 const ACCURACY_LIMIT = 25;
+
+const DESK_MODE_KEY = "tlvq-desk-mode";
+const DESK_MODE_EVENT = "tlvq-desk-mode-change";
+
+const subscribeToDeskMode = (onChange: () => void) => {
+  window.addEventListener(DESK_MODE_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(DESK_MODE_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+};
 
 /**
  * What kind of puzzle this point can host. Captured as structured flags rather
@@ -253,6 +272,23 @@ export function FieldVerification() {
   const [openId, setOpenId] = useState("");
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  // Capturing a point and describing it are different jobs in different
+  // places. Walking, you want the shortest possible path from "I am standing
+  // here" to "saved"; at a desk you want every field. One form cannot be both,
+  // and the long version lost — nine points came back with photos and nothing
+  // else filled in.
+  const deskMode = useSyncExternalStore(
+    subscribeToDeskMode,
+    () => window.localStorage.getItem(DESK_MODE_KEY) === "1",
+    // Server render assumes field mode: it is the safer default, since showing
+    // the long form to someone who is walking is the failure being fixed.
+    () => false
+  );
+
+  const toggleMode = () => {
+    window.localStorage.setItem(DESK_MODE_KEY, deskMode ? "0" : "1");
+    window.dispatchEvent(new Event(DESK_MODE_EVENT));
+  };
 
   const reload = useCallback(async () => {
     setReloadKey((current) => current + 1);
@@ -355,9 +391,24 @@ export function FieldVerification() {
         <div className={styles.header}>
           <h1 className={styles.title}>תחנות שטח</h1>
           <p className={styles.sub}>
-            עמוד בנקודה, לכוד אותה, ואז צלם והוסף הערות. את המסלול נבנה אחר כך
-            מהתחנות שקיימות באמת.
+            {deskMode
+              ? "השלמת פרטים מהתמונות. כאן ממלאים את מה שלא ממלאים בהליכה."
+              : "עמוד בנקודה, תן שם, צלם. כל השאר מחכה."}
           </p>
+          <div className={styles.row} style={{ marginTop: 10 }}>
+            <button
+              className={`${styles.button} ${deskMode ? "" : styles.primary}`}
+              onClick={() => deskMode && toggleMode()}
+            >
+              בשטח
+            </button>
+            <button
+              className={`${styles.button} ${deskMode ? styles.primary : ""}`}
+              onClick={() => !deskMode && toggleMode()}
+            >
+              מהמשרד
+            </button>
+          </div>
         </div>
 
         <Capture token={token} onCreated={reload} />
@@ -378,6 +429,7 @@ export function FieldVerification() {
           <StationCard
             key={station.id}
             station={station}
+            deskMode={deskMode}
             hasPhotoRiddle={(library?.riddles ?? []).some(
               (riddle) =>
                 riddle.station_id === station.id && riddle.kind === "photo"
@@ -526,6 +578,7 @@ function Capture({
 
 function StationCard({
   station,
+  deskMode,
   hasPhotoRiddle,
   token,
   open,
@@ -533,6 +586,7 @@ function StationCard({
   onSaved
 }: {
   station: Station;
+  deskMode: boolean;
   hasPhotoRiddle: boolean;
   token: string;
   open: boolean;
@@ -843,15 +897,22 @@ function StationCard({
               onChange={(event) => setName(event.target.value)}
             />
 
-            <label className={styles.label}>רדיוס אימות (מ׳)</label>
-            <input
-              className={styles.input}
-              inputMode="numeric"
-              value={radius}
-              onChange={(event) => setRadius(event.target.value)}
-            />
+            {deskMode && (
+              <>
+                <label className={styles.label}>רדיוס אימות (מ׳)</label>
+                <input
+                  className={styles.input}
+                  inputMode="numeric"
+                  value={radius}
+                  onChange={(event) => setRadius(event.target.value)}
+                />
+              </>
+            )}
 
-            <div className={styles.checks} style={{ marginTop: 12 }}>
+            <div
+              className={styles.checks}
+              style={{ marginTop: 12, display: deskMode ? "grid" : "none" }}
+            >
               <label className={styles.check}>
                 <input
                   type="checkbox"
@@ -878,6 +939,8 @@ function StationCard({
               </label>
             </div>
 
+{deskMode && (
+              <>
             <p className={styles.sectionTitle} style={{ marginTop: 18 }}>
               מה אפשר לבנות כאן
             </p>
@@ -948,6 +1011,9 @@ function StationCard({
               placeholder="כביש, קצה מים, אופניים, עבודות, חושך…"
             />
 
+              </>
+            )}
+
             <label className={styles.label}>הערות</label>
             <textarea
               className={styles.textarea}
@@ -956,18 +1022,22 @@ function StationCard({
               placeholder="מה יש כאן, מה כתוב על השילוט, מה מעניין, מפגעים…"
             />
 
-            <label className={styles.label}>מצב</label>
-            <select
-              className={styles.select}
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              {STATUSES.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
+            {deskMode && (
+              <>
+                <label className={styles.label}>מצב</label>
+                <select
+                  className={styles.select}
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value)}
+                >
+                  {STATUSES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
 
             <button
               className={`${styles.button} ${styles.primary}`}

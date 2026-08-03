@@ -18,7 +18,24 @@ patched releases are available:
 - `postcss` is overridden to `8.5.25`.
 - `sharp` is overridden to `0.35.3`.
 
-Both overrides must remain covered by lint, unit, build, and browser tests.
+One override comes from a different chain:
+
+- `brace-expansion` is overridden to `5.0.9`, **scoped to `@sentry/nextjs`**.
+  It reaches production through `@sentry/nextjs` →
+  `@sentry/bundler-plugin-core` → `glob` → `minimatch`, which still resolves
+  `5.0.8`. GHSA-rgw5-rvv9-x895 (high) is a denial of service through unbounded
+  intermediate arrays that bypasses the earlier CVE-2026-14257 mitigation.
+
+  The scope matters. A global override was tried first and took `npm run lint`
+  down: ESLint carries its own much older `minimatch` under
+  `@eslint/config-array`, which expects the version 1 `brace-expansion` API and
+  throws inside `braceExpand` when handed 5.x. Only the vulnerable chain should
+  be moved.
+
+  Added 2026-08-03, when the advisory was published and the audit gate caught
+  it on an unrelated pull request — the gate working as intended.
+
+Every override must remain covered by lint, unit, build, and browser tests.
 Remove an override when a supported Next.js release resolves the corresponding
 dependency itself.
 
