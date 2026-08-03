@@ -83,7 +83,7 @@ export const enforceAdminRateLimit = (
 ) => enforceRateLimit({ policyName, subject: `admin:${email}` });
 
 export const enforceIpRateLimit = (
-  policyName: "join" | "leads" | "worker",
+  policyName: "join" | "leads" | "worker" | "freeBooking",
   request: Request
 ) =>
   enforceRateLimit({

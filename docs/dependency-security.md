@@ -35,6 +35,19 @@ One override comes from a different chain:
   Added 2026-08-03, when the advisory was published and the audit gate caught
   it on an unrelated pull request — the gate working as intended.
 
+- `fast-uri` is overridden to `3.1.5`, **globally**. GHSA-7p8r-x3mc-p8w7
+  (high) is host confusion via a backslash authority introducer, affecting
+  `3.0.0 - 3.1.4`. It arrives through `@sentry/nextjs` → `@sentry/webpack-plugin`
+  → `webpack` → `schema-utils` → `ajv`.
+
+  Unlike `brace-expansion` this one is global on purpose, and the reason is
+  worth recording: `ajv` is hoisted and shared with ESLint's own copy, so a
+  scoped override silently does not apply — npm resolves the deduped instance
+  and the audit keeps failing with the package apparently pinned. `3.1.5` is a
+  patch inside the same major, so every consumer expecting `^3` is satisfied,
+  which is what makes the global form safe here and unsafe there.
+  Added 2026-08-03.
+
 Every override must remain covered by lint, unit, build, and browser tests.
 Remove an override when a supported Next.js release resolves the corresponding
 dependency itself.

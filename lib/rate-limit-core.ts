@@ -20,6 +20,10 @@ export const RATE_LIMIT_POLICIES = {
   },
   join: { scope: "join", limit: 5, windowSeconds: 60 },
   leads: { scope: "leads", limit: 3, windowSeconds: 60 * 60 },
+  // Free booking creates real rows and real tokens from an unauthenticated
+  // request, so the transport limit is deliberately tighter than the
+  // per-person cap it sits in front of.
+  freeBooking: { scope: "free-booking", limit: 3, windowSeconds: 60 * 60 },
   worker: { scope: "worker", limit: 10, windowSeconds: 60 },
   // Authoring routes are admin-only and already behind requireAdmin, so these
   // bound cost and accidental loops rather than abuse. Translation is the

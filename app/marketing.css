@@ -234,3 +234,156 @@
   .marketing-hero-visual img { animation: harbor-breathe 18s ease-in-out infinite alternate; }
   @keyframes harbor-breathe { from { transform: scale(1); } to { transform: scale(1.035); } }
 }
+
+/* Live route strip — real photos from the field survey. */
+.marketing-route {
+  padding: clamp(60px, 8vw, 110px) clamp(18px, 5vw, 80px);
+}
+
+.marketing-route-track {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  margin-top: 34px;
+}
+
+.marketing-route-track article {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(19, 41, 75, 0.06);
+  border: 1px solid rgba(19, 41, 75, 0.12);
+}
+
+.marketing-route-track img,
+.marketing-route-blank {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  background: linear-gradient(160deg, #cddbe6, #8fb0c6);
+}
+
+.marketing-route-track span {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-start: 10px;
+  background: rgba(11, 23, 45, 0.82);
+  color: #ffd978;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 9px;
+  border-radius: 99px;
+}
+
+.marketing-route-track h3 {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  margin: 0;
+  padding: 26px 12px 12px;
+  font-size: 15px;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(11, 23, 45, 0.88));
+}
+
+/* Free booking */
+.marketing-private-forms {
+  display: grid;
+  gap: 20px;
+}
+
+.marketing-free-slot {
+  background: #0f1a2e;
+  border: 1px solid #2b3f63;
+  border-radius: 18px;
+  padding: 20px;
+  color: #e8eefc;
+}
+
+.marketing-free-slot h3 {
+  margin: 10px 0 6px;
+  font-size: 20px;
+}
+
+.marketing-free-slot p {
+  margin: 0 0 14px;
+  color: #93a4c4;
+  font-size: 14.5px;
+}
+
+.marketing-free-badge {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #4ecb8f;
+  border: 1px solid currentColor;
+  border-radius: 99px;
+  padding: 3px 10px;
+}
+
+.marketing-booking label {
+  display: block;
+  font-size: 12.5px;
+  color: #93a4c4;
+  margin: 10px 0 4px;
+}
+
+.marketing-booking input {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  background: #0a1424;
+  border: 1px solid #22314f;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #e8eefc;
+}
+
+.marketing-booking button {
+  width: 100%;
+  margin-top: 14px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  background: #ffd978;
+  color: #13294b;
+  border: 0;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.marketing-booking button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.marketing-booking-error {
+  color: #ff6b6b;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.marketing-booking-done h3 {
+  margin: 0 0 8px;
+  color: #4ecb8f;
+}
+
+.marketing-booking-warning {
+  background: rgba(255, 193, 77, 0.1);
+  border: 1px solid #5c4a1f;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  color: #ffc14d;
+  margin: 0 0 12px;
+}
+
+.marketing-booking-meta {
+  margin-top: 12px;
+  font-size: 13.5px;
+  color: #93a4c4;
+}
