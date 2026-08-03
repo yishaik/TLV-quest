@@ -52,6 +52,18 @@ describe("free booking limits", () => {
     expect(route).toContain('enforceIpRateLimit("freeBooking", request)');
   });
 
+  it("keeps the transport limit above the per-person cap", () => {
+    // Observed in production: at three per hour per address the IP limit fired
+    // first and the cap was never reached, so anyone behind carrier NAT would
+    // block their colleagues after three bookings between them.
+    const core = readFileSync("lib/rate-limit-core.ts", "utf8");
+    const transport = Number(
+      /freeBooking: \{ scope: "free-booking", limit: (\d+)/.exec(core)?.[1]
+    );
+    const perBooker = Number(/FREE_RUNS_PER_BOOKER = (\d+)/.exec(source)?.[1]);
+    expect(transport).toBeGreaterThan(perBooker);
+  });
+
   it("never returns the organizer token as a bare value", () => {
     // The management URL embeds it and is shown once; echoing the raw token
     // separately would invite it being logged or copied elsewhere.
