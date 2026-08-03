@@ -130,4 +130,54 @@ describe("field capture surface", () => {
     expect(update).toBeGreaterThan(-1);
     expect(rollback).toBeGreaterThan(update);
   });
+
+  it("uploads straight to storage instead of through the function", () => {
+    // Vercel rejects a body over 4.5 MB before any handler runs and answers
+    // with HTML, which is smaller than a phone photo and unparseable as JSON.
+    const upload = readFileSync(
+      "app/api/admin/content/stations/[stationId]/gallery/upload/route.ts",
+      "utf8"
+    );
+    expect(upload).toContain("createSignedUploadUrl");
+    expect(component).toContain("uploadToSignedUrl");
+    // The attach step must stay a small JSON request.
+    expect(route).not.toContain("formData");
+  });
+
+  it("refuses a path from another station", () => {
+    // A signed URL is scoped to one object, but the station is named again on
+    // attach; without this a token for station A could land on station B.
+    expect(route).toContain("galleryPrefix(stationId)");
+    expect(route).toContain("does not belong to this station");
+  });
+
+  it("survives a non-JSON platform error", () => {
+    expect(component).toContain("await response.text()");
+    expect(component).toContain("JSON.parse(raw)");
+    expect(component).toContain("הקובץ גדול מדי לשרת");
+  });
+
+  it("converges the fix rather than trusting the first reading", () => {
+    // A phone's first fix is routinely 50-100 m out and tightens over seconds.
+    expect(component).toContain("watchPosition");
+    expect(component).toContain("GOOD_ENOUGH_METRES");
+    expect(component).toContain("fix.accuracy < best.accuracy");
+    expect(component).toContain("clearWatch");
+  });
+
+  it("confirms before deleting a captured point", () => {
+    expect(component).toContain("window.confirm");
+    expect(component).toContain("מחק תחנה");
+  });
+
+  it("removes gallery objects when the station is deleted", () => {
+    // Otherwise up to sixty objects per station are stranded with nothing in
+    // the database pointing at them.
+    const stationRoute = readFileSync(
+      "app/api/admin/content/stations/[stationId]/route.ts",
+      "utf8"
+    );
+    expect(stationRoute).toContain("galleryEntries(station?.gallery)");
+    expect(stationRoute).toContain("orphans");
+  });
 });

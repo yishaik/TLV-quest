@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/browser";
 import {
+  GALLERY_MAX_BYTES,
   galleryEntries,
+  isGalleryMimeType,
   type GalleryEntry,
   type GalleryVerdict
 } from "@/lib/station-gallery";
@@ -65,34 +67,130 @@ async function requestJson<T>(
     ...init,
     headers: {
       authorization: `Bearer ${token}`,
-      ...(init?.body && !(init.body instanceof FormData)
-        ? { "content-type": "application/json" }
-        : {}),
+      ...(init?.body ? { "content-type": "application/json" } : {}),
       ...(init?.headers ?? {})
     }
   });
-  const payload = await response.json();
+
+  // Platform-level failures never reach the JSON error contract. Vercel's
+  // body-size rejection returns an HTML page, and blindly parsing it produced
+  // the useless "Unexpected token 'R'" that this replaces.
+  const raw = await response.text();
+  let payload: { ok?: boolean; data?: unknown; error?: { message?: string } };
+  try {
+    payload = JSON.parse(raw) as typeof payload;
+  } catch {
+    throw new Error(
+      response.status === 413
+        ? "הקובץ גדול מדי לשרת"
+        : `השרת החזיר תשובה לא צפויה (${response.status})`
+    );
+  }
+
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error?.message ?? "הפעולה נכשלה");
   }
   return payload.data as T;
 }
 
-function readPosition(): Promise<Fix> {
+/**
+ * Uploads straight to Storage with a signed URL, then records the path.
+ *
+ * The bytes deliberately do not pass through the API route: Vercel caps a
+ * function request body at 4.5 MB, which is below both the bucket's limit and
+ * a typical phone photo.
+ */
+async function uploadGalleryPhoto(
+  stationId: string,
+  token: string,
+  file: File,
+  verdict: GalleryVerdict
+) {
+  if (!isGalleryMimeType(file.type)) {
+    throw new Error("אפשר להעלות JPG, PNG או WebP בלבד");
+  }
+  if (file.size > GALLERY_MAX_BYTES) {
+    throw new Error("התמונה גדולה מ-8MB");
+  }
+
+  const authorization = await requestJson<{
+    bucket: string;
+    path: string;
+    uploadToken: string;
+  }>(`/api/admin/content/stations/${stationId}/gallery/upload`, token, {
+    method: "POST",
+    body: JSON.stringify({ mimeType: file.type, size: file.size })
+  });
+
+  const { error: uploadError } = await getBrowserClient()
+    .storage.from(authorization.bucket)
+    .uploadToSignedUrl(authorization.path, authorization.uploadToken, file, {
+      contentType: file.type,
+      upsert: false
+    });
+  if (uploadError) throw new Error(uploadError.message);
+
+  await requestJson(`/api/admin/content/stations/${stationId}/gallery`, token, {
+    method: "POST",
+    body: JSON.stringify({ path: authorization.path, verdict })
+  });
+}
+
+const GOOD_ENOUGH_METRES = 8;
+const SAMPLE_WINDOW_MS = 15000;
+
+/**
+ * Samples GPS until it converges instead of trusting the first reading.
+ *
+ * A phone's first fix is routinely 50-100 m out and then tightens over several
+ * seconds. `getCurrentPosition` happily returns that first guess, which is how
+ * a coordinate captured while standing in the right place ends up pointing
+ * somewhere else. This watches for up to 15 s, keeps the most accurate reading
+ * seen, and stops early once it is good enough to stop caring.
+ */
+function readPosition(onSample?: (fix: Fix) => void): Promise<Fix> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("המכשיר לא תומך במיקום"));
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (position) =>
-        resolve({
+
+    let best: Fix | null = null;
+    let settled = false;
+    let watchId = 0;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      navigator.geolocation.clearWatch(watchId);
+      window.clearTimeout(timer);
+      if (best) resolve(best);
+      else reject(new Error("לא התקבל מיקום"));
+    };
+
+    const timer = window.setTimeout(finish, SAMPLE_WINDOW_MS);
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const fix: Fix = {
           lat: position.coords.latitude,
           lon: position.coords.longitude,
           accuracy: Math.round(position.coords.accuracy)
-        }),
-      (error) => reject(new Error(error.message)),
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        };
+        if (!best || fix.accuracy < best.accuracy) {
+          best = fix;
+          onSample?.(fix);
+        }
+        if (fix.accuracy <= GOOD_ENOUGH_METRES) finish();
+      },
+      (error) => {
+        if (settled) return;
+        settled = true;
+        navigator.geolocation.clearWatch(watchId);
+        window.clearTimeout(timer);
+        reject(new Error(error.message));
+      },
+      { enableHighAccuracy: true, timeout: SAMPLE_WINDOW_MS, maximumAge: 0 }
     );
   });
 }
@@ -263,8 +361,11 @@ function Capture({
   const locate = async () => {
     setBusy(true);
     setMessage("");
+    setFix(null);
     try {
-      setFix(await readPosition());
+      // Show each improvement as it arrives so the wait is legible rather than
+      // a spinner that looks stuck for fifteen seconds.
+      setFix(await readPosition((sample) => setFix(sample)));
     } catch (locateError) {
       setMessage(
         locateError instanceof Error ? locateError.message : "מיקום נכשל"
@@ -316,7 +417,7 @@ function Capture({
             onClick={() => void locate()}
             disabled={busy}
           >
-            {busy ? "מודד…" : "לכוד את הנקודה הזו"}
+            {busy ? "מתכנס…" : "לכוד את הנקודה הזו"}
           </button>
         ) : (
           <>
@@ -331,14 +432,14 @@ function Capture({
                     : `${styles.muted} ${styles.good}`
                 }
               >
-                ±{fix.accuracy} מ׳
+                ±{fix.accuracy} מ׳{busy ? " — משתפר…" : ""}
               </span>
               <button
                 className={styles.button}
                 onClick={() => void locate()}
                 disabled={busy}
               >
-                מדוד שוב
+                {busy ? "מתכנס…" : "מדוד שוב"}
               </button>
             </div>
 
@@ -436,7 +537,7 @@ function StationCard({
     setBusy("fix");
     setMessage("");
     try {
-      setFix(await readPosition());
+      setFix(await readPosition((sample) => setFix(sample)));
     } catch (locateError) {
       setMessage(
         locateError instanceof Error ? locateError.message : "מיקום נכשל"
@@ -462,20 +563,33 @@ function StationCard({
     setBusy("photo");
     setMessage("");
     try {
-      const form = new FormData();
-      form.append("image", file);
-      form.append("verdict", verdict);
-      await requestJson(
-        `/api/admin/content/stations/${station.id}/gallery`,
-        token,
-        { method: "POST", body: form }
-      );
+      await uploadGalleryPhoto(station.id, token, file, verdict);
       await onSaved();
     } catch (uploadError) {
       setMessage(
         uploadError instanceof Error ? uploadError.message : "העלאה נכשלה"
       );
     } finally {
+      setBusy("");
+    }
+  };
+
+  const deleteStation = async () => {
+    // Deleting a captured point removes its photos with it, so it is worth one
+    // deliberate confirmation rather than an undo nobody has built.
+    if (!window.confirm(`למחוק את "${titleOf(station)}" ואת ${gallery.length} התמונות שלה?`)) {
+      return;
+    }
+    setBusy("delete");
+    try {
+      await requestJson(`/api/admin/content/stations/${station.id}`, token, {
+        method: "DELETE"
+      });
+      await onSaved();
+    } catch (deleteError) {
+      setMessage(
+        deleteError instanceof Error ? deleteError.message : "מחיקה נכשלה"
+      );
       setBusy("");
     }
   };
@@ -693,6 +807,15 @@ function StationCard({
               disabled={busy === "all"}
             >
               {busy === "all" ? "שומר…" : "שמור"}
+            </button>
+
+            <button
+              className={`${styles.button} ${styles.danger}`}
+              style={{ marginTop: 9, width: "100%" }}
+              onClick={() => void deleteStation()}
+              disabled={busy === "delete"}
+            >
+              {busy === "delete" ? "מוחק…" : "מחק תחנה"}
             </button>
           </div>
 
