@@ -257,3 +257,31 @@ describe("photo intake", () => {
     expect(component).toContain("מתוך");
   });
 });
+
+describe("field and desk modes", () => {
+  const component = readFileSync("components/FieldVerification.tsx", "utf8");
+
+  it("defaults to field mode on the server", () => {
+    // Showing the long survey to someone who is walking is the failure this
+    // split exists to fix, so it must never be the default render.
+    expect(component).toContain("useSyncExternalStore");
+    expect(component).toContain("() => false");
+  });
+
+  it("hides the survey while in the field", () => {
+    // Nine points came back with coordinates and photos and nothing else
+    // filled in — the form lost to the walk.
+    expect(component).toContain("{deskMode && (");
+    const surveyGate = component.indexOf("מה אפשר לבנות כאן");
+    expect(surveyGate).toBeGreaterThan(-1);
+  });
+
+  it("keeps capture and photos available in both modes", () => {
+    // These are the two things that cannot be done later from a desk.
+    const photoButton = component.indexOf("הוסף תמונות");
+    const gateBefore = component.lastIndexOf("{deskMode && (", photoButton);
+    const closeBefore = component.lastIndexOf(")}", photoButton);
+    // The photo button is not inside an open desk-mode gate.
+    expect(gateBefore < closeBefore || gateBefore === -1).toBe(true);
+  });
+});

@@ -28,6 +28,24 @@ Per point, standing at it:
 Once enough real points exist, the route is built from the ones marked approved
 — fitting the quest to the ground instead of the ground to the quest.
 
+## Two modes, because they are two different jobs
+
+The first walk came back with nine points, coordinates and photos — and every
+survey field empty. That is not carelessness; the form lost to the walk.
+Standing at a point you want the shortest path from *I am here* to *saved*, and
+eight fields is not that.
+
+So the screen has a switch:
+
+- **בשטח** — capture the fix, name it, add photos. Nothing else is shown.
+  These are the two things that cannot be reconstructed later: the coordinate
+  requires standing there, and a sign that was never photographed cannot be
+  transcribed at home.
+- **מהמשרד** — the full survey below, filled in afterwards from the photos.
+
+Field mode is the default, including on the server render, because showing the
+long form to someone who is walking is the failure being corrected.
+
 ## What to record, and why each one matters
 
 Coordinates and a photo say *where* a point is. Route design starts from a
