@@ -38,7 +38,17 @@ const metresBetween = (
  * nobody noticed because the text had no relationship to the data. Reading it
  * live means the site cannot drift from what is actually bookable.
  */
-export const getMarketingRoute = async (): Promise<MarketingRoute | null> => {
+/**
+ * How long the homepage will wait for content before rendering without it.
+ *
+ * The route strip is an enhancement; the page sells the product with or
+ * without it. Blocking the render on a database round trip would mean a slow
+ * or unreachable Postgres takes the marketing site down with it — and in CI,
+ * where the Supabase host is a placeholder, it made every navigation hang.
+ */
+const CONTENT_TIMEOUT_MS = 2_500;
+
+const readRoute = async (): Promise<MarketingRoute | null> => {
   const supabase = createAdminClient();
 
   const { data: template } = await supabase
@@ -110,3 +120,11 @@ export const getMarketingRoute = async (): Promise<MarketingRoute | null> => {
     })
   };
 };
+
+export const getMarketingRoute = async (): Promise<MarketingRoute | null> =>
+  Promise.race([
+    readRoute(),
+    new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), CONTENT_TIMEOUT_MS)
+    )
+  ]).catch(() => null);

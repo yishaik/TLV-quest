@@ -85,6 +85,16 @@ describe("marketing page reflects live content", () => {
     expect(page).toContain('export const dynamic = "force-dynamic"');
   });
 
+  it("renders without content rather than hanging on it", () => {
+    // The route strip is an enhancement. Blocking the render on a database
+    // round trip would let a slow Postgres take the marketing site down, and
+    // in CI — where the Supabase host is a placeholder — it made every
+    // navigation hang past the test timeout.
+    expect(reader).toContain("CONTENT_TIMEOUT_MS");
+    expect(reader).toContain("Promise.race");
+    expect(reader).toContain("catch(() => null)");
+  });
+
   it("shows real field photos when a station has them", () => {
     expect(reader).toContain("galleryEntries");
     expect(home).toContain("stop.photo");
