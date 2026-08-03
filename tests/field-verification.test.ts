@@ -181,3 +181,40 @@ describe("field capture surface", () => {
     expect(stationRoute).toContain("orphans");
   });
 });
+
+describe("route-design survey", () => {
+  const component = readFileSync("components/FieldVerification.tsx", "utf8");
+
+  it("captures what a point can host, not only where it is", () => {
+    // Coordinates alone cannot answer "which points can carry a text riddle",
+    // which is the question route design starts from.
+    expect(component).toContain("factOnSite");
+    expect(component).toContain("visualSubject");
+    expect(component).toContain("tagSurface");
+    expect(component).toContain("findable");
+  });
+
+  it("records capacity, because thirty participants is the design constraint", () => {
+    expect(component).toContain("CAPACITIES");
+    expect(component).toContain("צוואר בקבוק");
+  });
+
+  it("asks for the signage verbatim", () => {
+    // Text answers are derived from signage; a paraphrase in the notes is not
+    // enough to author one from, and a transcription error breaks the riddle.
+    expect(component).toContain("signText");
+    expect(component).toContain("מילה במילה");
+  });
+
+  it("shows what is still missing on the collapsed card", () => {
+    // A gap has to be visible while standing at the point. Discovering it at
+    // design time means another trip.
+    expect(component).toContain("missingSurvey");
+    expect(component).toContain("חסר:");
+  });
+
+  it("stores the survey without needing a migration", () => {
+    // health_checklist is an existing jsonb column that nothing else writes.
+    expect(component).toContain("healthChecklist");
+  });
+});
