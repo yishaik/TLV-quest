@@ -28,6 +28,30 @@ Per point, standing at it:
 Once enough real points exist, the route is built from the ones marked approved
 — fitting the quest to the ground instead of the ground to the quest.
 
+## What to record, and why each one matters
+
+Coordinates and a photo say *where* a point is. Route design starts from a
+different question — *what can live here* — and that cannot be answered from a
+paragraph of notes weeks later. So the survey is structured:
+
+| Field | Without it |
+|---|---|
+| A fact or sign to ask about | no text riddle is possible here |
+| A distinctive visual subject | no photo riddle is possible here |
+| A protected surface for NFC/QR | no fallback when GPS is imprecise |
+| Findable from a clue, without navigation | the "puzzle" is just following a map |
+| Capacity — one group, a few, or open | thirty participants queue at a bottleneck |
+| Availability — always, daylight, restricted | an evening event dies at a locked gate |
+| Signage transcribed **verbatim** | answers cannot be authored, and a paraphrase silently breaks them |
+| Hazards | a teen group is sent somewhere unsafe |
+
+Each collapsed card shows what is still missing, so a gap is visible while
+standing at the point rather than discovered when the route is designed and the
+only fix is another trip.
+
+The survey lives in the existing `health_checklist` column; access flags stay in
+`accessibility`. No migration.
+
 The station library seeded by earlier migrations is gone from the database. It
 remains reproducible from `supabase/migrations/` if it is ever wanted back.
 

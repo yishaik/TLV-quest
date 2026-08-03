@@ -23,6 +23,7 @@ type Station = {
   radius_meters: number | null;
   gallery: unknown;
   accessibility: Record<string, unknown> | null;
+  health_checklist: Record<string, unknown> | null;
   health_status: string;
   health_notes: string | null;
   created_at: string;
@@ -49,6 +50,49 @@ const BADGE: Record<string, string> = {
 };
 
 const ACCURACY_LIMIT = 25;
+
+/**
+ * What kind of puzzle this point can host. Captured as structured flags rather
+ * than prose because the route is designed later by filtering on them — "which
+ * points can carry a text answer" has to be answerable without re-reading
+ * thirteen paragraphs of notes.
+ */
+const AFFORDANCES: { key: string; label: string; why: string }[] = [
+  {
+    key: "factOnSite",
+    label: "יש שילוט או עובדה שאפשר לשאול עליה",
+    why: "בלי זה אין חידת טקסט כאן"
+  },
+  {
+    key: "visualSubject",
+    label: "יש אובייקט ויזואלי ייחודי לצילום",
+    why: "בלי זה אין חידת צילום"
+  },
+  {
+    key: "tagSurface",
+    label: "יש משטח מוגן לתג NFC או QR",
+    why: "גיבוי כשה-GPS לא מדויק"
+  },
+  {
+    key: "findable",
+    label: "אפשר למצוא את המקום מרמז, בלי ניווט",
+    why: "אחרת החידה היא רק הליכה לפי מפה"
+  }
+];
+
+const CAPACITIES: { value: string; label: string }[] = [
+  { value: "", label: "לא נבדק" },
+  { value: "single", label: "קבוצה אחת בלבד — צוואר בקבוק" },
+  { value: "few", label: "2–3 קבוצות בו זמנית" },
+  { value: "open", label: "שטח פתוח — כל הקבוצות" }
+];
+
+const HOURS: { value: string; label: string }[] = [
+  { value: "", label: "לא נבדק" },
+  { value: "always", label: "פתוח תמיד" },
+  { value: "daylight", label: "שעות אור בלבד" },
+  { value: "limited", label: "שעות מוגבלות או נעילה" }
+];
 
 const titleOf = (station: Station) =>
   station.title?.he || station.title?.en || station.slug;
@@ -491,6 +535,7 @@ function StationCard({
   onSaved: () => Promise<void>;
 }) {
   const access = station.accessibility ?? {};
+  const survey = station.health_checklist ?? {};
   const [name, setName] = useState(titleOf(station));
   const [notes, setNotes] = useState(station.health_notes ?? "");
   const [radius, setRadius] = useState(String(station.radius_meters ?? ""));
@@ -498,6 +543,15 @@ function StationCard({
   const [wheelchair, setWheelchair] = useState(Boolean(access.wheelchair));
   const [stroller, setStroller] = useState(Boolean(access.stroller));
   const [reception, setReception] = useState(Boolean(access.reception));
+  const [affordances, setAffordances] = useState<Record<string, boolean>>(() => {
+    const next: Record<string, boolean> = {};
+    for (const item of AFFORDANCES) next[item.key] = Boolean(survey[item.key]);
+    return next;
+  });
+  const [capacity, setCapacity] = useState(String(survey.capacity ?? ""));
+  const [hours, setHours] = useState(String(survey.hours ?? ""));
+  const [signText, setSignText] = useState(String(survey.signText ?? ""));
+  const [hazards, setHazards] = useState(String(survey.hazards ?? ""));
   const [fix, setFix] = useState<Fix | null>(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -505,6 +559,15 @@ function StationCard({
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const gallery = galleryEntries(station.gallery);
+
+  // Surfaced on the collapsed card so a gap is visible while still standing
+  // there, rather than discovered weeks later when designing the route.
+  const missingSurvey = [
+    gallery.length === 0 ? "תמונה" : "",
+    !AFFORDANCES.some((item) => survey[item.key]) ? "יכולות" : "",
+    !survey.capacity ? "קיבולת" : "",
+    !survey.hours ? "זמינות" : ""
+  ].filter(Boolean);
 
   const drift =
     fix && station.latitude !== null && station.longitude !== null
@@ -554,6 +617,13 @@ function StationCard({
         healthStatus: status,
         healthNotes: notes,
         accessibility: { wheelchair, stroller, reception },
+        healthChecklist: {
+          ...affordances,
+          capacity,
+          hours,
+          signText: signText.trim(),
+          hazards: hazards.trim()
+        },
         ...(radius.trim() ? { radiusMeters: Number(radius) } : {})
       },
       "all"
@@ -626,6 +696,11 @@ function StationCard({
           <div className={styles.stationMeta}>
             {station.latitude?.toFixed(5)}, {station.longitude?.toFixed(5)} ·{" "}
             {gallery.length} תמונות
+            {missingSurvey.length > 0 ? (
+              <span className={styles.warn}> · חסר: {missingSurvey.join(", ")}</span>
+            ) : (
+              <span className={styles.good}> · סקר מלא</span>
+            )}
           </div>
         </div>
         <span className={`${styles.badge} ${BADGE[station.health_status] ?? ""}`}>
@@ -778,6 +853,76 @@ function StationCard({
                 <span>קליטה סלולרית תקינה</span>
               </label>
             </div>
+
+            <p className={styles.sectionTitle} style={{ marginTop: 18 }}>
+              מה אפשר לבנות כאן
+            </p>
+            <div className={styles.checks}>
+              {AFFORDANCES.map((item) => (
+                <label key={item.key} className={styles.check}>
+                  <input
+                    type="checkbox"
+                    checked={affordances[item.key] ?? false}
+                    onChange={(event) =>
+                      setAffordances((current) => ({
+                        ...current,
+                        [item.key]: event.target.checked
+                      }))
+                    }
+                  />
+                  <span>
+                    {item.label}
+                    <span className={styles.stationMeta}> — {item.why}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <label className={styles.label}>
+              כמה קבוצות נכנסות כאן בו זמנית
+            </label>
+            <select
+              className={styles.select}
+              value={capacity}
+              onChange={(event) => setCapacity(event.target.value)}
+            >
+              {CAPACITIES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            <label className={styles.label}>זמינות</label>
+            <select
+              className={styles.select}
+              value={hours}
+              onChange={(event) => setHours(event.target.value)}
+            >
+              {HOURS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            <label className={styles.label}>
+              תמלול השילוט — מילה במילה
+            </label>
+            <textarea
+              className={styles.textarea}
+              value={signText}
+              onChange={(event) => setSignText(event.target.value)}
+              placeholder="העתק בדיוק מה שכתוב. מכאן נגזרות התשובות, וטעות תמלול שוברת את החידה."
+            />
+
+            <label className={styles.label}>מפגעים ובטיחות</label>
+            <textarea
+              className={styles.textarea}
+              value={hazards}
+              onChange={(event) => setHazards(event.target.value)}
+              placeholder="כביש, קצה מים, אופניים, עבודות, חושך…"
+            />
 
             <label className={styles.label}>הערות</label>
             <textarea
