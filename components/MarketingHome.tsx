@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { LeadCaptureForm } from "@/components/LeadCaptureForm";
+import { FreeBookingForm } from "@/components/FreeBookingForm";
+import type { MarketingRoute } from "@/lib/marketing-route";
 
 type Locale = "he" | "en";
 
@@ -41,18 +43,18 @@ const copy: Record<Locale, Copy> = {
     nav: [["הסיפור", "#story"], ["המסע", "#chapters"], ["איך זה עובד", "#flow"], ["אירוע פרטי", "#private"]],
     eyebrow: "מסע אורבני פרטי · נמל תל אביב",
     title: <>הנמל זוכר.<br /><em>אתם באים לגלות?</em></>,
-    intro: "ערב אחד. קפסולת זמן שננעלה ב־1936. סדרת רמזים שהתעוררה מחדש בין הרציפים, המנוף והמגדלור. TLV Quest הופך את הנמל לסיפור חי שהקבוצה שלכם היא הדמות הראשית בו.",
+    intro: "ערב אחד. שישה עוגנים אמיתיים בין הנמל לשפך הירקון — עגורן שנשאר, פסל שנהרס וחזר, מגדלור בריטי ושדה תעופה שנסגר. כל תשובה כתובה על שלט בשטח. TLV Quest הופך את הנמל לסיפור חי שהקבוצה שלכם היא הדמות הראשית בו.",
     primary: "בקשת הזמנה",
     secondary: "הצצה למסע",
     access: "כבר קיבלתם קישור?",
     facts: ["60–90 דקות", "2–30 משתתפים", "עברית / English", "ללא הורדת אפליקציה"],
     manifesto: "זה לא סיור. זה לא חדר בריחה.",
     manifestoText: "הרחובות הם התפאורה, הפרטים הם המנגנון, והטלפון רק פותח דלתות. רוב הזמן תסתכלו החוצה — לא למסך.",
-    storyEyebrow: "תיק 1936",
+    storyEyebrow: "קו הירקון",
     storyTitle: "המסר שהיה אמור להיפתח בעתיד נעלם.",
     storyText: [
-      "בימי הקמת הנמל הוטמנה קפסולה ובה עדויות, צילומים ומפתח לסיפור שלא הושלם. השנים עברו, המבנים השתנו, והמסלול אליה נשכח.",
-      "כעת אות מסתורי מחזיר את הסימנים לחיים. כדי לפתוח את הקפסולה תצטרכו לחבר בין הנמל שהיה, הנמל של היום והפרטים שאף אחד אחר לא שם לב אליהם."
+      "נמל תל אביב נבנה ב-1936 בתוך שבועות, כי נמל יפו נסגר. מאז הוא הפסיק לפרוק מטענים, המגדלור כבה, ושדה התעופה שמעליו נסגר סופית ב-2019.",
+      "כל מה שנשאר מזה עומד עדיין בשטח, מסומן בשלטים שאיש לא עוצר לקרוא. המשחק מכריח אתכם לקרוא אותם — ולחבר בין המספרים שכתובים עליהם."
     ],
     storyQuote: "הנמל הוא המפה. האור הוא המצפן. הזמן הוא היריב.",
     chaptersTitle: "שלושה פרקים. סיפור אחד שנפתח בתנועה.",
@@ -100,14 +102,14 @@ const copy: Record<Locale, Copy> = {
     nav: [["The story", "#story"], ["The quest", "#chapters"], ["How it works", "#flow"], ["Private event", "#private"]],
     eyebrow: "A private urban quest · Tel Aviv Port",
     title: <>The port remembers.<br /><em>Will you uncover it?</em></>,
-    intro: "One evening. A time capsule sealed in 1936. A trail of signals resurfacing between the docks, the crane and the lighthouse. TLV Quest turns the port into a living story with your team at its center.",
+    intro: "One evening. Six real anchors between the port and the Yarkon estuary — a crane that stayed, a statue destroyed and returned, a British lighthouse and an airfield that closed. Every answer is written on a sign in the field. TLV Quest turns the port into a living story with your team at its center.",
     primary: "Request an invitation",
     secondary: "Enter the story",
     access: "Already received a link?",
     facts: ["60–90 minutes", "2–30 participants", "Hebrew / English", "No app download"],
     manifesto: "Not a tour. Not an escape room.",
     manifestoText: "The waterfront is the set, overlooked details are the mechanism, and your phone only opens doors. Most of the time, you will be looking up — not down.",
-    storyEyebrow: "Case 1936",
+    storyEyebrow: "The Yarkon Line",
     storyTitle: "The message meant for the future disappeared.",
     storyText: [
       "When the port was founded, a capsule was sealed with evidence, photographs and the key to an unfinished story. The waterfront changed and the route was forgotten.",
@@ -157,7 +159,13 @@ const copy: Record<Locale, Copy> = {
   }
 };
 
-export function MarketingHome({ locale }: { locale: Locale }) {
+export function MarketingHome({
+  locale,
+  route
+}: {
+  locale: Locale;
+  route: MarketingRoute | null;
+}) {
   const c = copy[locale];
   const rtl = locale === "he";
 
@@ -208,6 +216,34 @@ export function MarketingHome({ locale }: { locale: Locale }) {
         </div>
       </section>
 
+      {route && route.stops.length > 0 && (
+        <section className="marketing-route" id="route">
+          <div className="marketing-heading">
+            <span>THE ROUTE</span>
+            <h2>{rtl ? route.title.he ?? "" : route.title.en ?? route.title.he ?? ""}</h2>
+            <p>
+              {rtl
+                ? `${route.stops.length} תחנות · ${(route.metres / 1000).toFixed(1)} ק״מ · כל תחנה אומתה בשטח`
+                : `${route.stops.length} stops · ${(route.metres / 1000).toFixed(1)} km · every stop verified on foot`}
+            </p>
+          </div>
+          <div className="marketing-route-track">
+            {route.stops.map((stop, index) => (
+              <article key={stop.slug}>
+                {stop.photo ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={stop.photo} alt={stop.name} loading="lazy" />
+                ) : (
+                  <div className="marketing-route-blank" aria-hidden="true" />
+                )}
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <h3>{stop.name}</h3>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="marketing-chapters" id="chapters">
         <div className="marketing-heading"><span>THE ROUTE</span><h2>{c.chaptersTitle}</h2><p>{c.chaptersText}</p></div>
         <div className="chapter-track">
@@ -239,7 +275,23 @@ export function MarketingHome({ locale }: { locale: Locale }) {
           <div className="marketing-private-points">{c.privatePoints.map((point) => <span key={point}>{point}</span>)}</div>
           <div className="private-seal" aria-hidden="true"><img src="/visuals/quest-mark.svg" alt="" /><span>PRIVATE<br />SESSION</span></div>
         </div>
-        <LeadCaptureForm locale={locale} />
+        <div className="marketing-private-forms">
+          {route && (
+            <div className="marketing-free-slot">
+              <span className="marketing-free-badge">
+                {rtl ? "חינם · לזמן מוגבל" : "Free · limited time"}
+              </span>
+              <h3>{rtl ? "צרו משחק עכשיו, בלי לחכות לנו" : "Create a game now, without waiting for us"}</h3>
+              <p>
+                {rtl
+                  ? "עד שלושה משחקים חינם לכל אדם. הקישורים נוצרים מיד."
+                  : "Up to three free games per person. Links are generated immediately."}
+              </p>
+              <FreeBookingForm locale={locale} templateSlug={route.slug} />
+            </div>
+          )}
+          <LeadCaptureForm locale={locale} />
+        </div>
       </section>
 
       <section className="marketing-faq">

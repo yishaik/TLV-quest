@@ -124,7 +124,9 @@ const applyFile = (file, user) => {
       .filter((line) => /^(ERROR|DETAIL|HINT|LINE|CONTEXT)/.test(line))
       .slice(0, 8)
       .join("\n");
-    throw new Error(`${file} failed to apply:\n${detail}`);
+    throw new Error(
+      `${file} failed to apply:\n${detail || result.stderr || result.stdout || "no output"}`
+    );
   }
 };
 
@@ -156,8 +158,23 @@ const startContainer = () => {
   }
   startedContainer = true;
 
+  // Poll the same path the gate itself uses. `pg_isready` answers over the
+  // unix socket, which comes up before the TCP listener does — so a socket
+  // check reports ready and the first real connection is then refused.
   for (let attempt = 0; attempt < 90; attempt += 1) {
-    const ready = run("docker", ["exec", CONTAINER, "pg_isready", "-U", "postgres"]);
+    const ready = run("docker", [
+      "exec",
+      CONTAINER,
+      "psql",
+      "-h",
+      "127.0.0.1",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-c",
+      "select 1"
+    ]);
     if (ready.status === 0) return;
     execFileSync("sleep", ["2"]);
   }
