@@ -73,26 +73,47 @@ describe("station gallery", () => {
   });
 });
 
-describe("field verification surface", () => {
+describe("field capture surface", () => {
   const component = readFileSync("components/FieldVerification.tsx", "utf8");
   const route = readFileSync(
     "app/api/admin/content/stations/[stationId]/gallery/route.ts",
     "utf8"
   );
 
-  it("walks the route south to north rather than alphabetically", () => {
-    expect(component).toContain("(a.latitude ?? 0) - (b.latitude ?? 0)");
+  it("captures a fix before asking for a name", () => {
+    // Standing at the point is the only moment the coordinate is free. Asking
+    // for the name first invites capturing it from the wrong place later.
+    const locate = component.indexOf("לכוד את הנקודה הזו");
+    const nameField = component.indexOf("שם התחנה");
+    expect(locate).toBeGreaterThan(-1);
+    expect(nameField).toBeGreaterThan(locate);
   });
 
-  it("warns before saving a low-accuracy fix", () => {
-    // Writing a bad coordinate silently breaks location verification for every
-    // future player, and nobody would know until a live run.
-    expect(component).toContain("fix.accuracy > 25");
+  it("generates a Latin slug so a Hebrew name is accepted", () => {
+    // The create API rejects a slug that normalises to empty, which is what a
+    // Hebrew title would produce.
+    expect(component).toContain("const generateSlug");
+    expect(component).toContain("poi-");
+  });
+
+  it("warns on a poor fix instead of saving it silently", () => {
+    expect(component).toContain("ACCURACY_LIMIT");
     expect(component).toContain("enableHighAccuracy: true");
     expect(component).toContain("maximumAge: 0");
   });
 
-  it("shows drift against the stored coordinate", () => {
+  it("offers photos on every station, not only ones with photo riddles", () => {
+    // A freshly captured point has no riddles at all; gating photos on them
+    // would make the capture flow useless.
+    const photoButton = component.indexOf("הוסף תמונה");
+    const gate = component.indexOf("hasPhotoRiddle && (");
+    expect(photoButton).toBeGreaterThan(-1);
+    // The gate exists, but only around the calibration verdict selector.
+    expect(gate).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(photoButton);
+  });
+
+  it("shows drift before replacing a stored coordinate", () => {
     expect(component).toContain("routeDistanceMeters");
     expect(component).toContain("drift");
   });
@@ -100,14 +121,10 @@ describe("field verification surface", () => {
   it("keeps gallery uploads additive and authorised", () => {
     expect(route).toContain("requireAdmin");
     expect(route).toContain("appendGalleryEntry");
-    // The hero-image route deletes the previous file; calibration needs the
-    // opposite, so this route must never remove on upload.
     expect(route).not.toContain("hero_image_path");
   });
 
   it("rolls the upload back when the row update fails", () => {
-    // A stored object with no row pointing at it is invisible in the UI and
-    // cannot be deleted from it.
     const update = route.indexOf(".update(");
     const rollback = route.indexOf('.remove([path])');
     expect(update).toBeGreaterThan(-1);

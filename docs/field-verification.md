@@ -2,33 +2,34 @@
 
 Complete this checklist once before inviting external pilot participants.
 
-## Do it from the phone: `/admin/field`
+## Capture first: `/admin/field`
 
-The checklist below is the *what*. `/admin/field` is the *how* — a mobile
-verification mode that writes straight into the content tables, so nothing has
-to be transcribed twice.
+The original checklist assumed the route already existed and the walk merely
+confirmed it. That was backwards, and it is why the checklist stayed unticked:
+the content was authored from a desk, and the field visit was being asked to
+justify decisions rather than inform them.
 
-Per station it lets you:
+The thirteen speculative stations have been deleted. `/admin/field` now
+captures points of interest that actually exist, and the route is designed from
+them afterwards.
 
-- **measure and save the coordinate.** It shows GPS accuracy and the drift from
-  the stored value, and warns before saving a fix worse than 25 m. A bad
-  coordinate silently breaks location verification for every future player and
-  would not surface until a live run.
-- tick the field checks, set the verification radius, leave notes, and move the
-  station between `pending` / `verified` / `needs_attention` / `blocked`.
-- **capture calibration photos**, each labelled with the verdict a human expects
-  from it. The screen tracks accepts and rejects separately and refuses to call
-  a station calibration-ready without both — a pile of good photos cannot tell
-  you where the threshold is.
-- read and edit the question text, the accepted answers, and for photo
-  checkpoints the approval criteria and confidence threshold. Signage wording
-  is what drives the answers, so it is edited where the signage is read.
+Per point, standing at it:
 
-Stations are listed south to north, which is the order the port is walked.
+- **Capture the fix first, name it second.** Standing at the point is the only
+  moment the coordinate is free; naming first invites recording it from the
+  wrong place later. The screen shows GPS accuracy and warns below 25 m rather
+  than saving a bad coordinate silently.
+- Add as many photos as the point deserves — what is there, what the signage
+  says, what might obstruct a team.
+- Record wheelchair and stroller access, mobile reception, a verification
+  radius, and free-text notes.
+- Mark it captured, approved for use, needs another look, or unsuitable.
 
-Sign in with an address on the admin allowlist; the link must be opened on the
-same device.
+Once enough real points exist, the route is built from the ones marked approved
+— fitting the quest to the ground instead of the ground to the quest.
 
+The station library seeded by earlier migrations is gone from the database. It
+remains reproducible from `supabase/migrations/` if it is ever wanted back.
 
 ## General route
 
