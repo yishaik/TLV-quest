@@ -10,6 +10,7 @@ import {
   type GalleryVerdict
 } from "@/lib/station-gallery";
 import { routeDistanceMeters } from "@/lib/route-planning";
+import { downscaleImage } from "@/lib/image-downscale";
 import styles from "./FieldVerification.module.css";
 
 type Localized = { he?: string; en?: string };
@@ -150,11 +151,15 @@ async function uploadGalleryPhoto(
   file: File,
   verdict: GalleryVerdict
 ) {
-  if (!isGalleryMimeType(file.type)) {
-    throw new Error("אפשר להעלות JPG, PNG או WebP בלבד");
+  // Downscale before anything else. The picked file may be HEIC, or 12 MB, or
+  // both — neither of which the bucket accepts, and rejecting them here is how
+  // the first field attempt "failed" without a request ever being sent.
+  const { file: prepared } = await downscaleImage(file);
+  if (!isGalleryMimeType(prepared.type)) {
+    throw new Error("המרת התמונה נכשלה");
   }
-  if (file.size > GALLERY_MAX_BYTES) {
-    throw new Error("התמונה גדולה מ-8MB");
+  if (prepared.size > GALLERY_MAX_BYTES) {
+    throw new Error("התמונה עדיין גדולה מדי אחרי הקטנה");
   }
 
   const authorization = await requestJson<{
@@ -163,13 +168,13 @@ async function uploadGalleryPhoto(
     uploadToken: string;
   }>(`/api/admin/content/stations/${stationId}/gallery/upload`, token, {
     method: "POST",
-    body: JSON.stringify({ mimeType: file.type, size: file.size })
+    body: JSON.stringify({ mimeType: prepared.type, size: prepared.size })
   });
 
   const { error: uploadError } = await getBrowserClient()
     .storage.from(authorization.bucket)
-    .uploadToSignedUrl(authorization.path, authorization.uploadToken, file, {
-      contentType: file.type,
+    .uploadToSignedUrl(authorization.path, authorization.uploadToken, prepared, {
+      contentType: prepared.type,
       upsert: false
     });
   if (uploadError) throw new Error(uploadError.message);
@@ -556,6 +561,7 @@ function StationCard({
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [verdict, setVerdict] = useState<GalleryVerdict>("reference");
+  const [progress, setProgress] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const gallery = galleryEntries(station.gallery);
@@ -629,19 +635,30 @@ function StationCard({
       "all"
     );
 
-  const uploadPhoto = async (file: File) => {
+  const uploadPhotos = async (files: File[]) => {
     setBusy("photo");
     setMessage("");
-    try {
-      await uploadGalleryPhoto(station.id, token, file, verdict);
-      await onSaved();
-    } catch (uploadError) {
-      setMessage(
-        uploadError instanceof Error ? uploadError.message : "העלאה נכשלה"
-      );
-    } finally {
-      setBusy("");
+    const failures: string[] = [];
+    for (let index = 0; index < files.length; index += 1) {
+      setProgress(`${index + 1}/${files.length}`);
+      try {
+        await uploadGalleryPhoto(station.id, token, files[index], verdict);
+      } catch (uploadError) {
+        // One bad photo must not discard the rest of the batch — on mobile
+        // data, re-picking them all is a real cost.
+        failures.push(
+          uploadError instanceof Error ? uploadError.message : "שגיאה"
+        );
+      }
     }
+    setProgress("");
+    await onSaved();
+    setMessage(
+      failures.length === 0
+        ? `הועלו ${files.length}`
+        : `הועלו ${files.length - failures.length} מתוך ${files.length} — ${failures[0]}`
+    );
+    setBusy("");
   };
 
   const deleteStation = async () => {
@@ -735,15 +752,20 @@ function StationCard({
               </div>
             )}
 
+            {/*
+              No `capture` attribute: forcing the camera makes it impossible to
+              add photos taken earlier, which is most of them. Without it the
+              OS offers both the camera and the library.
+            */}
             <input
               ref={fileRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp"
-              capture="environment"
+              accept="image/*"
+              multiple
               hidden
               onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void uploadPhoto(file);
+                const files = Array.from(event.target.files ?? []);
+                if (files.length > 0) void uploadPhotos(files);
                 event.target.value = "";
               }}
             />
@@ -753,7 +775,9 @@ function StationCard({
               onClick={() => fileRef.current?.click()}
               disabled={busy === "photo"}
             >
-              {busy === "photo" ? "מעלה…" : "הוסף תמונה"}
+              {busy === "photo"
+                ? `מעלה ${progress}…`
+                : "הוסף תמונות — מצלמה או גלריה"}
             </button>
 
             {gallery.length > 0 && (

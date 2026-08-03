@@ -105,7 +105,7 @@ describe("field capture surface", () => {
   it("offers photos on every station, not only ones with photo riddles", () => {
     // A freshly captured point has no riddles at all; gating photos on them
     // would make the capture flow useless.
-    const photoButton = component.indexOf("הוסף תמונה");
+    const photoButton = component.indexOf("הוסף תמונות");
     const gate = component.indexOf("hasPhotoRiddle && (");
     expect(photoButton).toBeGreaterThan(-1);
     // The gate exists, but only around the calibration verdict selector.
@@ -216,5 +216,44 @@ describe("route-design survey", () => {
   it("stores the survey without needing a migration", () => {
     // health_checklist is an existing jsonb column that nothing else writes.
     expect(component).toContain("healthChecklist");
+  });
+});
+
+describe("photo intake", () => {
+  const component = readFileSync("components/FieldVerification.tsx", "utf8");
+  const downscale = readFileSync("lib/image-downscale.ts", "utf8");
+
+  it("downscales before checking the size, not instead of uploading", () => {
+    // The first field attempt failed entirely in the browser: photos were
+    // 4-12 MB and some were HEIC, so the guards rejected them before any
+    // request was made. Re-encoding fixes size and format together.
+    expect(component).toContain("downscaleImage(file)");
+    const shrink = component.indexOf("downscaleImage(file)");
+    const check = component.indexOf("prepared.size > GALLERY_MAX_BYTES");
+    expect(check).toBeGreaterThan(shrink);
+  });
+
+  it("re-encodes to JPEG so HEIC from an iPhone is accepted", () => {
+    expect(downscale).toContain('"image/jpeg"');
+    expect(downscale).toContain("canvas.toBlob");
+  });
+
+  it("caps the long edge rather than uploading full resolution", () => {
+    expect(downscale).toContain("MAX_EDGE");
+    // A field reference does not need 4000px, and mobile data makes it slow.
+    expect(downscale).toMatch(/MAX_EDGE = \d{3,4}/);
+  });
+
+  it("allows picking existing photos, not only the camera", () => {
+    // `capture` forces the camera and hides the library, which makes adding
+    // photos taken earlier impossible.
+    expect(component).not.toContain('capture="environment"');
+    expect(component).toContain("multiple");
+  });
+
+  it("keeps going when one photo in a batch fails", () => {
+    // Re-picking a whole batch over mobile data is a real cost.
+    expect(component).toContain("failures.push");
+    expect(component).toContain("מתוך");
   });
 });
