@@ -21,9 +21,13 @@ export const RATE_LIMIT_POLICIES = {
   join: { scope: "join", limit: 5, windowSeconds: 60 },
   leads: { scope: "leads", limit: 3, windowSeconds: 60 * 60 },
   // Free booking creates real rows and real tokens from an unauthenticated
-  // request, so the transport limit is deliberately tighter than the
-  // per-person cap it sits in front of.
-  freeBooking: { scope: "free-booking", limit: 3, windowSeconds: 60 * 60 },
+  // request, so it needs a transport limit — but it must sit *above* the
+  // three-run cap it fronts, not at it. At three per hour per address the IP
+  // limit fires first and the per-person cap is never reached, so anyone
+  // behind carrier NAT or an office gateway blocks their colleagues after
+  // three bookings between them. This bounds hammering; the real limit is
+  // FREE_RUNS_PER_BOOKER, which no address change can evade.
+  freeBooking: { scope: "free-booking", limit: 12, windowSeconds: 60 * 60 },
   worker: { scope: "worker", limit: 10, windowSeconds: 60 },
   // Authoring routes are admin-only and already behind requireAdmin, so these
   // bound cost and accidental loops rather than abuse. Translation is the
