@@ -7,6 +7,35 @@
  * which keeps the field-verification UI from crashing on a malformed entry.
  */
 
+export const GALLERY_BUCKET = "content-media";
+/** Matches the bucket's own `file_size_limit`; the browser checks it first. */
+export const GALLERY_MAX_BYTES = 8 * 1024 * 1024;
+
+const MIME_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp"
+};
+
+export const isGalleryMimeType = (value: string): boolean =>
+  Object.prototype.hasOwnProperty.call(MIME_EXTENSIONS, value);
+
+export const galleryExtension = (mimeType: string): string =>
+  MIME_EXTENSIONS[mimeType] ?? "jpg";
+
+/**
+ * Every gallery object lives under its own station. The attach step re-derives
+ * this prefix and refuses anything outside it, so a signed URL for one station
+ * cannot be used to graft an object onto another.
+ */
+export const galleryPrefix = (stationId: string): string =>
+  `stations/${stationId}/gallery/`;
+
+export const galleryObjectPath = (
+  stationId: string,
+  extension: string
+): string => `${galleryPrefix(stationId)}${crypto.randomUUID()}.${extension}`;
+
 export type GalleryVerdict = "accept" | "reject" | "reference";
 
 export type GalleryEntry = {

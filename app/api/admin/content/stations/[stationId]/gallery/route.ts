@@ -1,8 +1,10 @@
 import { requireAdmin } from "@/lib/admin-auth";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
 import {
+  GALLERY_BUCKET,
   appendGalleryEntry,
   galleryEntries,
+  galleryPrefix,
   removeGalleryEntry,
   type GalleryVerdict
 } from "@/lib/station-gallery";
@@ -10,17 +12,15 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const verdicts = new Set<GalleryVerdict>(["accept", "reject", "reference"]);
 
 /**
- * Appends one photo to a station's gallery.
+ * Records an already-uploaded object against a station.
  *
- * Distinct from the hero-image route, which replaces the single hero and
- * deletes the previous file. Field verification needs the opposite: many
- * photos accumulated per station, each labelled with the verdict a human
- * expects from it, so the Gemini threshold can be tuned against real
- * accept/reject pairs rather than guessed.
+ * The bytes never pass through here — the browser uploads to Storage with a
+ * signed URL from `./upload`, because Vercel caps a function request body at
+ * 4.5 MB and returns an HTML error page when it is exceeded. This endpoint
+ * only takes the resulting path, so the request stays a few hundred bytes.
  */
 export async function POST(
   request: Request,
@@ -29,22 +29,21 @@ export async function POST(
   try {
     const { supabase, email } = await requireAdmin(request);
     const { stationId } = await context.params;
+    const body = await readJson<Record<string, unknown>>(request);
 
-    const form = await request.formData();
-    const file = form.get("image");
-    if (!(file instanceof File)) throw new Error("Image is required");
-    if (!allowedTypes.has(file.type)) {
-      throw new Error("Use a JPG, PNG or WebP image");
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      throw new Error("Image must be smaller than 8 MB");
+    const path = String(body.path ?? "");
+    // A signed URL is scoped to one object, but the caller still names the
+    // station here. Without this check a token issued for station A could
+    // attach its object to station B's gallery.
+    if (!path.startsWith(galleryPrefix(stationId))) {
+      throw new Error("Photo path does not belong to this station");
     }
 
-    const rawVerdict = String(form.get("verdict") ?? "reference");
+    const rawVerdict = String(body.verdict ?? "reference");
     const verdict = verdicts.has(rawVerdict as GalleryVerdict)
       ? (rawVerdict as GalleryVerdict)
       : "reference";
-    const note = String(form.get("note") ?? "").trim().slice(0, 280);
+    const note = String(body.note ?? "").trim().slice(0, 280);
 
     const { data: station, error: stationError } = await supabase
       .from("content_stations")
@@ -60,18 +59,20 @@ export async function POST(
       throw new Error("This station already has 60 photos");
     }
 
-    const extension =
-      file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const path = `stations/${stationId}/gallery/${crypto.randomUUID()}.${extension}`;
-    const bytes = new Uint8Array(await file.arrayBuffer());
-
-    const { error: uploadError } = await supabase.storage
-      .from("content-media")
-      .upload(path, bytes, { contentType: file.type, upsert: false });
-    if (uploadError) throw uploadError;
+    // Recording a path that was never uploaded would produce a gallery tile
+    // that renders as a broken image and cannot be explained.
+    const { data: found, error: listError } = await supabase.storage
+      .from(GALLERY_BUCKET)
+      .list(galleryPrefix(stationId).replace(/\/$/, ""), {
+        search: path.split("/").pop() ?? ""
+      });
+    if (listError) throw listError;
+    if (!found || found.length === 0) {
+      throw new Error("The upload did not complete");
+    }
 
     const { data: publicData } = supabase.storage
-      .from("content-media")
+      .from(GALLERY_BUCKET)
       .getPublicUrl(path);
 
     const gallery = appendGalleryEntry(existing, {
@@ -93,11 +94,8 @@ export async function POST(
       .eq("id", stationId)
       .select("*")
       .single();
-
-    // The row is the record; a file with no row pointing at it is invisible
-    // and un-deletable through the UI, so roll the upload back.
     if (error || !data) {
-      await supabase.storage.from("content-media").remove([path]);
+      await supabase.storage.from(GALLERY_BUCKET).remove([path]);
       throw error ?? new Error("Failed to attach the photo");
     }
 
@@ -146,8 +144,8 @@ export async function DELETE(
     if (error || !data) throw error ?? new Error("Failed to remove the photo");
 
     // Storage last: if this fails the row is already clean, which leaves an
-    // orphaned object rather than a broken gallery entry.
-    await supabase.storage.from("content-media").remove([path]);
+    // orphaned object rather than a gallery tile pointing at nothing.
+    await supabase.storage.from(GALLERY_BUCKET).remove([path]);
 
     return jsonOk(data);
   } catch (error) {

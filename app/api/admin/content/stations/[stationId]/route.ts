@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/admin-auth";
 import { normalizeContentSlug, numberOrNull, objectValue } from "@/lib/content-os";
 import { handleRouteError, jsonOk, readJson } from "@/lib/http";
+import { galleryEntries } from "@/lib/station-gallery";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -148,15 +149,23 @@ export async function DELETE(
 
     const { data: station, error: stationError } = await supabase
       .from("content_stations")
-      .select("hero_image_path")
+      .select("hero_image_path,gallery")
       .eq("id", stationId)
       .single();
     if (stationError) throw stationError;
 
     const { error } = await supabase.from("content_stations").delete().eq("id", stationId);
     if (error) throw error;
-    if (station?.hero_image_path) {
-      await supabase.storage.from("content-media").remove([station.hero_image_path]);
+
+    // Field capture attaches many gallery photos, so removing only the hero
+    // would strand up to sixty objects per deleted station with nothing left
+    // in the database pointing at them.
+    const orphans = [
+      ...(station?.hero_image_path ? [station.hero_image_path] : []),
+      ...galleryEntries(station?.gallery).map((entry) => entry.path)
+    ];
+    if (orphans.length > 0) {
+      await supabase.storage.from("content-media").remove(orphans);
     }
     return jsonOk({ stationId });
   } catch (error) {
