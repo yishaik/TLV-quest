@@ -13,6 +13,37 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 type Locale = CheckpointMessageLocale;
 
+const recordValue = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const withSmallTeamAlternative = ({
+  body,
+  validationValue,
+  fallbackValue,
+  participantCount,
+  locale
+}: {
+  body: string;
+  validationValue: unknown;
+  fallbackValue: unknown;
+  participantCount: number;
+  locale: Locale;
+}) => {
+  const validation = recordValue(validationValue);
+  const fallback = recordValue(fallbackValue);
+  const minimum =
+    typeof validation.minParticipants === "number"
+      ? validation.minParticipants
+      : 1;
+  const prompt =
+    typeof fallback[locale] === "string" ? fallback[locale].trim() : "";
+  if (participantCount >= minimum || !prompt) return body;
+  const label = locale === "he" ? "חלופה לקבוצה קטנה" : "Small-team alternative";
+  return `${body}\n\n${label}: ${prompt}`;
+};
+
 export const resumeUrl = `${publicEnv.appUrl}/resume`;
 
 export { formatCheckpointMessage, formatCheckpointSkipMessage };
@@ -63,7 +94,7 @@ export const deliverCheckpointToTeam = async ({
   ] = await Promise.all([
     supabase
       .from("run_checkpoints")
-      .select("sequence_no,content")
+      .select("sequence_no,content,validation,fallback_checkpoint")
       .eq("run_id", runId)
       .eq("slug", slug)
       .single(),
@@ -80,16 +111,29 @@ export const deliverCheckpointToTeam = async ({
   }
   if (participantError) throw participantError;
 
+  const { count: participantCount, error: participantCountError } = await supabase
+    .from("participants")
+    .select("id", { count: "exact", head: true })
+    .eq("team_id", teamId);
+  if (participantCountError) throw participantCountError;
+
   let sent = 0;
   let failed = 0;
   for (const participant of participants ?? []) {
     if (participant.id === excludeParticipantId || !participant.phone_ciphertext) continue;
     const locale: Locale = participant.language === "en" ? "en" : "he";
-    const body = formatCheckpointMessage({
+    const formattedBody = formatCheckpointMessage({
       contentValue: checkpoint.content,
       locale,
       sequenceNo: checkpoint.sequence_no,
       resumeLink: participantResumeUrl(participant.id)
+    });
+    const body = withSmallTeamAlternative({
+      body: formattedBody,
+      validationValue: checkpoint.validation,
+      fallbackValue: checkpoint.fallback_checkpoint,
+      participantCount: participantCount ?? 0,
+      locale
     });
     try {
       await sendWhatsapp({

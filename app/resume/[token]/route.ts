@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { hashSecret, randomToken } from "@/lib/crypto";
-import { verifyParticipantResumeToken } from "@/lib/participant-resume";
+import { hashSecret } from "@/lib/crypto";
+import {
+  stableParticipantPlayToken,
+  verifyParticipantResumeToken
+} from "@/lib/participant-resume";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -21,7 +24,7 @@ export async function GET(
       .single();
     if (error || !participant) throw new Error("Participant was not found");
 
-    const personalToken = randomToken();
+    const personalToken = stableParticipantPlayToken(participant.id);
     const { error: updateError } = await supabase
       .from("participants")
       .update({

@@ -13,6 +13,7 @@ import {
   announcePhotoRetry
 } from "@/lib/quest-runtime-events";
 import { readRetryAfterSeconds } from "@/lib/rate-limit-client";
+import { teamRolesForCheckpoint } from "@/lib/team-challenge";
 
 type Locale = "he" | "en";
 type ParticipantState = {
@@ -46,6 +47,13 @@ type ParticipantState = {
 };
 
 type Drawer = "team" | "map" | "board" | null;
+type CompletionMoment = {
+  actor: string;
+  answer: string | null;
+  points: number | null;
+  success: string;
+  completedSequence: number;
+};
 
 function ParticipantBanners({
   banners,
@@ -87,7 +95,8 @@ const contentFor = (
     story: text("story"),
     prompt: text("prompt"),
     locationHint: text("locationHint"),
-    success: text("success")
+    success: text("success"),
+    transition: text("transition")
   };
 };
 
@@ -123,9 +132,19 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [answer, setAnswer] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  const photoPreview = useMemo(
+    () => (photo ? URL.createObjectURL(photo) : ""),
+    [photo]
+  );
+  useEffect(() => {
+    return () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+    };
+  }, [photoPreview]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [completion, setCompletion] = useState<CompletionMoment | null>(null);
   const [locationVerified, setLocationVerified] = useState(false);
   const [answerCooldownSeconds, setAnswerCooldownSeconds] = useState(0);
   const [idempotencyKeys] = useState(() => new ClientIdempotencyKeys());
@@ -157,6 +176,16 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
   const choices = useMemo(
     () => (state?.checkpoint ? validationOptions(state.checkpoint) : []),
     [state?.checkpoint]
+  );
+  const teamRoles = useMemo(
+    () => state?.checkpoint
+      ? teamRolesForCheckpoint({
+          kind: state.checkpoint.kind,
+          participantCount: state.members.length,
+          locale: language
+        })
+      : [],
+    [language, state?.checkpoint, state?.members.length]
   );
 
   async function sendAnswer(value: string) {
@@ -199,14 +228,14 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
       }
       if (payload.data.evaluation.correct) {
         setAnswerCooldownSeconds(0);
-        setMessage(
-          mission?.success ||
-            (isHebrew
-              ? "המפתח נמצא. התחנה הבאה נפתחת…"
-              : "Key found. Unlocking the next checkpoint…")
-        );
+        setCompletion({
+          actor: state?.participant.firstName ?? "",
+          answer: submitted,
+          points: typeof payload.data.scoreDelta === "number" ? payload.data.scoreDelta : null,
+          success: mission?.success || (isHebrew ? "המפתח נמצא." : "Key found."),
+          completedSequence: state?.checkpoint?.sequenceNo ?? 1
+        });
         setAnswer("");
-        window.setTimeout(() => void refresh(), 850);
       } else {
         setError(
           isHebrew
@@ -382,14 +411,14 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
       idempotencyKeys.settle(actionScope, idempotencyKey, 200);
       if (result.approved) {
         announcePhotoApproved(checkpointSlug);
-        setMessage(
-          mission?.success ||
-            (isHebrew
-              ? "התמונה אושרה. הסיפור ממשיך…"
-              : "Photo approved. The story continues…")
-        );
+        setCompletion({
+          actor: state?.participant.firstName ?? "",
+          answer: null,
+          points: null,
+          success: mission?.success || (isHebrew ? "התמונה התקבלה." : "Photo received."),
+          completedSequence: state?.checkpoint?.sequenceNo ?? 1
+        });
         setPhoto(null);
-        window.setTimeout(() => void refresh(), 850);
       } else {
         const fallbackText =
           typeof result.fallbackPrompt === "string" &&
@@ -450,6 +479,31 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
             <span>{state.team.name}</span>
             <span>{state.run.publicCode}</span>
           </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (completion) {
+    return (
+      <main className="quest-experience quest-completion" dir={isHebrew ? "rtl" : "ltr"}>
+        <div className="quest-ambient" />
+        <section className="completion-panel" role="status" aria-live="polite">
+          <span className="completion-check">✓</span>
+          <span className="quest-kicker">{isHebrew ? "התחנה הושלמה" : "Stop complete"}</span>
+          <h1>{completion.success}</h1>
+          <div className="completion-details">
+            <p><small>{isHebrew ? "מי פתר/ה" : "Solved by"}</small><strong>{completion.actor}</strong></p>
+            {completion.answer && <p><small>{isHebrew ? "התשובה" : "Answer"}</small><strong>{completion.answer}</strong></p>}
+            {completion.points !== null && <p><small>{isHebrew ? "ניקוד" : "Score"}</small><strong>+{completion.points}</strong></p>}
+          </div>
+          <div className="completion-progress"><span style={{ width: `${Math.min(100, completion.completedSequence / total * 100)}%` }} /></div>
+          <p>{isHebrew ? `השלמתם ${completion.completedSequence} מתוך ${total} תחנות.` : `${completion.completedSequence} of ${total} stops complete.`}</p>
+          <button className="button quest-gold-button" onClick={() => { setCompletion(null); void refresh(); }}>
+            {completion.completedSequence >= total
+              ? (isHebrew ? "לסיום המשחק" : "Finish quest")
+              : (isHebrew ? "ממשיכים לתחנה הבאה" : "Continue to the next stop")}
+          </button>
         </section>
       </main>
     );
@@ -529,11 +583,31 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
           <strong>{String(state.checkpoint.sequenceNo).padStart(2, "0")}</strong>
         </div>
         <div className="mission-copy">
+          {state.team.completedCount > 0 && (
+            <div className="mission-transition" role="status">
+              <span>✓</span>
+              <p>
+                {isHebrew
+                  ? mission?.transition || `השלמתם ${state.team.completedCount} מתוך ${total} תחנות. הסיפור ממשיך מכאן.`
+                  : mission?.transition || `${state.team.completedCount} of ${total} stops complete. The story continues here.`}
+              </p>
+            </div>
+          )}
           <span className="quest-kicker">
             {statusCopy(state.team.status, isHebrew)}
           </span>
           <h1>{mission?.title}</h1>
           <p className="mission-story">{mission?.story}</p>
+          {teamRoles.length > 0 && (
+            <div className="team-role-brief" aria-label={isHebrew ? "חלוקת תפקידים" : "Team roles"}>
+              {teamRoles.map((role, index) => (
+                <div key={role.title}>
+                  <span>{index + 1}</span>
+                  <p><strong>{role.title}</strong><small>{role.instruction}</small></p>
+                </div>
+              ))}
+            </div>
+          )}
           {mission?.locationHint && (
             <div className="mission-location">
               <span>⌖</span>
@@ -587,6 +661,9 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
                     }
                   }}
                 />
+                {photoPreview && (
+                  <img className="photo-preview" src={photoPreview} alt={isHebrew ? "תצוגה מקדימה" : "Photo preview"} />
+                )}
                 <span>＋</span>
                 <strong>
                   {photo
@@ -604,8 +681,8 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
               <button className="button quest-gold-button" disabled={busy || !photo}>
                 {busy
                   ? isHebrew
-                    ? "בודק את הרגע…"
-                    : "Checking the moment…"
+                    ? "מעלה את התמונה…"
+                    : "Uploading photo…"
                   : isHebrew
                     ? "שליחת התמונה"
                     : "Submit photo"}
@@ -739,16 +816,12 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
                       <a
                         className="button quest-gold-button"
                         href={`https://www.google.com/maps/search/?api=1&query=${state.checkpoint.latitude},${state.checkpoint.longitude}`}
-                        target="_blank"
-                        rel="noreferrer"
                       >
                         Google Maps
                       </a>
                       <a
                         className="button button-secondary"
                         href={`https://waze.com/ul?ll=${state.checkpoint.latitude},${state.checkpoint.longitude}&navigate=yes`}
-                        target="_blank"
-                        rel="noreferrer"
                       >
                         Waze
                       </a>

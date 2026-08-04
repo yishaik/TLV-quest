@@ -156,6 +156,13 @@ const assertAnswerPrerequisites = async (state: ParticipantState) => {
   }
 
   if (checkpoint.kind === "photo") {
+    const minimumParticipants =
+      typeof checkpoint.validation.minParticipants === "number" &&
+      Number.isInteger(checkpoint.validation.minParticipants)
+        ? checkpoint.validation.minParticipants
+        : 1;
+    if (state.members.length < minimumParticipants) return;
+
     const { data, error } = await supabase
       .from("media_assets")
       .select("validation")
@@ -183,10 +190,14 @@ const assertAnswerPrerequisites = async (state: ParticipantState) => {
 
 const queueSuccessMessage = async ({
   state,
-  success
+  success,
+  answer,
+  scoreDelta
 }: {
   state: ParticipantState;
   success: string;
+  answer: string;
+  scoreDelta: number;
 }) => {
   const supabase = createAdminClient();
   const { data: participants, error } = await supabase
@@ -203,7 +214,13 @@ const queueSuccessMessage = async ({
       participant_id: participant.id,
       channel: "whatsapp",
       recipient_ciphertext: participant.phone_ciphertext,
-      payload: { body: success, locale: state.participant.language }
+      payload: {
+        body:
+          state.participant.language === "he"
+            ? `${state.participant.firstName} פתר/ה את התחנה\nהתשובה: ${answer}\n+${scoreDelta} נקודות\n${success}`
+            : `${state.participant.firstName} solved the stop\nAnswer: ${answer}\n+${scoreDelta} points\n${success}`,
+        locale: state.participant.language
+      }
     }))
   );
   if (insertError) throw insertError;
@@ -270,6 +287,7 @@ export const submitCheckpointAnswer = async ({
     p_normalized_answer: evaluation.normalizedAnswer,
     p_payload: {
       rawLength: answer.length,
+      answer: evaluation.normalizedAnswer,
       reason: evaluation.reason,
       kind: state.checkpoint.kind
     },
@@ -295,7 +313,12 @@ export const submitCheckpointAnswer = async ({
       contentForLocale.success,
       locale === "he" ? "נכון!" : "Correct!"
     );
-    await queueSuccessMessage({ state, success });
+    await queueSuccessMessage({
+      state,
+      success,
+      answer: evaluation.normalizedAnswer,
+      scoreDelta
+    });
   }
 
   return { evaluation, scoreDelta, result, replayed: false };

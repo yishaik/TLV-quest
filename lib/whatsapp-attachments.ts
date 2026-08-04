@@ -268,15 +268,8 @@ export const handleWhatsappPhoto = async ({
     throw mediaError ?? new Error("media_asset_insert_failed");
   }
 
-  if (!assessment.approved || assessment.confidence < threshold) {
-    const fallback = asObject(checkpoint.fallback_checkpoint);
-    return (
-      text(fallback[locale]) ||
-      (locale === "he"
-        ? "לא ניתן לאמת את התמונה. השתמשו בשאלת הגיבוי באתר."
-        : "The photo could not be verified. Use the fallback question in the web app.")
-    );
-  }
+  const criteriaMatched =
+    assessment.approved && assessment.confidence >= threshold;
 
   const { data: nextCheckpoint, error: nextError } = await supabase
     .from("run_checkpoints")
@@ -307,15 +300,20 @@ export const handleWhatsappPhoto = async ({
     p_participant_id: participant.id,
     p_checkpoint_id: checkpoint.id,
     p_submission_type: "whatsapp_photo",
-    p_normalized_answer: "gemini_photo_approved",
+    p_normalized_answer: criteriaMatched
+      ? "gemini_photo_approved"
+      : "photo_received_soft_validation",
     p_payload: {
       source: "whatsapp",
       mediaAssetId: mediaAsset.id,
-      confidence: assessment.confidence
+      confidence: assessment.confidence,
+      criteriaMatched
     },
     p_is_correct: true,
     p_score_delta: scoreDelta,
-    p_validation_reason: "gemini_photo_approved",
+    p_validation_reason: criteriaMatched
+      ? "gemini_photo_approved"
+      : "photo_received_soft_validation",
     p_idempotency_key: `wa-photo:${messageSid}`,
     p_next_checkpoint_slug: nextCheckpoint?.slug ?? null,
     p_is_final: isFinal
@@ -325,8 +323,11 @@ export const handleWhatsappPhoto = async ({
   const success = localizedSuccess(
     checkpoint.content,
     locale,
-    locale === "he" ? "התמונה אושרה." : "Photo approved."
+    locale === "he" ? "התמונה התקבלה והמשחק ממשיך." : "Photo received. The game continues."
   );
-  await queueTeamMessage({ runId: run.id, teamId: team.id, body: success });
-  return success;
+  const teamSuccess = locale === "he"
+    ? `${participant.public_alias} העלה/תה תמונה\n${success}\n+${scoreDelta} נקודות`
+    : `${participant.public_alias} uploaded a photo\n${success}\n+${scoreDelta} points`;
+  await queueTeamMessage({ runId: run.id, teamId: team.id, body: teamSuccess });
+  return teamSuccess;
 };

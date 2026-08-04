@@ -17,6 +17,8 @@ const copy = {
     name: "שם מלא",
     email: "אימייל",
     participants: "כמה משתתפים (עד 30)",
+    stations: "כמה תחנות תרצו במשחק?",
+    stationNote: "המערכת שומרת על תחנת הפתיחה, הסיום והסדר המקורי ביניהן.",
     submit: "צרו משחק חינם",
     working: "יוצר…",
     doneTitle: "המשחק שלכם מוכן",
@@ -33,6 +35,8 @@ const copy = {
     name: "Full name",
     email: "Email",
     participants: "How many participants (up to 30)",
+    stations: "How many stops should the game include?",
+    stationNote: "The opening, finale and authored route order are preserved.",
     submit: "Create a free game",
     working: "Creating…",
     doneTitle: "Your game is ready",
@@ -49,15 +53,18 @@ const copy = {
 
 export function FreeBookingForm({
   locale,
-  templateSlug
+  templateSlug,
+  checkpointCount
 }: {
   locale: Locale;
   templateSlug: string;
+  checkpointCount: number;
 }) {
   const t = copy[locale];
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [participants, setParticipants] = useState("12");
+  const [participants, setParticipants] = useState("2");
+  const [stations, setStations] = useState(String(Math.min(6, checkpointCount)));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<Created | null>(null);
@@ -74,6 +81,7 @@ export function FreeBookingForm({
           email,
           templateSlug,
           maxParticipants: Number(participants),
+          checkpointCount: Number(stations),
           locale
         })
       });
@@ -135,6 +143,13 @@ export function FreeBookingForm({
         value={participants}
         onChange={(event) => setParticipants(event.target.value)}
       />
+      <label>{t.stations}</label>
+      <select value={stations} onChange={(event) => setStations(event.target.value)}>
+        {Array.from({ length: Math.max(1, checkpointCount - 3) }, (_, index) => index + Math.min(4, checkpointCount))
+          .filter((count) => count <= checkpointCount)
+          .map((count) => <option key={count} value={count}>{count}</option>)}
+      </select>
+      <small>{t.stationNote}</small>
       <button
         type="button"
         onClick={() => void submit()}

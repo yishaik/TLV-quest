@@ -27,6 +27,7 @@ export async function POST(request: Request) {
           ? body.scheduledAt
           : null,
       maxParticipants: Number(body.maxParticipants),
+      checkpointCount: Number(body.checkpointCount),
       locale: body.locale === "en" ? "en" : "he"
     });
 

@@ -24,6 +24,7 @@ import {
   throwIdempotencyConflict
 } from "@/lib/idempotency";
 import { publicEnv } from "@/lib/env";
+import { stableParticipantPlayToken } from "@/lib/participant-resume";
 import {
   resolveWhatsappContextCandidates,
   type WhatsappContextResolution,
@@ -331,7 +332,7 @@ const chooseTeam = async ({
     return data;
   }
 
-  if (requestedTeamName?.trim()) {
+  if (teamMode === "preassigned" && requestedTeamName?.trim()) {
     const desiredName = requestedTeamName.trim().slice(0, 40);
     const { data: existing } = await supabase
       .from("teams")
@@ -453,7 +454,7 @@ export const joinRun = async (input: JoinRunInput) => {
     publicAlias
   });
 
-  const personalToken = randomToken();
+  const provisionalToken = randomToken();
   const recoveryCode = randomCode(6);
   const { data: participant, error: participantError } = await supabase
     .from("participants")
@@ -465,7 +466,7 @@ export const joinRun = async (input: JoinRunInput) => {
       phone_ciphertext: normalizedPhone ? encryptPii(normalizedPhone) : null,
       phone_hash: phoneHash,
       language: input.language,
-      personal_token_hash: hashSecret(personalToken),
+      personal_token_hash: hashSecret(provisionalToken),
       recovery_code_hash: hashSecret(recoveryCode),
       consent_at: new Date().toISOString()
     })
@@ -475,6 +476,13 @@ export const joinRun = async (input: JoinRunInput) => {
   if (participantError || !participant) {
     throw participantError ?? new Error("Failed to register participant");
   }
+
+  const personalToken = stableParticipantPlayToken(participant.id);
+  const { error: stableTokenError } = await supabase
+    .from("participants")
+    .update({ personal_token_hash: hashSecret(personalToken) })
+    .eq("id", participant.id);
+  if (stableTokenError) throw stableTokenError;
 
   await supabase.from("game_events").insert({
     run_id: run.id,

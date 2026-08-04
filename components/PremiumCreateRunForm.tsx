@@ -37,6 +37,7 @@ type Config = {
   organizerPhone: string;
   routeLength: "short" | "full";
   accessibilityMode: "regular" | "accessible";
+  checkpointCount: number;
 };
 
 const presets = {
@@ -45,7 +46,7 @@ const presets = {
     note: "2–6 משתתפים · קצב אינטימי",
     maxParticipants: 6,
     desiredTeamSize: 3,
-    maxTeams: 2
+    maxTeams: 1
   },
   family: {
     label: "משפחה",
@@ -108,7 +109,8 @@ export function PremiumCreateRunForm({ inviteToken }: { inviteToken: string }) {
     organizerEmail: "",
     organizerPhone: "",
     routeLength: "short",
-    accessibilityMode: "regular"
+    accessibilityMode: "regular",
+    checkpointCount: 6
   });
 
   const selectedRoute = useMemo(
@@ -132,7 +134,12 @@ export function PremiumCreateRunForm({ inviteToken }: { inviteToken: string }) {
           templateSlug:
             publishedRoutes.some((route) => route.slug === current.templateSlug)
               ? current.templateSlug
-              : publishedRoutes[0]?.slug ?? ""
+              : publishedRoutes[0]?.slug ?? "",
+          checkpointCount: Math.min(
+            current.checkpointCount,
+            publishedRoutes.find((route) => route.slug === current.templateSlug)?.checkpointCount ??
+              publishedRoutes[0]?.checkpointCount ?? 6
+          )
         }));
       })
       .catch((cause) => {
@@ -196,6 +203,7 @@ export function PremiumCreateRunForm({ inviteToken }: { inviteToken: string }) {
           maxParticipants: config.maxParticipants,
           maxTeams: config.maxTeams,
           desiredTeamSize: config.desiredTeamSize,
+          checkpointCount: config.checkpointCount,
           graceMinutes: config.graceMinutes,
           organizerEmail: config.organizerEmail,
           organizerPhone: config.organizerPhone,
@@ -354,7 +362,11 @@ export function PremiumCreateRunForm({ inviteToken }: { inviteToken: string }) {
                     type="button"
                     key={route.slug}
                     className={`preset-card ${config.templateSlug === route.slug ? "active" : ""}`}
-                    onClick={() => update("templateSlug", route.slug)}
+                    onClick={() => setConfig((current) => ({
+                      ...current,
+                      templateSlug: route.slug,
+                      checkpointCount: Math.min(current.checkpointCount, route.checkpointCount)
+                    }))}
                   >
                     <span>V{route.version} · {route.checkpointCount} STOPS</span>
                     <h3>{textValue(route.title.he, textValue(route.title.en, route.slug))}</h3>
@@ -362,6 +374,24 @@ export function PremiumCreateRunForm({ inviteToken }: { inviteToken: string }) {
                   </button>
                 ))}
               </div>
+            )}
+
+            {selectedRoute && (
+              <label className="wizard-field" style={{ marginTop: 24 }}>
+                <span>מספר תחנות במשחק</span>
+                <select
+                  value={config.checkpointCount}
+                  onChange={(event) => update("checkpointCount", Number(event.target.value))}
+                >
+                  {Array.from(
+                    { length: Math.max(1, selectedRoute.checkpointCount - 3) },
+                    (_, index) => index + Math.min(4, selectedRoute.checkpointCount)
+                  ).filter((count) => count <= selectedRoute.checkpointCount).map((count) => (
+                    <option key={count} value={count}>{count} תחנות</option>
+                  ))}
+                </select>
+                <small>תחנות הפתיחה והסיום נשמרות, והתחנות שביניהן נבחרות לפי הסדר המקורי.</small>
+              </label>
             )}
 
             <div className="wizard-section-header" style={{ marginTop: 30 }}>
@@ -568,6 +598,10 @@ export function PremiumCreateRunForm({ inviteToken }: { inviteToken: string }) {
               <div>
                 <span>קיבולת</span>
                 <strong>עד {config.maxParticipants} משתתפים</strong>
+              </div>
+              <div>
+                <span>אורך המשחק</span>
+                <strong>{config.checkpointCount} תחנות</strong>
               </div>
             </div>
             {!inviteToken && (

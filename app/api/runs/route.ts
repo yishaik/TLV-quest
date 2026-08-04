@@ -77,6 +77,8 @@ export async function POST(request: Request) {
         typeof body.graceMinutes === "number" ? body.graceMinutes : 10,
       desiredTeamSize:
         typeof body.desiredTeamSize === "number" ? body.desiredTeamSize : 4,
+      checkpointCount:
+        typeof body.checkpointCount === "number" ? body.checkpointCount : undefined,
       organizerEmail:
         typeof body.organizerEmail === "string" ? body.organizerEmail : undefined,
       organizerPhone:

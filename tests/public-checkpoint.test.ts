@@ -39,7 +39,8 @@ describe("public checkpoint projection", () => {
       locale: "he",
       isOptional: false,
       scanVerified: false,
-      photoFallbackAvailable: true
+      photoFallbackAvailable: true,
+      participantCount: 3
     });
 
     expect(projected.choiceOptions).toEqual(["A", "B", "C"]);
@@ -60,7 +61,8 @@ describe("public checkpoint projection", () => {
       locale: "en",
       isOptional: false,
       scanVerified: false,
-      photoFallbackAvailable: false
+      photoFallbackAvailable: false,
+      participantCount: 3
     });
 
     expect(projected.hasFallback).toBe(true);

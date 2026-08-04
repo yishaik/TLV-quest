@@ -22,6 +22,9 @@
 # vercel
 .vercel
 
+# here.now local publish state
+.herenow
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

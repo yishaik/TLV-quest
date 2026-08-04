@@ -58,3 +58,8 @@ export const verifyParticipantResumeToken = (token: string): ResumePayload => {
 
 export const participantResumeUrl = (participantId: string): string =>
   `${publicEnv.appUrl}/resume/${createParticipantResumeToken(participantId)}`;
+
+/** Stable for the participant's retained lifetime. Opening a WhatsApp return
+ * link must not invalidate an already-open game tab. */
+export const stableParticipantPlayToken = (participantId: string): string =>
+  hashSecret(`participant-play:${participantId}`);

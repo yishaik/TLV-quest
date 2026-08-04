@@ -113,7 +113,16 @@ body:has(.page), body:has(.quest-shell) {
 .mission-index strong { color: var(--xp-gold-light); font-family: Georgia, serif; font-size: 4.2rem; font-weight: 400; line-height: 1; }
 .quest-kicker { color: var(--xp-gold); font-size: .66rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; }
 .mission-copy h1 { margin: 14px 0 20px; font-family: Georgia, serif; font-size: clamp(2.8rem, 7vw, 5.7rem); font-weight: 500; line-height: .92; letter-spacing: -.045em; }
+.mission-transition { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: center; margin: 0 0 22px; padding: 11px 13px; color: #c8f0d8; border: 1px solid rgba(100,202,147,.25); background: rgba(55,141,95,.12); }
+.mission-transition span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(100,202,147,.18); }
+.mission-transition p { margin: 0; font-size: .82rem; line-height: 1.45; }
 .mission-story { color: rgba(255,255,255,.65); font-size: 1rem; }
+.team-role-brief { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin-top: 20px; overflow: hidden; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.12); }
+.team-role-brief > div { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 13px; background: rgba(7,17,28,.78); }
+.team-role-brief > div > span { display: grid; place-items: center; width: 25px; height: 25px; color: #17120a; border-radius: 50%; background: var(--xp-gold-light); font-weight: 900; font-size: .72rem; }
+.team-role-brief p { display: grid; gap: 4px; margin: 0; }
+.team-role-brief strong { color: #fff; font-size: .8rem; }
+.team-role-brief small { color: rgba(255,255,255,.55); line-height: 1.4; }
 .mission-location { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; margin-top: 22px; padding: 16px; border-inline-start: 2px solid var(--xp-gold); background: rgba(217,170,88,.09); }
 .mission-location > span { color: var(--xp-gold-light); font-size: 1.3rem; }
 .mission-location p { margin: 0; color: rgba(255,255,255,.76); font-size: .9rem; }
@@ -153,11 +162,22 @@ body:has(.page), body:has(.quest-shell) {
 .quest-gold-button { color: #17120a !important; border-radius: 3px !important; background: linear-gradient(135deg, var(--xp-gold-light), var(--xp-gold)) !important; box-shadow: 0 12px 34px rgba(0,0,0,.22) !important; }
 .photo-drop { position: relative; place-items: center; min-height: 145px; padding: 20px; border: 1px dashed rgba(217,170,88,.48); background: rgba(217,170,88,.06); text-align: center; cursor: pointer; }
 .photo-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.photo-preview { width: min(100%, 360px); max-height: 240px; object-fit: cover; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 34px rgba(0,0,0,.28); }
 .photo-drop > span { color: var(--xp-gold-light); font-size: 2.2rem; font-weight: 300; }
 .photo-drop > strong { color: rgba(255,255,255,.75); font-size: .86rem; }
 .quest-feedback { margin-top: 16px; padding: 15px 17px; border-radius: 3px; font-size: .9rem; line-height: 1.55; }
 .quest-feedback.success { color: #c8f0d8; border: 1px solid rgba(100,202,147,.28); background: rgba(55,141,95,.15); }
 .quest-feedback.error { color: #ffd3cc; border: 1px solid rgba(237,123,101,.28); background: rgba(176,71,54,.14); }
+.quest-completion { display: grid; min-height: 100svh; place-items: center; padding: 24px; }
+.completion-panel { position: relative; z-index: 2; width: min(620px,100%); padding: clamp(30px,7vw,64px); text-align: center; border: 1px solid rgba(244,214,141,.34); background: linear-gradient(145deg,rgba(13,34,49,.97),rgba(7,17,28,.99)); box-shadow: 0 36px 120px rgba(0,0,0,.48); }
+.completion-check { display: grid; place-items: center; width: 72px; height: 72px; margin: 0 auto 22px; color: #17120a; border-radius: 50%; background: linear-gradient(135deg,var(--xp-gold-light),var(--xp-gold)); font-size: 2rem; font-weight: 900; }
+.completion-panel h1 { margin: 14px auto 25px; font-family: Georgia,serif; font-size: clamp(2.2rem,7vw,4rem); font-weight: 500; line-height: 1; }
+.completion-details { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin: 24px 0; border-block: 1px solid rgba(255,255,255,.12); }
+.completion-details p { display: grid; gap: 5px; margin: 0; padding: 15px 8px; border-inline-end: 1px solid rgba(255,255,255,.1); }
+.completion-details p:last-child { border: 0; }.completion-details small{color:rgba(255,255,255,.46)}.completion-details strong{color:var(--xp-gold-light)}
+.completion-progress { height: 4px; margin: 24px 0 12px; overflow: hidden; background: rgba(255,255,255,.1); }.completion-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--xp-gold),var(--xp-gold-light))}
+.completion-panel > p { color: rgba(255,255,255,.62); }
+.completion-panel .button { width: 100%; margin-top: 18px; }
 
 .quest-dock {
   position: fixed;
@@ -213,6 +233,7 @@ body:has(.page), body:has(.quest-shell) {
   .mission-index { grid-template-columns: 1fr auto; align-items: center; padding: 0 0 14px; border: 0; border-bottom: 1px solid rgba(255,255,255,.1); }
   .mission-index strong { font-size: 2.7rem; }
   .mission-copy h1 { font-size: 3.25rem; }
+  .team-role-brief { grid-template-columns: 1fr; }
   .quest-dock { width: calc(100% - 20px); grid-template-columns: repeat(4, 1fr); }
   .quest-dock button { min-width: 0; }
   .race-list > div { grid-template-columns: 38px 1fr 46px 55px; gap: 8px; font-size: .82rem; }

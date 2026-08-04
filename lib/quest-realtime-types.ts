@@ -89,6 +89,8 @@ export type QuestParticipantState = {
     isOptional: boolean;
     scanVerified: boolean;
     photoFallbackAvailable: boolean;
+    minimumParticipants: number | null;
+    participantCount: number;
   };
   realtime: {
     teamTopic: string;

@@ -7,7 +7,6 @@ import {
   throwIdempotencyConflict
 } from "@/lib/idempotency";
 import { getParticipantState } from "@/lib/repository";
-import { publicFallbackSummary } from "@/lib/public-checkpoint";
 import {
   calculateScoreDelta,
   distanceMeters,
@@ -332,7 +331,6 @@ export const submitStoredPhoto = async ({
     typeof validation.confidenceThreshold === "number"
       ? validation.confidenceThreshold
       : 0.86;
-
   let assessment = recoveredAssessment;
   let mediaId = existingMedia?.id ?? null;
   if (!assessment) {
@@ -370,20 +368,8 @@ export const submitStoredPhoto = async ({
     }
   }
   if (!mediaId) throw new Error("Failed to save photo");
-
-  if (!assessment.approved || assessment.confidence < threshold) {
-    const fallback = publicFallbackSummary(
-      state.checkpoint.fallback,
-      state.participant.language
-    );
-    return {
-      approved: false,
-      confidence: assessment.confidence,
-      reason: assessment.reason,
-      hasFallback: fallback.hasFallback,
-      fallbackPrompt: fallback.hasFallback ? fallback.fallbackPrompt : null
-    };
-  }
+  const criteriaMatched =
+    assessment.approved === true && assessment.confidence >= threshold;
 
   const completion = await completeCheckpoint({
     token,
@@ -392,15 +378,19 @@ export const submitStoredPhoto = async ({
     idempotencyKey,
     payload: {
       mediaAssetId: mediaId,
-      confidence: assessment.confidence
+      confidence: assessment.confidence,
+      criteriaMatched
     },
-    validationReason: "gemini_photo_approved"
+    validationReason: criteriaMatched
+      ? "gemini_photo_approved"
+      : "photo_received_soft_validation"
   });
 
   return {
     approved: true,
     confidence: assessment.confidence,
     reason: assessment.reason,
+    criteriaMatched,
     completion: completion.result
   };
 };

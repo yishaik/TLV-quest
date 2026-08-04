@@ -133,7 +133,8 @@ export async function getParticipantExperienceState(token: string) {
         locale: state.participant.language,
         isOptional: false,
         scanVerified: false,
-        photoFallbackAvailable: false
+        photoFallbackAvailable: false,
+        participantCount: state.members.length
       })
     : null;
 
@@ -188,7 +189,8 @@ export async function getParticipantExperienceState(token: string) {
       locale: state.participant.language,
       isOptional: checkpointMeta.is_optional === true,
       scanVerified,
-      photoFallbackAvailable
+      photoFallbackAvailable,
+      participantCount: state.members.length
     });
   }
 

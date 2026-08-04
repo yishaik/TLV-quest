@@ -26,6 +26,7 @@ export type FreeBookingInput = {
   templateSlug: string;
   scheduledAt?: string | null;
   maxParticipants?: number;
+  checkpointCount?: number;
   locale?: "he" | "en";
 };
 
@@ -85,6 +86,10 @@ export const createFreeRun = async (input: FreeBookingInput) => {
     startMode: "manual",
     localeDefault: input.locale === "en" ? "en" : "he",
     maxParticipants,
+    checkpointCount: input.checkpointCount,
+    teamMode: "automatic",
+    maxTeams: maxParticipants <= 6 ? 1 : undefined,
+    desiredTeamSize: maxParticipants <= 6 ? maxParticipants : undefined,
     organizerEmail: email,
     settings: { freeBooking: true, bookerName: name }
   });

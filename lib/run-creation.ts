@@ -10,6 +10,7 @@ import {
 } from "@/lib/crypto";
 import { publicEnv } from "@/lib/env";
 import type { Locale } from "@/lib/game-engine";
+import { selectCoherentCheckpoints } from "@/lib/checkpoint-selection";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -33,6 +34,7 @@ export type CreateRouteRunInput = {
   maxTeams?: number;
   graceMinutes?: number;
   desiredTeamSize?: number;
+  checkpointCount?: number;
   organizerEmail?: string;
   organizerPhone?: string;
   settings?: UnknownRecord;
@@ -74,6 +76,11 @@ export const createRouteRun = async (input: CreateRouteRunInput) => {
 
   if (checkpointError) throw checkpointError;
   if (!checkpoints?.length) throw new Error("The selected route has no active checkpoints");
+  const selectedCheckpoints = selectCoherentCheckpoints(
+    checkpoints,
+    input.checkpointCount
+  );
+  const selectedSlugs = new Set(selectedCheckpoints.map((checkpoint) => checkpoint.slug));
 
   const organizerToken = randomToken();
   const publicCode = randomCode(6);
@@ -120,6 +127,8 @@ export const createRouteRun = async (input: CreateRouteRunInput) => {
         accessibilityMode: "regular",
         templateSlug: template.slug,
         templateTitle: template.title,
+        selectedCheckpointCount: selectedCheckpoints.length,
+        sourceCheckpointCount: checkpoints.length,
         ...(input.settings ?? {})
       }
     })
@@ -128,25 +137,53 @@ export const createRouteRun = async (input: CreateRouteRunInput) => {
 
   if (runError || !run) throw runError ?? new Error("Failed to create run");
 
-  const snapshotRows = checkpoints.map((checkpoint) => {
+  const snapshotRows = selectedCheckpoints.map((checkpoint, index) => {
     const config = objectValue(checkpoint.config);
+    const content = objectValue(config.content);
+    const previousConfig = index > 0
+      ? objectValue(selectedCheckpoints[index - 1].config)
+      : null;
+    const previousContent = previousConfig
+      ? objectValue(previousConfig.content)
+      : null;
+    const contentWithTransition = { ...content };
+    if (previousContent) {
+      for (const locale of ["he", "en"] as const) {
+        const localized = objectValue(content[locale]);
+        const previousLocalized = objectValue(previousContent[locale]);
+        const previousTitle =
+          typeof previousLocalized.title === "string"
+            ? previousLocalized.title
+            : "";
+        const currentTitle =
+          typeof localized.title === "string" ? localized.title : "";
+        contentWithTransition[locale] = {
+          ...localized,
+          transition:
+            locale === "he"
+              ? `השלמתם את ${previousTitle || "התחנה הקודמת"}. עכשיו ממשיכים אל ${currentTitle || "התחנה הבאה"}.`
+              : `${previousTitle || "The previous stop"} is complete. Continue to ${currentTitle || "the next stop"}.`
+        };
+      }
+    }
     return {
       run_id: run.id,
       source_checkpoint_id: checkpoint.id,
       slug: checkpoint.slug,
-      sequence_no: checkpoint.sequence_no,
+      sequence_no: index + 1,
       kind: checkpoint.kind,
       latitude: checkpoint.latitude,
       longitude: checkpoint.longitude,
       radius_meters: checkpoint.radius_meters,
-      content: objectValue(config.content),
+      content: contentWithTransition,
       validation: objectValue(config.validation),
       hints: arrayValue(config.hints),
       accessibility: checkpoint.accessibility,
       scoring: objectValue(config.scoring),
       prerequisites: Array.isArray(config.prerequisites)
         ? config.prerequisites.filter(
-            (item): item is string => typeof item === "string"
+            (item): item is string =>
+              typeof item === "string" && selectedSlugs.has(item)
           )
         : [],
       fallback_checkpoint: config.fallback ? objectValue(config.fallback) : null,
@@ -170,7 +207,9 @@ export const createRouteRun = async (input: CreateRouteRunInput) => {
     idempotency_key: `run-created:${run.id}`,
     payload: {
       templateSlug: template.slug,
-      version: template.active_version
+      version: template.active_version,
+      checkpointCount: selectedCheckpoints.length,
+      sourceCheckpointCount: checkpoints.length
     }
   });
 

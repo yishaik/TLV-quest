@@ -19,6 +19,8 @@ export type PublicCheckpoint = {
   isOptional: boolean;
   scanVerified: boolean;
   photoFallbackAvailable: boolean;
+  minimumParticipants: number | null;
+  participantCount: number;
 };
 
 const cleanStrings = (value: unknown): string[] =>
@@ -52,12 +54,14 @@ export const toPublicCheckpoint = (
     locale,
     isOptional,
     scanVerified,
-    photoFallbackAvailable
+    photoFallbackAvailable,
+    participantCount
   }: {
     locale: ParticipantLocale;
     isOptional: boolean;
     scanVerified: boolean;
     photoFallbackAvailable: boolean;
+    participantCount: number;
   }
 ): PublicCheckpoint => {
   const validationType =
@@ -65,6 +69,15 @@ export const toPublicCheckpoint = (
       ? checkpoint.validation.type
       : checkpoint.kind;
   const fallback = publicFallbackSummary(checkpoint.fallback, locale);
+  const minimumParticipants =
+    typeof checkpoint.validation.minParticipants === "number" &&
+    Number.isInteger(checkpoint.validation.minParticipants) &&
+    checkpoint.validation.minParticipants > 1
+      ? checkpoint.validation.minParticipants
+      : null;
+  const undersizedTeam = Boolean(
+    minimumParticipants && participantCount < minimumParticipants
+  );
 
   return {
     id: checkpoint.id,
@@ -79,7 +92,7 @@ export const toPublicCheckpoint = (
         : [],
     hasFallback: fallback.hasFallback,
     fallbackPrompt:
-      fallback.hasFallback && photoFallbackAvailable
+      fallback.hasFallback && (photoFallbackAvailable || undersizedTeam)
         ? fallback.fallbackPrompt
         : null,
     latitude: checkpoint.latitude,
@@ -87,6 +100,8 @@ export const toPublicCheckpoint = (
     radiusMeters: checkpoint.radiusMeters,
     isOptional,
     scanVerified,
-    photoFallbackAvailable
+    photoFallbackAvailable: photoFallbackAvailable || undersizedTeam,
+    minimumParticipants,
+    participantCount
   };
 };

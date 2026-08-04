@@ -140,7 +140,7 @@ export function MarketingHome({
           <h2>{c.cta}</h2>
           <p>{c.freeNote}</p>
         </div>
-        {route && <FreeBookingForm locale={locale} templateSlug={route.slug} />}
+        {route && <FreeBookingForm locale={locale} templateSlug={route.slug} checkpointCount={route.stops.length} />}
         <details className="mk-lead">
           <summary>
             {c.bigEvent} <strong>{c.bigEventCta}</strong>

@@ -15,11 +15,9 @@ const copy = {
   he: {
     kicker: "הזמנה אישית למסע",
     title: "לפני שהאות נפתח",
-    intro: "ההרשמה קצרה ואישית. אחריה תקבלו צוות, קוד שחזור וכניסה מאובטחת למסע.",
+    intro: "שם פרטי וזהו. המערכת תחבר אתכם אוטומטית לאותה קבוצה.",
     firstName: "שם פרטי",
-    alias: "כינוי שיופיע במשחק",
-    phone: "מספר WhatsApp",
-    team: "שם צוות, אם נקבע מראש",
+    phone: "WhatsApp לעדכונים — לא חובה",
     consent: "אני מסכים לשמירה מוצפנת של פרטי ההרשמה, ההודעות והתמונות עד 72 שעות לאחר סיום המשחק, ולאחר מכן למחיקתם.",
     submit: "פתיחת ההזמנה",
     loading: "מכין את הכניסה…",
@@ -29,21 +27,19 @@ const copy = {
     recoveryNote: "שמרו צילום מסך. הקוד מאפשר לחזור למסע גם ממכשיר אחר.",
     copy: "העתקת הקוד",
     copied: "הקוד הועתק",
-    whatsapp: "חיבור ערוץ הסיפור",
-    whatsappText: "חברו WhatsApp כדי לקבל רמזים, הודעות סיפור וקישורי חזרה למסע.",
-    sandbox: "1. הצטרפות לערוץ",
-    connect: "2. חיבור למשחק",
+    whatsapp: "עדכונים ב־WhatsApp — לא חובה",
+    whatsappText: "המשחק מתנהל באתר. אפשר לחבר WhatsApp רק לקבלת עדכונים וקישור חזרה.",
+    sandbox: "הצטרפות ל־WhatsApp",
+    connect: "חיבור לעדכונים",
     enter: "כניסה למסע",
     ready: "הכול מוכן. המסך יתעדכן אוטומטית כשהמשחק יתחיל."
   },
   en: {
     kicker: "Your private quest invitation",
     title: "Before the signal opens",
-    intro: "Registration is brief and personal. You will receive a team, recovery key and secure entry to the quest.",
+    intro: "First name and you're in. The game places you in the same team automatically.",
     firstName: "First name",
-    alias: "Public game alias",
-    phone: "WhatsApp number",
-    team: "Preassigned team name",
+    phone: "WhatsApp for updates — optional",
     consent: "I consent to encrypted storage of registration details, messages and photos until 72 hours after the quest, followed by deletion.",
     submit: "Open invitation",
     loading: "Preparing entry…",
@@ -53,10 +49,10 @@ const copy = {
     recoveryNote: "Keep a screenshot. This key restores the quest on another device.",
     copy: "Copy key",
     copied: "Key copied",
-    whatsapp: "Connect the story channel",
-    whatsappText: "Connect WhatsApp for clues, story messages and secure links back to the quest.",
-    sandbox: "1. Join channel",
-    connect: "2. Link this quest",
+    whatsapp: "WhatsApp updates — optional",
+    whatsappText: "The game stays on this page. Connect WhatsApp only for updates and a return link.",
+    sandbox: "Join WhatsApp",
+    connect: "Connect updates",
     enter: "Enter the quest",
     ready: "Everything is ready. This screen updates automatically when the quest starts."
   }
@@ -82,9 +78,9 @@ export function PremiumJoinRunForm({ code }: { code: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           firstName: form.get("firstName"),
-          publicAlias: form.get("publicAlias"),
+          publicAlias: form.get("firstName"),
           phone: form.get("phone"),
-          requestedTeamName: form.get("requestedTeamName"),
+          requestedTeamName: "",
           language,
           consent: form.get("consent") === "on"
         })
@@ -117,27 +113,25 @@ export function PremiumJoinRunForm({ code }: { code: string }) {
           <p>{c.ready}</p>
         </div>
 
-        <div className="join-success-grid">
-          <article className="recovery-card">
-            <span>01 / RECOVERY</span>
-            <h2>{c.recovery}</h2>
-            <button type="button" className="recovery-code" onClick={copyRecovery}>{joined.recoveryCode}</button>
-            <p>{c.recoveryNote}</p>
-            <button className="button button-secondary" type="button" onClick={copyRecovery}>{copied ? c.copied : c.copy}</button>
-          </article>
+        <a className="button quest-entry-button" href={joined.playUrl}>{c.enter}<span>←</span></a>
 
+        <div className="join-success-grid">
           <article className="whatsapp-card">
-            <span>02 / WHATSAPP</span>
+            <span>OPTIONAL / WHATSAPP</span>
             <h2>{c.whatsapp}</h2>
             <p>{c.whatsappText}</p>
             <div className="join-actions">
-              {joined.sandboxJoinUrl && <a className="button button-secondary" href={joined.sandboxJoinUrl} target="_blank" rel="noreferrer">{c.sandbox}</a>}
-              <a className="button button-primary" href={joined.gameLinkUrl} target="_blank" rel="noreferrer">{c.connect}</a>
+              {joined.sandboxJoinUrl && <a className="button button-secondary" href={joined.sandboxJoinUrl}>{c.sandbox}</a>}
+              <a className="button button-secondary" href={joined.gameLinkUrl}>{c.connect}</a>
             </div>
           </article>
+          <details className="recovery-card">
+            <summary>{c.recovery}</summary>
+            <button type="button" className="recovery-code" onClick={copyRecovery}>{joined.recoveryCode}</button>
+            <p>{c.recoveryNote}</p>
+            <button className="button button-secondary" type="button" onClick={copyRecovery}>{copied ? c.copied : c.copy}</button>
+          </details>
         </div>
-
-        <a className="button quest-entry-button" href={joined.playUrl}>{c.enter}<span>↗</span></a>
       </section>
     );
   }
@@ -155,9 +149,7 @@ export function PremiumJoinRunForm({ code }: { code: string }) {
       <form className="join-form" onSubmit={submit} dir={language === "he" ? "rtl" : "ltr"}>
         <div className="join-form-grid">
           <label><span>01</span><div><b>{c.firstName}</b><input name="firstName" required maxLength={40} autoComplete="given-name" /></div></label>
-          <label><span>02</span><div><b>{c.alias}</b><input name="publicAlias" maxLength={40} /></div></label>
-          <label><span>03</span><div><b>{c.phone}</b><input name="phone" type="tel" autoComplete="tel" placeholder="050-0000000" /></div></label>
-          <label><span>04</span><div><b>{c.team}</b><input name="requestedTeamName" maxLength={40} /></div></label>
+          <label><span>02</span><div><b>{c.phone}</b><input name="phone" type="tel" autoComplete="tel" placeholder="050-0000000" /></div></label>
         </div>
         <label className="join-consent"><input name="consent" type="checkbox" required /><span>{c.consent}</span></label>
         {error && <div className="flow-error" role="alert">{error}</div>}
