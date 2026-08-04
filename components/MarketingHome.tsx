@@ -1,163 +1,65 @@
 import Link from "next/link";
-import { LeadCaptureForm } from "@/components/LeadCaptureForm";
 import { FreeBookingForm } from "@/components/FreeBookingForm";
+import { LeadCaptureForm } from "@/components/LeadCaptureForm";
 import type { MarketingRoute } from "@/lib/marketing-route";
 
 type Locale = "he" | "en";
 
-type Copy = {
-  nav: Array<[string, string]>;
-  eyebrow: string;
-  title: React.ReactNode;
-  intro: string;
-  primary: string;
-  secondary: string;
-  access: string;
-  facts: string[];
-  manifesto: string;
-  manifestoText: string;
-  storyEyebrow: string;
-  storyTitle: string;
-  storyText: string[];
-  storyQuote: string;
-  chaptersTitle: string;
-  chaptersText: string;
-  chapters: Array<[string, string, string]>;
-  momentsTitle: string;
-  moments: Array<[string, string]>;
-  flowTitle: string;
-  flow: Array<[string, string]>;
-  privateEyebrow: string;
-  privateTitle: string;
-  privateText: string;
-  privatePoints: string[];
-  faqTitle: string;
-  faq: Array<[string, string]>;
-  finalTitle: string;
-  finalText: string;
-  resume: string;
-};
-
-const copy: Record<Locale, Copy> = {
+/**
+ * One screen of selling, one screen of proof, one form. The previous page ran
+ * nine sections deep and described content that had been deleted; this one is
+ * deliberately short, and everything factual on it — stop names, distance,
+ * photos — comes from the published route, so it cannot claim anything the
+ * product does not do.
+ */
+const copy = {
   he: {
-    nav: [["הסיפור", "#story"], ["המסע", "#chapters"], ["איך זה עובד", "#flow"], ["אירוע פרטי", "#private"]],
-    eyebrow: "מסע אורבני פרטי · נמל תל אביב",
-    title: <>הנמל זוכר.<br /><em>אתם באים לגלות?</em></>,
-    intro: "ערב אחד. שישה עוגנים אמיתיים בין הנמל לשפך הירקון — עגורן שנשאר, פסל שנהרס וחזר, מגדלור בריטי ושדה תעופה שנסגר. כל תשובה כתובה על שלט בשטח. TLV Quest הופך את הנמל לסיפור חי שהקבוצה שלכם היא הדמות הראשית בו.",
-    primary: "בקשת הזמנה",
-    secondary: "הצצה למסע",
-    access: "כבר קיבלתם קישור?",
-    facts: ["60–90 דקות", "2–30 משתתפים", "עברית / English", "ללא הורדת אפליקציה"],
-    manifesto: "זה לא סיור. זה לא חדר בריחה.",
-    manifestoText: "הרחובות הם התפאורה, הפרטים הם המנגנון, והטלפון רק פותח דלתות. רוב הזמן תסתכלו החוצה — לא למסך.",
-    storyEyebrow: "קו הירקון",
-    storyTitle: "המסר שהיה אמור להיפתח בעתיד נעלם.",
-    storyText: [
-      "נמל תל אביב נבנה ב-1936 בתוך שבועות, כי נמל יפו נסגר. מאז הוא הפסיק לפרוק מטענים, המגדלור כבה, ושדה התעופה שמעליו נסגר סופית ב-2019.",
-      "כל מה שנשאר מזה עומד עדיין בשטח, מסומן בשלטים שאיש לא עוצר לקרוא. המשחק מכריח אתכם לקרוא אותם — ולחבר בין המספרים שכתובים עליהם."
-    ],
-    storyQuote: "הנמל הוא המפה. האור הוא המצפן. הזמן הוא היריב.",
-    chaptersTitle: "שלושה פרקים. סיפור אחד שנפתח בתנועה.",
-    chaptersText: "כל תחנה משנה את הקצב: תצפית, פעולה בעולם האמיתי, רגע קבוצתי ופיסת סיפור שנשארת איתכם גם אחרי המשחק.",
-    chapters: [
-      ["01", "האות הראשון", "התחילו במקום שבו הים הפך לעיר. מצאו את השנה שממנה הכול יצא לדרך."],
-      ["02", "צל המנוף", "סרקו, התמקמו וצרו יחד תמונה שאפשר לראות נכון רק מזווית אחת."],
-      ["03", "האור האחרון", "עקבו אחרי קו האור אל המגדלור וחברו את המפתחות לפני שהחלון נסגר."]
-    ],
-    momentsTitle: "בנוי לרגעים שאי אפשר לייצר סביב שולחן",
-    moments: [
-      ["רמזים פיזיים", "שלטים, מבנים, קווי ראייה וסמלים שהופכים לחלק מממשק המשחק."],
-      ["משימות צוות", "לא רק לענות נכון — לזוז, לצלם, להתווכח ולבחור יחד."],
-      ["שכבת WhatsApp", "הודעות סיפור, רמזים ועדכונים מגיעים בדיוק ברגע הנכון."],
-      ["מרוץ חי", "התקדמות וניקוד בזמן אמת בלי לחשוף פתרונות או מיקומים מדויקים."],
-      ["מסלול דו־לשוני", "כל משתתף מקבל את החוויה בעברית או באנגלית."],
-      ["ללא מפעיל", "ההרשמה, חלוקת הקבוצות, התחנות, הרמזים והסיום עובדים אוטומטית."]
-    ],
-    flowTitle: "מהזמנה אחת לערב שמתנהל מעצמו",
-    flow: [
-      ["01", "פותחים הרצה פרטית ומקבלים קישור אישי למארגן."],
-      ["02", "משתפים קישור. כל משתתף נרשם ומקבל כניסה אישית למסע."],
-      ["03", "המערכת מחלקת לקבוצות, מחברת WhatsApp ומכינה את כולם לזינוק."],
-      ["04", "המשחק מתקדם אוטומטית; המארגן רואה חדר בקרה ולוח חי."],
-      ["05", "בסיום נפתחים התוצאות, הסיפור והגלריה לזמן מוגבל."]
-    ],
-    privateEyebrow: "Invitation only",
-    privateTitle: "הנמל מחכה לקבוצה שלכם.",
-    privateText: "הפיילוט נפתח בהרצות פרטיות נבחרות. ספרו לנו מי מגיע ומתי, ונבנה עבורכם פתיחה מדויקת — מזוג ועד אירוע צוות.",
-    privatePoints: ["הרצה פרטית", "מספר צוותים", "לוח חי", "התאמה לקבוצה", "עברית ואנגלית"],
-    faqTitle: "לפני ששולחים את האות",
-    faq: [
-      ["צריך להוריד אפליקציה?", "לא. החוויה נפתחת בדפדפן הנייד ומשתלבת עם WhatsApp."],
-      ["אפשר לשחק בזוג?", "כן. המשחק עובד מצוין לזוג, למשפחה ולקבוצות שמתחרות בכמה צוותים."],
-      ["האם צריך מפעיל?", "לא. המערכת מנהלת הרשמה, חלוקה, התחלה, רמזים, ניקוד וסיום. למארגן נשאר חדר בקרה למקרי חירום."],
-      ["מה קורה אם נתקעים?", "בכל תחנה אפשר לחשוף רמז מדורג. הוא שומר על הקצב ועשוי להפחית מעט מהניקוד."],
-      ["האם זה מתאים לילדים?", "החוויה מתאימה במיוחד לבני נוער, למשפחות עם ילדים גדולים ולקבוצות מבוגרים."],
-      ["מה עושים במזג אוויר בעייתי?", "לפני הרצה פרטית מתאמים חלון זמן ומדיניות דחייה בהתאם לתנאים בנמל."]
-    ],
-    finalTitle: "הסיפור כבר התחיל.",
-    finalText: "השאירו פרטים וקבלו הזמנה להרצה פרטית של TLV Quest.",
-    resume: "חזרה למסע"
+    langLink: "/?lang=en",
+    langLabel: "EN",
+    kicker: "משחק חקירה ברחובות נמל תל אביב",
+    titleA: "הנמל זוכר הכול.",
+    titleB: "בואו לגלות מה.",
+    lede: "קבוצה אחת, טלפון אחד, שעה וחצי בין העגורן, הפסל והמגדלור. חידות שהתשובות שלהן כתובות על העיר עצמה.",
+    cta: "צרו משחק חינם",
+    ctaSub: "בלי תשלום, בלי תיאום — הקישורים נוצרים מיד",
+    stopsLine: (n: number, km: string) =>
+      `${n} תחנות · ${km} ק״מ הליכה · כל תחנה אומתה בשטח`,
+    how: [
+      ["צרו משחק", "שם, מייל, וכמה אתם. זהו."],
+      ["שתפו קישור", "כל מי שמצטרף מקבל את החידות לטלפון."],
+      ["צאו לדרך", "ניקוד, רמזים ולוח תוצאות — הכול אוטומטי."]
+    ] as const,
+    freeBadge: "חינם · לזמן מוגבל",
+    freeNote: "עד שלושה משחקים לכל נרשם",
+    bigEvent: "מארגנים אירוע גדול או ערב חברה?",
+    bigEventCta: "דברו איתנו",
+    resume: "כבר באמצע משחק? המשיכו מכאן",
+    footer: "נוצר בתל אביב. משוחק בעולם האמיתי."
   },
   en: {
-    nav: [["The story", "#story"], ["The quest", "#chapters"], ["How it works", "#flow"], ["Private event", "#private"]],
-    eyebrow: "A private urban quest · Tel Aviv Port",
-    title: <>The port remembers.<br /><em>Will you uncover it?</em></>,
-    intro: "One evening. Six real anchors between the port and the Yarkon estuary — a crane that stayed, a statue destroyed and returned, a British lighthouse and an airfield that closed. Every answer is written on a sign in the field. TLV Quest turns the port into a living story with your team at its center.",
-    primary: "Request an invitation",
-    secondary: "Enter the story",
-    access: "Already received a link?",
-    facts: ["60–90 minutes", "2–30 participants", "Hebrew / English", "No app download"],
-    manifesto: "Not a tour. Not an escape room.",
-    manifestoText: "The waterfront is the set, overlooked details are the mechanism, and your phone only opens doors. Most of the time, you will be looking up — not down.",
-    storyEyebrow: "The Yarkon Line",
-    storyTitle: "The message meant for the future disappeared.",
-    storyText: [
-      "When the port was founded, a capsule was sealed with evidence, photographs and the key to an unfinished story. The waterfront changed and the route was forgotten.",
-      "Now a mysterious signal has brought the clues back. Connect the port that was, the port you see today and the details everyone else walks past."
-    ],
-    storyQuote: "The port is the map. Light is the compass. Time is the rival.",
-    chaptersTitle: "Three chapters. One story unlocked in motion.",
-    chaptersText: "Each checkpoint changes the rhythm: observation, a physical action, a team moment and another fragment of the mystery.",
-    chapters: [
-      ["01", "The first signal", "Begin where the sea became a city. Find the year that started everything."],
-      ["02", "The crane’s shadow", "Scan, position yourselves and create an image that only works from one angle."],
-      ["03", "The final light", "Follow the beam to the lighthouse and assemble the keys before the window closes."]
-    ],
-    momentsTitle: "Designed for moments a table cannot create",
-    moments: [
-      ["Physical clues", "Signs, structures, sight lines and symbols become part of the interface."],
-      ["Team missions", "Move, photograph, debate and decide together — not merely submit answers."],
-      ["WhatsApp layer", "Story beats, hints and updates arrive at exactly the right moment."],
-      ["Live race", "Realtime progress without revealing solutions or precise locations."],
-      ["Bilingual route", "Each participant experiences the quest in Hebrew or English."],
-      ["Autonomous operation", "Registration, teams, checkpoints, hints and finishing run automatically."]
-    ],
-    flowTitle: "From one invitation to a self-running night",
-    flow: [
-      ["01", "Open a private session and receive a secure organizer link."],
-      ["02", "Share one invitation. Every participant gets a personal entry to the quest."],
-      ["03", "The system balances teams, connects WhatsApp and prepares the start."],
-      ["04", "The quest advances automatically while the organizer sees a live control room."],
-      ["05", "Results, story and gallery unlock for a limited time after the finale."]
-    ],
-    privateEyebrow: "Invitation only",
-    privateTitle: "The port is waiting for your team.",
-    privateText: "The pilot is opening through selected private sessions. Tell us who is coming and when; we will shape the right opening for a couple, family or company team.",
-    privatePoints: ["Private session", "Multiple teams", "Live board", "Group adaptation", "Hebrew and English"],
-    faqTitle: "Before you send the signal",
-    faq: [
-      ["Do I need an app?", "No. The experience opens in the mobile browser and connects with WhatsApp."],
-      ["Can two people play?", "Yes. It works for a couple, a family or a larger group split into competing teams."],
-      ["Does it require an operator?", "No. Registration, team balancing, start, hints, scoring and finish are automated, with emergency controls for the organizer."],
-      ["What if we get stuck?", "Every checkpoint offers progressive hints that preserve the pace and may reduce the score slightly."],
-      ["Is it suitable for children?", "It is best for teenagers, families with older children and adult groups."],
-      ["What about bad weather?", "Private sessions include a coordinated time window and postponement policy based on port conditions."]
-    ],
-    finalTitle: "The story has already begun.",
-    finalText: "Leave your details to receive an invitation for a private TLV Quest session.",
-    resume: "Resume quest"
+    langLink: "/",
+    langLabel: "עב",
+    kicker: "A street investigation game at Tel Aviv Port",
+    titleA: "The port remembers everything.",
+    titleB: "Come find out what.",
+    lede: "One team, one phone, ninety minutes between the crane, the statue and the lighthouse. Riddles whose answers are written on the city itself.",
+    cta: "Create a free game",
+    ctaSub: "No payment, no scheduling — links are generated instantly",
+    stopsLine: (n: number, km: string) =>
+      `${n} stops · ${km} km on foot · every stop verified in the field`,
+    how: [
+      ["Create a game", "Name, email, group size. That's it."],
+      ["Share a link", "Everyone who joins gets the riddles on their phone."],
+      ["Head out", "Scoring, hints and a live leaderboard — all automatic."]
+    ] as const,
+    freeBadge: "Free · limited time",
+    freeNote: "Up to three games per person",
+    bigEvent: "Planning a company evening or a big event?",
+    bigEventCta: "Talk to us",
+    resume: "Mid-game already? Continue here",
+    footer: "Created in Tel Aviv. Played in the real world."
   }
-};
+} as const;
 
 export function MarketingHome({
   locale,
@@ -168,149 +70,90 @@ export function MarketingHome({
 }) {
   const c = copy[locale];
   const rtl = locale === "he";
+  const photoStops = (route?.stops ?? []).filter((stop) => stop.photo);
 
   return (
-    <main className="marketing-page" dir={rtl ? "rtl" : "ltr"}>
-      <header className="marketing-nav">
-        <Link className="marketing-logo" href={rtl ? "/" : "/?lang=en"}>
-          <img src="/visuals/quest-mark.svg" alt="" width="42" height="42" />
-          <span><b>TLV QUEST</b><small>THE PORT REMEMBERS</small></span>
-        </Link>
-        <nav>{c.nav.map(([label, href]) => <a key={href} href={href}>{label}</a>)}</nav>
-        <div className="marketing-nav-actions">
-          <Link className="language-switch" href={rtl ? "/?lang=en" : "/"}>{rtl ? "EN" : "עברית"}</Link>
-          <a className="button marketing-button" href="#private">{c.primary}</a>
-        </div>
-      </header>
+    <main className="mk" dir={rtl ? "rtl" : "ltr"}>
+      <section
+        className="mk-hero"
+        style={
+          route?.heroPhoto
+            ? { backgroundImage: `url(${route.heroPhoto})` }
+            : undefined
+        }
+      >
+        <header className="mk-top">
+          <span className="mk-logo">TLV QUEST</span>
+          <Link className="mk-lang" href={c.langLink}>
+            {c.langLabel}
+          </Link>
+        </header>
 
-      <section className="marketing-hero">
-        <div className="marketing-hero-visual" aria-hidden="true"><img src="/visuals/harbor-hero.svg" alt="" /></div>
-        <div className="marketing-hero-vignette" />
-        <div className="marketing-hero-copy">
-          <span className="marketing-eyebrow"><i />{c.eyebrow}</span>
-          <h1>{c.title}</h1>
-          <p>{c.intro}</p>
-          <div className="marketing-actions">
-            <a className="button marketing-button" href="#private">{c.primary}</a>
-            <a className="button marketing-button-secondary" href="#story">{c.secondary}</a>
-          </div>
-          <Link className="marketing-access-link" href="/resume">{c.access} <strong>{c.resume} ↗</strong></Link>
-          <div className="marketing-facts">{c.facts.map((fact) => <span key={fact}>{fact}</span>)}</div>
-        </div>
-        <div className="hero-coordinate" aria-hidden="true"><span>32.0969° N</span><span>34.7748° E</span></div>
-      </section>
-
-      <section className="marketing-manifesto">
-        <span>TLV / 1936 / NOW</span>
-        <h2>{c.manifesto}</h2>
-        <p>{c.manifestoText}</p>
-      </section>
-
-      <section className="marketing-story" id="story">
-        <div className="marketing-story-art"><img src="/visuals/capsule-1936.svg" alt={rtl ? "קפסולת הזמן 1936" : "The 1936 time capsule"} /><span>ARCHIVE OBJECT / 01</span></div>
-        <div className="marketing-story-copy">
-          <span className="marketing-eyebrow"><i />{c.storyEyebrow}</span>
-          <h2>{c.storyTitle}</h2>
-          {c.storyText.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-          <blockquote>{c.storyQuote}</blockquote>
+        <div className="mk-hero-copy">
+          <span className="mk-kicker">{c.kicker}</span>
+          <h1>
+            {c.titleA}
+            <br />
+            <em>{c.titleB}</em>
+          </h1>
+          <p>{c.lede}</p>
+          <a className="mk-cta" href="#book">
+            {c.cta}
+          </a>
+          <span className="mk-cta-sub">{c.ctaSub}</span>
+          {route && (
+            <span className="mk-facts">
+              {c.stopsLine(
+                route.stops.length,
+                (route.metres / 1000).toFixed(1)
+              )}
+            </span>
+          )}
         </div>
       </section>
 
-      {route && route.stops.length > 0 && (
-        <section className="marketing-route" id="route">
-          <div className="marketing-heading">
-            <span>THE ROUTE</span>
-            <h2>{rtl ? route.title.he ?? "" : route.title.en ?? route.title.he ?? ""}</h2>
-            <p>
-              {rtl
-                ? `${route.stops.length} תחנות · ${(route.metres / 1000).toFixed(1)} ק״מ · כל תחנה אומתה בשטח`
-                : `${route.stops.length} stops · ${(route.metres / 1000).toFixed(1)} km · every stop verified on foot`}
-            </p>
-          </div>
-          <div className="marketing-route-track">
-            {route.stops.map((stop, index) => (
-              <article key={stop.slug}>
-                {stop.photo ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={stop.photo} alt={stop.name} loading="lazy" />
-                ) : (
-                  <div className="marketing-route-blank" aria-hidden="true" />
-                )}
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <h3>{stop.name}</h3>
-              </article>
-            ))}
-          </div>
+      {photoStops.length > 0 && (
+        <section className="mk-strip" aria-label={rtl ? "תחנות" : "Stops"}>
+          {photoStops.map((stop) => (
+            <figure key={stop.slug}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={stop.photo ?? ""} alt={stop.name} loading="lazy" />
+              <figcaption>{stop.name}</figcaption>
+            </figure>
+          ))}
         </section>
       )}
 
-      <section className="marketing-chapters" id="chapters">
-        <div className="marketing-heading"><span>THE ROUTE</span><h2>{c.chaptersTitle}</h2><p>{c.chaptersText}</p></div>
-        <div className="chapter-track">
-          {c.chapters.map(([number, title, text], index) => (
-            <article key={number}>
-              <div className="chapter-number">{number}</div>
-              <div className={`chapter-icon chapter-icon-${index + 1}`} aria-hidden="true" />
-              <h3>{title}</h3><p>{text}</p>
-            </article>
-          ))}
+      <section className="mk-how">
+        {c.how.map(([title, text], index) => (
+          <div key={title}>
+            <span>{index + 1}</span>
+            <h3>{title}</h3>
+            <p>{text}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="mk-book" id="book">
+        <div className="mk-book-head">
+          <span className="mk-badge">{c.freeBadge}</span>
+          <h2>{c.cta}</h2>
+          <p>{c.freeNote}</p>
         </div>
-      </section>
-
-      <section className="marketing-moments">
-        <div className="marketing-heading"><span>THE EXPERIENCE</span><h2>{c.momentsTitle}</h2></div>
-        <div className="moment-grid">{c.moments.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
-      </section>
-
-      <section className="marketing-flow" id="flow">
-        <div className="marketing-flow-copy"><span className="marketing-eyebrow"><i />SYSTEM FLOW</span><h2>{c.flowTitle}</h2></div>
-        <div className="marketing-flow-steps">{c.flow.map(([number, text]) => <div key={number}><strong>{number}</strong><p>{text}</p></div>)}</div>
-      </section>
-
-      <section className="marketing-private" id="private">
-        <div className="marketing-private-copy">
-          <span className="marketing-eyebrow"><i />{c.privateEyebrow}</span>
-          <h2>{c.privateTitle}</h2>
-          <p>{c.privateText}</p>
-          <div className="marketing-private-points">{c.privatePoints.map((point) => <span key={point}>{point}</span>)}</div>
-          <div className="private-seal" aria-hidden="true"><img src="/visuals/quest-mark.svg" alt="" /><span>PRIVATE<br />SESSION</span></div>
-        </div>
-        <div className="marketing-private-forms">
-          {route && (
-            <div className="marketing-free-slot">
-              <span className="marketing-free-badge">
-                {rtl ? "חינם · לזמן מוגבל" : "Free · limited time"}
-              </span>
-              <h3>{rtl ? "צרו משחק עכשיו, בלי לחכות לנו" : "Create a game now, without waiting for us"}</h3>
-              <p>
-                {rtl
-                  ? "עד שלושה משחקים חינם לכל אדם. הקישורים נוצרים מיד."
-                  : "Up to three free games per person. Links are generated immediately."}
-              </p>
-              <FreeBookingForm locale={locale} templateSlug={route.slug} />
-            </div>
-          )}
+        {route && <FreeBookingForm locale={locale} templateSlug={route.slug} />}
+        <details className="mk-lead">
+          <summary>
+            {c.bigEvent} <strong>{c.bigEventCta}</strong>
+          </summary>
           <LeadCaptureForm locale={locale} />
-        </div>
+        </details>
       </section>
 
-      <section className="marketing-faq">
-        <div className="marketing-heading"><span>FIELD NOTES</span><h2>{c.faqTitle}</h2></div>
-        <div>{c.faq.map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
-      </section>
-
-      <section className="marketing-final">
-        <img src="/visuals/quest-mark.svg" alt="" width="70" height="70" />
-        <h2>{c.finalTitle}</h2><p>{c.finalText}</p>
-        <a className="button marketing-button" href="#private">{c.primary}</a>
-      </section>
-
-      <footer className="marketing-footer">
-        <div className="marketing-logo"><img src="/visuals/quest-mark.svg" alt="" width="38" height="38" /><span><b>TLV QUEST</b><small>THE PORT REMEMBERS</small></span></div>
-        <p>{rtl ? "נוצר בתל אביב. משוחק בעולם האמיתי." : "Created in Tel Aviv. Played in the real world."}</p>
-        <small>© 2026 TLV Quest · Private pilot</small>
+      <footer className="mk-footer">
+        <Link href="/resume">{c.resume} ↗</Link>
+        <p>{c.footer}</p>
+        <small>© 2026 TLV Quest</small>
       </footer>
-      <a className="marketing-sticky-cta" href="#private">{c.primary}</a>
     </main>
   );
 }
