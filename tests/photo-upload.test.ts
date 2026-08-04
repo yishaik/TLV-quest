@@ -141,3 +141,31 @@ describe("direct participant photo uploads", () => {
     expect(migration).toContain("expected_size <= 10485760");
   });
 });
+
+describe("player photo intake", () => {
+  const player = readFileSync("components/PremiumQuestPlayer.tsx", "utf8");
+
+  it("re-encodes before upload so HEIC and oversized photos survive", () => {
+    // All three first real runs show zero upload intents: phone photos were
+    // rejected client-side (HEIC / >10 MB) before any request, which played as
+    // "the photo button just doesn't work" and forced organizer skips.
+    expect(player).toContain("downscaleImage(photo)");
+    const shrink = player.indexOf("downscaleImage(photo)");
+    const upload = player.indexOf("uploadParticipantPhoto({");
+    expect(shrink).toBeGreaterThan(-1);
+    expect(shrink).toBeLessThan(upload);
+    expect(player).toContain("file: prepared");
+  });
+
+  it("lets players pick from the library, not only the camera", () => {
+    expect(player).not.toContain('capture="environment"');
+    expect(player).toContain('accept="image/*"');
+  });
+
+  it("keys idempotency off the prepared file, so a retry reuses the key", () => {
+    const scope = player.indexOf("idempotencyPhotoScope(");
+    const preparedArg = player.indexOf("prepared\n    );", scope);
+    expect(scope).toBeGreaterThan(-1);
+    expect(preparedArg).toBeGreaterThan(scope);
+  });
+});

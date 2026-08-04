@@ -8,6 +8,7 @@ import {
   idempotencyPhotoScope
 } from "@/lib/idempotency-client";
 import { uploadParticipantPhoto } from "@/lib/photo-upload-client";
+import { downscaleImage } from "@/lib/image-downscale";
 import {
   announcePhotoApproved,
   announcePhotoRetry
@@ -390,9 +391,20 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
     if (!photo) return;
     const checkpointSlug = state?.checkpoint?.slug;
     if (!checkpointSlug) return;
+    // Re-encode before anything else. Phones hand over HEIC and 10 MB
+    // originals; both used to be rejected client-side before a single request
+    // was made, which played as "the photo button just doesn't work". Observed
+    // in all three first real runs: zero upload intents, hints requested at
+    // the photo stop, organizer skips to get past it.
+    let prepared: File;
+    try {
+      ({ file: prepared } = await downscaleImage(photo));
+    } catch {
+      prepared = photo;
+    }
     const actionScope = idempotencyPhotoScope(
       `${token}:${checkpointSlug}`,
-      photo
+      prepared
     );
     const idempotencyKey = idempotencyKeys.acquire(
       actionScope,
@@ -404,7 +416,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
     try {
       const result = await uploadParticipantPhoto({
         token,
-        file: photo,
+        file: prepared,
         locale: language,
         idempotencyKey
       });
@@ -648,8 +660,7 @@ export function PremiumQuestPlayer({ token }: { token: string }) {
               <label className="photo-drop">
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  capture="environment"
+                  accept="image/*"
                   onClick={() =>
                     announcePhotoRetry(state.checkpoint!.slug)
                   }
