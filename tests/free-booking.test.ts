@@ -107,8 +107,12 @@ describe("marketing page reflects live content", () => {
     expect(reader).toContain("catch(() => null)");
   });
 
-  it("shows real field photos when a station has them", () => {
-    expect(reader).toContain("galleryEntries");
+  it("shows only curated hero photos, never the raw gallery", () => {
+    // The gallery is a working archive — signage shots for authoring,
+    // calibration rejects. The hero column is the one curated slot, so it is
+    // the only thing the marketing page is allowed to read.
+    expect(reader).toContain("hero_image_url");
+    expect(reader).not.toContain("galleryEntries");
     expect(home).toContain("stop.photo");
   });
 

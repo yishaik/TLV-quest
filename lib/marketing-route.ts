@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { galleryEntries } from "@/lib/station-gallery";
 
 export type MarketingStop = {
   slug: string;
@@ -15,6 +14,8 @@ export type MarketingRoute = {
   title: { he?: string; en?: string };
   stops: MarketingStop[];
   metres: number;
+  /** The single strongest photo, for the hero backdrop. */
+  heroPhoto: string | null;
 };
 
 const metresBetween = (
@@ -74,7 +75,7 @@ const readRoute = async (): Promise<MarketingRoute | null> => {
     .filter((id): id is string => Boolean(id));
   const { data: stations } = await supabase
     .from("content_stations")
-    .select("id,title,gallery")
+    .select("id,title,gallery,hero_image_url")
     .in("id", stationIds.length > 0 ? stationIds : ["00000000-0000-0000-0000-000000000000"]);
 
   const byId = new Map((stations ?? []).map((station) => [station.id, station]));
@@ -96,10 +97,24 @@ const readRoute = async (): Promise<MarketingRoute | null> => {
     }
   }
 
+  // Walk in stop order, not query order: the first stop is the route's front
+  // door, so its photo fronts the page.
+  const heroPhoto =
+    checkpoints
+      .map((checkpoint) =>
+        checkpoint.source_station_id
+          ? ((byId.get(checkpoint.source_station_id)?.hero_image_url as
+              | string
+              | undefined) ?? null)
+          : null
+      )
+      .find(Boolean) ?? null;
+
   return {
     slug: template.slug,
     title: (template.title ?? {}) as { he?: string; en?: string },
     metres: Math.round(metres),
+    heroPhoto,
     stops: checkpoints.map((checkpoint) => {
       const station = checkpoint.source_station_id
         ? byId.get(checkpoint.source_station_id)
@@ -115,7 +130,9 @@ const readRoute = async (): Promise<MarketingRoute | null> => {
           stationTitle.en ||
           checkpoint.slug,
         kind: checkpoint.kind as string,
-        photo: galleryEntries(station?.gallery)[0]?.url ?? null
+        photo:
+          (station?.hero_image_url as string | undefined) ??
+          null
       };
     })
   };

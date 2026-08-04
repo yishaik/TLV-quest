@@ -488,19 +488,22 @@ test("an approved photo retry removes the fallback affordance immediately", asyn
   ).toHaveCount(0);
 });
 
-test("landing page presents the cinematic quest in Hebrew and English", async ({ page }) => {
+test("landing page sells the quest in Hebrew and English", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: /הנמל זוכר.*אתם באים לגלות/ })
+    page.getByRole("heading", { name: /הנמל זוכר הכול/ })
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "בקשת הזמנה" }).first()).toBeVisible();
-  await expect(page.getByText("זה לא סיור. זה לא חדר בריחה.")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "צרו משחק חינם" })
+  ).toBeVisible();
 
   await page.getByRole("link", { name: "EN" }).click();
   await expect(
-    page.getByRole("heading", { name: /The port remembers.*Will you uncover it/ })
+    page.getByRole("heading", { name: /The port remembers everything/ })
   ).toBeVisible();
-  await expect(page.getByText("Not a tour. Not an escape room.")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Create a free game" })
+  ).toBeVisible();
 });
 
 test("join page exposes guided bilingual registration and privacy consent", async ({ page }) => {
