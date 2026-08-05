@@ -73,6 +73,13 @@ export const runMaintenanceWorker = async () => {
   );
 
   try {
+    // Before anything else: close runs nobody is coming back to. Without this
+    // an abandoned booking counts against the tenant's active-run quota
+    // forever, and twenty of them block every new game in the system.
+    const { data: expiredRuns, error: expireError } = await createAdminClient()
+      .rpc("expire_stale_runs");
+    if (expireError) throw expireError;
+
     const starts = await startDueRuns();
     const hints = await sendDueHints();
     const outbox = await processOutbox(30);
@@ -96,6 +103,7 @@ export const runMaintenanceWorker = async () => {
     });
 
     return {
+      expired: expiredRuns,
       starts,
       hints,
       outbox: {
