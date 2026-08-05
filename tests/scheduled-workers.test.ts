@@ -85,3 +85,44 @@ describe("worker request authorization", () => {
     expect(workerAuth).toContain("if (!token) return false;");
   });
 });
+
+describe("stale run expiry", () => {
+  const migration = readFileSync(
+    "supabase/migrations/20260805090000_expire_stale_runs.sql",
+    "utf8"
+  );
+  const maintenance = readFileSync("lib/maintenance.ts", "utf8");
+
+  it("closes any run still open seven hours after creation", () => {
+    // Abandoned bookings otherwise sit in registration_open forever —
+    // retention is only stamped on finish — and count against the tenant's
+    // active-run quota until every new game in the system is refused.
+    expect(migration).toContain("interval '7 hours'");
+    expect(migration).toContain("'draft','registration_open','ready'");
+    expect(migration).toContain("'active','paused'");
+  });
+
+  it("cancels the never-started and finishes the started", () => {
+    // A started run keeps its scores and flows through recap and metrics like
+    // any completed game; a never-started one has nothing worth keeping.
+    const cancel = migration.indexOf("status = 'cancelled'");
+    const finish = migration.indexOf("status = 'finished'");
+    expect(cancel).toBeGreaterThan(-1);
+    expect(finish).toBeGreaterThan(cancel);
+    expect(migration).toContain("retention_until = coalesce");
+  });
+
+  it("runs from the maintenance worker before anything else", () => {
+    const expire = maintenance.indexOf('rpc("expire_stale_runs")');
+    const starts = maintenance.indexOf("startDueRuns()");
+    expect(expire).toBeGreaterThan(-1);
+    expect(expire).toBeLessThan(starts);
+  });
+
+  it("is service-role only", () => {
+    expect(migration).toContain(
+      "revoke all on function public.expire_stale_runs"
+    );
+    expect(migration).toContain("to service_role");
+  });
+});

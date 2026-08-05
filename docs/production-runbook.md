@@ -62,9 +62,10 @@ Both workers are driven by pg_cron inside Supabase. Full detail in
 > plan-limited. Manual invocation uses `WORKER_SECRET`; the schedule uses a
 > single-use token minted in Postgres.
 
-The maintenance worker stages are: start due runs, send due hints, drain 30
-outbox messages, clean up abandoned photo uploads, clean up rate-limit
-buckets, and purge expired runs. **Storage objects are deleted before the
+The maintenance worker stages are: expire stale runs (a run still open seven
+hours after creation is cancelled if it never started, finished if it did),
+start due runs, send due hints, drain 30 outbox messages, clean up abandoned
+photo uploads, clean up rate-limit buckets, and purge expired runs. **Storage objects are deleted before the
 database rows**, so a failure mid-purge leaves orphaned rows rather than
 orphaned media.
 

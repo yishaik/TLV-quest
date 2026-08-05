@@ -24,9 +24,11 @@ default; upgrade only when something cannot be built without it.
 
 ## What the maintenance worker does
 
-`runMaintenanceWorker()` — starts due runs, sends due hints, drains 30 outbox
-messages, cleans up abandoned photo uploads and rate-limit buckets, and runs
-the retention purge. Until it was scheduled, none of that happened unless
+`runMaintenanceWorker()` — expires stale runs (any run still open seven hours
+after creation is cancelled or finished, so abandoned bookings cannot pile up
+against the tenant's active-run quota), starts due runs, sends due hints,
+drains 30 outbox messages, cleans up abandoned photo uploads and rate-limit
+buckets, and runs the retention purge. Until it was scheduled, none of that happened unless
 somebody called the endpoint by hand. Retention in particular is a privacy
 commitment, not a nicety.
 
