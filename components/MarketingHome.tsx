@@ -11,100 +11,130 @@ const copy = {
     langLabel: "EN",
     navLabel: "ניווט בעמוד",
     nav: [
-      ["#city", "פרק 1", "העיר"],
-      ["#play", "פרק 2", "המשחק"],
-      ["#route", "פרק 3", "המסלול"]
+      ["#model", "01", "הרעיון"],
+      ["#work", "02", "המשחק"],
+      ["#terms", "03", "המסלול"],
+      ["#questions", "04", "שאלות"]
     ] as const,
+    apply: "צרו משחק ←",
     resume: "המשך משחק",
-    kicker: "משחק חקירה עצמאי בנמל תל אביב",
-    titleA: "תל אביב",
-    titleB: "משאירה רמזים.",
-    lede:
-      "אתם מביאים את האנשים. העיר מספקת את הסיפור. TLV Quest הופך רחובות, פסלים ומבנים למשחק חי שמתקדם דרך הטלפון.",
-    cta: "צרו משחק חינם",
-    ctaSub: "בלי תשלום ובלי תיאום. קישור המשחק נוצר מיד.",
-    scroll: "גלו איך זה עובד",
-    heroTag: "הנמל / תל אביב / עכשיו",
-    cityEyebrow: "פרק 1 — העיר",
-    cityTitle: "לוח המשחק כבר בנוי.",
-    cityBody:
-      "לא צריך תפאורה, מפעיל או אפליקציה להורדה. כל פרט בסביבה יכול להפוך לרמז, וכל תחנה דוחפת את הקבוצה עמוק יותר לתוך הסיפור.",
-    factStops: "תחנות במסלול",
-    factDistance: "ק״מ הליכה",
-    factField: "אימות בשטח",
-    factFieldValue: "כל תחנה",
-    playEyebrow: "פרק 2 — המשחק",
-    playTitle: "שלושה צעדים. אפס תפעול.",
-    how: [
-      ["יוצרים משחק", "בוחרים גודל קבוצה ומספר תחנות. הקישורים נוצרים מיד."],
-      ["משתפים את המשתתפים", "כל אחד מצטרף מהטלפון. אין התקנה ואין חשבון חדש."],
-      ["יוצאים לחקור", "חידות, רמזים, ניקוד ולוח תוצאות מתקדמים אוטומטית."]
+    heroKicker: "משחק רחוב עצמאי · נמל תל אביב",
+    heroA: "העיר היתה כאן",
+    heroB: "כל הזמן.",
+    heroSub: "פשוט עוד לא שיחקתם בה.",
+    heroBody:
+      "TLV Quest הופך רחובות, מבנים ופרטים אמיתיים למשחק חקירה חי שמתקדם דרך הטלפון.",
+    heroCta: "צרו משחק חינם",
+    heroAside: "בלי אפליקציה. בלי מפעיל. בלי תיאום.",
+    revealLabel: "העיר / נחשפת",
+    manifesto: ["מוצאים את הרמז.", "פותרים את העיר.", "מתקדמים יחד."],
+    manifestoBody:
+      "קבוצה אחת, טלפון אחד ומסלול שהעיר עצמה כתבה. כל תחנה דורשת להסתכל אחרת על המקום שבו אתם כבר עומדים.",
+    modelKicker: "פרק 01 · הרעיון",
+    modelTitle: "הרחוב הוא הממשק.",
+    modelBody:
+      "אין תפאורה ואין מסכים שמחליפים את העולם האמיתי. המשחק משתמש במה שכבר נמצא סביבכם: כתובות, פסלים, מבנים, קווי חוף וסיפורים מקומיים.",
+    stops: "תחנות",
+    distance: "ק״מ",
+    verified: "מאומת בשטח",
+    verifiedValue: "הכול",
+    workKicker: "פרק 02 · המשחק",
+    workTitle: "כל מה שצריך כדי לצאת לדרך, במערכת אחת.",
+    workItems: [
+      ["יוצרים", "שם, אימייל, גודל קבוצה ומספר תחנות. קישורי המשחק נוצרים מיד."],
+      ["משתפים", "המשתתפים נכנסים מהטלפון. אין הורדה, הרשמה או הכנה מוקדמת."],
+      ["משחקים", "חידות, רמזים, ניקוד ולוח תוצאות מתקדמים אוטומטית." ]
     ] as const,
-    routeEyebrow: "פרק 3 — המסלול",
-    routeTitle: "הסיפור כתוב על העיר עצמה.",
-    routeBody:
-      "התחנות אינן רק רקע לתמונה. צריך להתבונן, להתקרב ולחבר בין פרטים אמיתיים כדי להתקדם.",
-    routeFallback: "תמונות המסלול יופיעו כאן לאחר פרסום התחנות.",
-    bookEyebrow: "התחילו עכשיו",
-    bookTitle: "העיר מחכה לקבוצה שלכם.",
-    bookBody:
-      "צרו משחק עצמאי בנמל תל אביב וקבלו מיד קישור הצטרפות, קישור ניהול ולוח תוצאות חי.",
+    zero: "0",
+    zeroLabel: "מפעילים שצריך להזמין",
+    termsKicker: "פרק 03 · המסלול",
+    termsTitle: "לא רק לראות את תל אביב. לקרוא אותה.",
+    termsBody:
+      "המסלול בנוי מפרטים אמיתיים שנבדקו בשטח. התשובות אינן בתוך האפליקציה — הן מחכות ברחוב.",
+    routeFallback: "תמונות המסלול יוצגו לאחר פרסום התחנות.",
+    termsFacts: ["משחק עצמאי", "עד 30 משתתפים", "כ־90 דקות", "טלפון אחד לכל צוות"] as const,
+    questionsKicker: "פרק 04 · שאלות",
+    questionsTitle: "נשאל לפני שמתחילים.",
+    faq: [
+      ["צריך להוריד אפליקציה?", "לא. המשחק פועל בדפדפן ונפתח מקישור רגיל."],
+      ["צריך לתאם שעה מראש?", "לא. יוצרים משחק ומקבלים את הקישורים מיד."],
+      ["כמה אנשים יכולים לשחק?", "המשחק העצמאי מתאים לקבוצות של עד 30 משתתפים."],
+      ["מה קורה אם נתקעים?", "בכל תחנה קיימים רמזים, והמערכת ממשיכה לנהל ניקוד והתקדמות." ]
+    ] as const,
+    applicationKicker: "הבקשה",
+    applicationTitle: "ספרו לנו מי יוצא לחפש.",
+    applicationBody:
+      "צרו משחק חינם וקבלו מיד קישור למשתתפים, קישור ניהול ולוח תוצאות חי.",
     freeBadge: "חינם · לזמן מוגבל",
     freeNote: "עד שלושה משחקים לכל נרשם",
-    bigEvent: "מארגנים יום הולדת, ערב חברה או אירוע גדול?",
-    bigEventCta: "בנו לנו משחק מותאם",
-    footerLine: "נוצר בתל אביב. משוחק בעולם האמיתי.",
-    mobileCta: "צרו משחק"
+    bigEvent: "אירוע גדול, יום הולדת או ערב חברה?",
+    bigEventCta: "בקשת משחק מותאם",
+    footer: "TLV QUEST · נוצר בתל אביב · משוחק בעולם האמיתי"
   },
   en: {
     langLink: "/",
     langLabel: "עב",
     navLabel: "Page navigation",
     nav: [
-      ["#city", "Ch. 1", "The city"],
-      ["#play", "Ch. 2", "The game"],
-      ["#route", "Ch. 3", "The route"]
+      ["#model", "01", "The model"],
+      ["#work", "02", "The game"],
+      ["#terms", "03", "The route"],
+      ["#questions", "04", "Questions"]
     ] as const,
+    apply: "Create a game →",
     resume: "Resume game",
-    kicker: "A self-guided investigation at Tel Aviv Port",
-    titleA: "Tel Aviv",
-    titleB: "leaves clues.",
-    lede:
-      "You bring the people. The city provides the story. TLV Quest turns streets, sculptures and buildings into a live game that runs through your phone.",
-    cta: "Create a free game",
-    ctaSub: "No payment and no scheduling. Your game links appear instantly.",
-    scroll: "See how it works",
-    heroTag: "The port / Tel Aviv / Now",
-    cityEyebrow: "Chapter 1 — The city",
-    cityTitle: "The game board already exists.",
-    cityBody:
-      "No scenery, host or download required. Every detail in the environment can become a clue, and every stop pulls the team further into the story.",
-    factStops: "Stops on the route",
-    factDistance: "Kilometres on foot",
-    factField: "Field verification",
-    factFieldValue: "Every stop",
-    playEyebrow: "Chapter 2 — The game",
-    playTitle: "Three steps. Zero operations.",
-    how: [
-      ["Create the game", "Choose group size and route length. The links are generated immediately."],
-      ["Share with the players", "Everyone joins on their phone. No installation and no new account."],
-      ["Go investigate", "Riddles, hints, scoring and the live leaderboard advance automatically."]
+    heroKicker: "A self-guided street game · Tel Aviv Port",
+    heroA: "The city was here",
+    heroB: "all along.",
+    heroSub: "You just had not played it yet.",
+    heroBody:
+      "TLV Quest turns streets, buildings and real-world details into a live investigation that runs through your phone.",
+    heroCta: "Create a free game",
+    heroAside: "No app. No host. No scheduling.",
+    revealLabel: "The city / revealed",
+    manifesto: ["Find the clue.", "Solve the city.", "Move together."],
+    manifestoBody:
+      "One team, one phone and a route written by the city itself. Every stop asks you to see the place you are already standing in differently.",
+    modelKicker: "Chapter 01 · The model",
+    modelTitle: "The street is the interface.",
+    modelBody:
+      "There is no scenery and no screen replacing the real world. The game uses what is already around you: signs, sculptures, buildings, coastline and local stories.",
+    stops: "Stops",
+    distance: "KM",
+    verified: "Field verified",
+    verifiedValue: "All of it",
+    workKicker: "Chapter 02 · The game",
+    workTitle: "Everything needed to head out, in one system.",
+    workItems: [
+      ["Create", "Name, email, group size and route length. The game links appear immediately."],
+      ["Share", "Players join from their phones. No download, account or advance setup."],
+      ["Play", "Riddles, hints, scoring and the live leaderboard advance automatically."]
     ] as const,
-    routeEyebrow: "Chapter 3 — The route",
-    routeTitle: "The story is written on the city itself.",
-    routeBody:
-      "The stops are not photo backdrops. Players must look closer, move around and connect real details to advance.",
-    routeFallback: "Route photography will appear here when stops are published.",
-    bookEyebrow: "Start now",
-    bookTitle: "The city is waiting for your team.",
-    bookBody:
-      "Create a self-guided Tel Aviv Port game and instantly receive a participant link, management link and live leaderboard.",
+    zero: "0",
+    zeroLabel: "Hosts you need to book",
+    termsKicker: "Chapter 03 · The route",
+    termsTitle: "Do not just see Tel Aviv. Read it.",
+    termsBody:
+      "The route is built from real details verified in the field. The answers are not inside the app — they are waiting in the street.",
+    routeFallback: "Route photography will appear after stops are published.",
+    termsFacts: ["Self-guided", "Up to 30 players", "About 90 minutes", "One phone per team"] as const,
+    questionsKicker: "Chapter 04 · Questions",
+    questionsTitle: "Asked before you begin.",
+    faq: [
+      ["Do we need to install an app?", "No. The game runs in the browser and opens from a normal link."],
+      ["Do we need to schedule a time?", "No. Create a game and receive the links immediately."],
+      ["How many people can play?", "The self-guided game supports groups of up to 30 participants."],
+      ["What happens if we get stuck?", "Hints are available at every stop, while the system keeps scoring and progress running."]
+    ] as const,
+    applicationKicker: "The application",
+    applicationTitle: "Tell us who is going looking.",
+    applicationBody:
+      "Create a free game and instantly receive a participant link, management link and live leaderboard.",
     freeBadge: "Free · limited time",
     freeNote: "Up to three games per person",
-    bigEvent: "Planning a birthday, company evening or larger event?",
-    bigEventCta: "Build us a custom quest",
-    footerLine: "Created in Tel Aviv. Played in the real world.",
-    mobileCta: "Create game"
+    bigEvent: "A larger event, birthday or company evening?",
+    bigEventCta: "Request a custom quest",
+    footer: "TLV QUEST · CREATED IN TEL AVIV · PLAYED IN THE REAL WORLD"
   }
 } as const;
 
@@ -117,155 +147,194 @@ export function MarketingHome({
 }) {
   const c = copy[locale];
   const rtl = locale === "he";
-  const photoStops = (route?.stops ?? []).filter((stop) => stop.photo).slice(0, 6);
+  const photoStops = (route?.stops ?? []).filter((stop) => stop.photo);
+  const coverPhoto = route?.heroPhoto ?? photoStops[0]?.photo ?? null;
+  const secondaryPhoto = photoStops[1]?.photo ?? photoStops[0]?.photo ?? null;
   const distance = route ? (route.metres / 1000).toFixed(1) : "—";
 
   return (
-    <main className="mk" dir={rtl ? "rtl" : "ltr"}>
-      <header className="mk-topbar">
-        <a className="mk-logo" href="#top" aria-label="TLV Quest">
-          <span>TLV</span> QUEST
+    <main className="pq" dir={rtl ? "rtl" : "ltr"}>
+      <header className="pq-header">
+        <a className="pq-logo" href="#top" aria-label="TLV Quest home">
+          TLV<span>Q</span>
         </a>
 
-        <nav className="mk-nav" aria-label={c.navLabel}>
-          {c.nav.map(([href, chapter, label]) => (
+        <nav className="pq-nav" aria-label={c.navLabel}>
+          {c.nav.map(([href, number, label]) => (
             <a key={href} href={href}>
-              <small>{chapter}</small>
+              <small>{number}</small>
               <span>{label}</span>
             </a>
           ))}
         </nav>
 
-        <div className="mk-top-actions">
-          <Link className="mk-resume" href="/resume">
-            {c.resume} ↗
-          </Link>
-          <Link className="mk-lang" href={c.langLink}>
-            {c.langLabel}
-          </Link>
+        <div className="pq-header-actions">
+          <Link href="/resume">{c.resume}</Link>
+          <Link href={c.langLink}>{c.langLabel}</Link>
+          <a className="pq-apply-link" href="#apply">{c.apply}</a>
         </div>
       </header>
 
-      <section className="mk-hero" id="top">
-        <div className="mk-hero-copy">
-          <p className="mk-kicker">{c.kicker}</p>
+      <section className="pq-hero" id="top">
+        <div className="pq-hero-topline">
+          <span>{c.heroKicker}</span>
+          <span>32°05′N / 34°46′E</span>
+        </div>
+
+        <div className="pq-hero-title">
           <h1>
-            <span>{c.titleA}</span>
-            <strong>{c.titleB}</strong>
+            <span>{c.heroA}</span>
+            <strong>{c.heroB}</strong>
           </h1>
-          <p className="mk-lede">{c.lede}</p>
-          <div className="mk-hero-actions">
-            <a className="mk-primary" href="#book">
-              {c.cta} <span aria-hidden="true">↗</span>
-            </a>
-            <small>{c.ctaSub}</small>
+          <p>{c.heroSub}</p>
+        </div>
+
+        <div className="pq-hero-bottom">
+          <p>{c.heroBody}</p>
+          <div>
+            <a href="#apply">{c.heroCta} <span aria-hidden="true">↗</span></a>
+            <small>{c.heroAside}</small>
           </div>
         </div>
 
-        <div className={`mk-hero-media${route?.heroPhoto ? " has-photo" : ""}`}>
-          {route?.heroPhoto ? (
+        <div className="pq-orbit pq-orbit-one" aria-hidden="true" />
+        <div className="pq-orbit pq-orbit-two" aria-hidden="true" />
+      </section>
+
+      <section className="pq-reveal" aria-label={c.revealLabel}>
+        <div className="pq-reveal-copy">
+          <span>{c.revealLabel}</span>
+          <strong>TLV</strong>
+          <span>QUEST</span>
+        </div>
+        <div className={`pq-reveal-media${coverPhoto ? " has-photo" : ""}`}>
+          {coverPhoto && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={route.heroPhoto} alt="" fetchPriority="high" />
-          ) : (
-            <div className="mk-hero-placeholder" aria-hidden="true">
-              <span>32°05′N</span>
-              <strong>TLV</strong>
-              <span>34°46′E</span>
-            </div>
+            <img src={coverPhoto} alt="" loading="eager" />
           )}
-          <span className="mk-media-tag">{c.heroTag}</span>
-          <span className="mk-media-mark" aria-hidden="true">+</span>
-        </div>
-
-        <a className="mk-scroll" href="#city">
-          <span>{c.scroll}</span>
-          <span aria-hidden="true">↓</span>
-        </a>
-      </section>
-
-      <section className="mk-chapter mk-city" id="city">
-        <div className="mk-chapter-head">
-          <p>{c.cityEyebrow}</p>
-          <span aria-hidden="true">01</span>
-        </div>
-        <div className="mk-statement">
-          <h2>{c.cityTitle}</h2>
-          <p>{c.cityBody}</p>
-        </div>
-        <div className="mk-facts">
-          <div>
-            <strong>{route?.stops.length ?? "—"}</strong>
-            <span>{c.factStops}</span>
-          </div>
-          <div>
-            <strong>{distance}</strong>
-            <span>{c.factDistance}</span>
-          </div>
-          <div>
-            <strong>{c.factFieldValue}</strong>
-            <span>{c.factField}</span>
-          </div>
+          <div className="pq-scanline" aria-hidden="true" />
         </div>
       </section>
 
-      <section className="mk-chapter mk-play" id="play">
-        <div className="mk-chapter-head">
-          <p>{c.playEyebrow}</p>
-          <span aria-hidden="true">02</span>
+      <section className="pq-manifesto">
+        <div className="pq-manifesto-lines">
+          {c.manifesto.map((line, index) => (
+            <p key={line} style={{ "--line": index } as React.CSSProperties}>{line}</p>
+          ))}
         </div>
-        <h2>{c.playTitle}</h2>
-        <div className="mk-steps">
-          {c.how.map(([title, text], index) => (
+        <p className="pq-manifesto-body">{c.manifestoBody}</p>
+      </section>
+
+      <section className="pq-section pq-model" id="model">
+        <div className="pq-section-index">
+          <span>01</span>
+          <p>{c.modelKicker}</p>
+        </div>
+
+        <div className="pq-model-copy">
+          <h2>{c.modelTitle}</h2>
+          <p>{c.modelBody}</p>
+        </div>
+
+        <div className="pq-model-visual">
+          <div className="pq-map-grid" aria-hidden="true">
+            <span className="pq-map-point point-a" />
+            <span className="pq-map-point point-b" />
+            <span className="pq-map-point point-c" />
+            <span className="pq-map-path" />
+          </div>
+          <div className="pq-model-facts">
+            <div><strong>{route?.stops.length ?? "—"}</strong><span>{c.stops}</span></div>
+            <div><strong>{distance}</strong><span>{c.distance}</span></div>
+            <div><strong>{c.verifiedValue}</strong><span>{c.verified}</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="pq-section pq-work" id="work">
+        <div className="pq-section-index">
+          <span>02</span>
+          <p>{c.workKicker}</p>
+        </div>
+
+        <div className="pq-work-heading">
+          <h2>{c.workTitle}</h2>
+          <div className="pq-zero">
+            <strong>{c.zero}</strong>
+            <span>{c.zeroLabel}</span>
+          </div>
+        </div>
+
+        <div className="pq-work-list">
+          {c.workItems.map(([title, body], index) => (
             <article key={title}>
-              <span className="mk-step-number">0{index + 1}</span>
+              <span>0{index + 1}</span>
               <h3>{title}</h3>
-              <p>{text}</p>
-              <span className="mk-step-arrow" aria-hidden="true">↗</span>
+              <p>{body}</p>
+              <b aria-hidden="true">↗</b>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="mk-chapter mk-route" id="route">
-        <div className="mk-chapter-head">
-          <p>{c.routeEyebrow}</p>
-          <span aria-hidden="true">03</span>
-        </div>
-        <div className="mk-route-intro">
-          <h2>{c.routeTitle}</h2>
-          <p>{c.routeBody}</p>
+      <section className="pq-section pq-terms" id="terms">
+        <div className="pq-section-index">
+          <span>03</span>
+          <p>{c.termsKicker}</p>
         </div>
 
-        {photoStops.length > 0 ? (
-          <div className="mk-gallery" aria-label={rtl ? "תחנות במסלול" : "Route stops"}>
-            {photoStops.map((stop, index) => (
-              <figure key={stop.slug} className={index === 0 ? "mk-gallery-featured" : undefined}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={stop.photo ?? ""} alt={stop.name} loading="lazy" />
-                <figcaption>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <strong>{stop.name}</strong>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        ) : (
-          <p className="mk-gallery-empty">{c.routeFallback}</p>
-        )}
+        <div className="pq-terms-copy">
+          <h2>{c.termsTitle}</h2>
+          <p>{c.termsBody}</p>
+          <ul>
+            {c.termsFacts.map((fact) => <li key={fact}>{fact}</li>)}
+          </ul>
+        </div>
+
+        <div className="pq-terms-media">
+          {secondaryPhoto ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={secondaryPhoto} alt="" loading="lazy" />
+          ) : (
+            <p>{c.routeFallback}</p>
+          )}
+          <span aria-hidden="true">+</span>
+          <span aria-hidden="true">+</span>
+        </div>
       </section>
 
-      <section className="mk-book" id="book">
-        <div className="mk-book-copy">
-          <p className="mk-book-eyebrow">{c.bookEyebrow}</p>
-          <h2>{c.bookTitle}</h2>
-          <p>{c.bookBody}</p>
-          <div className="mk-book-meta">
+      <section className="pq-section pq-questions" id="questions">
+        <div className="pq-section-index">
+          <span>04</span>
+          <p>{c.questionsKicker}</p>
+        </div>
+
+        <h2>{c.questionsTitle}</h2>
+        <div className="pq-faq">
+          {c.faq.map(([question, answer], index) => (
+            <details key={question} open={index === 0}>
+              <summary>
+                <span>{question}</span>
+                <b aria-hidden="true">+</b>
+              </summary>
+              <p>{answer}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <section className="pq-application" id="apply">
+        <div className="pq-application-copy">
+          <p>{c.applicationKicker}</p>
+          <h2>{c.applicationTitle}</h2>
+          <span>{c.applicationBody}</span>
+          <div>
             <strong>{c.freeBadge}</strong>
-            <span>{c.freeNote}</span>
+            <small>{c.freeNote}</small>
           </div>
         </div>
 
-        <div className="mk-book-form">
+        <div className="pq-application-form">
           {route ? (
             <FreeBookingForm
               locale={locale}
@@ -273,11 +342,11 @@ export function MarketingHome({
               checkpointCount={route.stops.length}
             />
           ) : (
-            <p className="mk-gallery-empty">{c.routeFallback}</p>
+            <p>{c.routeFallback}</p>
           )}
         </div>
 
-        <details className="mk-lead">
+        <details className="pq-private">
           <summary>
             <span>{c.bigEvent}</span>
             <strong>{c.bigEventCta} ↗</strong>
@@ -286,20 +355,12 @@ export function MarketingHome({
         </details>
       </section>
 
-      <footer className="mk-footer">
-        <a className="mk-logo" href="#top">
-          <span>TLV</span> QUEST
-        </a>
-        <p>{c.footerLine}</p>
-        <div>
-          <Link href="/resume">{c.resume} ↗</Link>
-          <small>© 2026 TLV Quest</small>
-        </div>
+      <footer className="pq-footer">
+        <span>{c.footer}</span>
+        <span>© 2026</span>
       </footer>
 
-      <a className="mk-mobile-cta" href="#book">
-        {c.mobileCta} <span aria-hidden="true">↗</span>
-      </a>
+      <a className="pq-mobile-apply" href="#apply">{c.apply}</a>
     </main>
   );
 }
