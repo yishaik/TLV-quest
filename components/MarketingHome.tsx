@@ -1,62 +1,118 @@
 import Link from "next/link";
 import { FreeBookingForm } from "@/components/FreeBookingForm";
 import { LeadCaptureForm } from "@/components/LeadCaptureForm";
+import { ScrollFilm, type ScrollFilmScene } from "@/components/ScrollFilm";
 import type { MarketingRoute } from "@/lib/marketing-route";
 
 type Locale = "he" | "en";
 
-/**
- * One screen of selling, one screen of proof, one form. The previous page ran
- * nine sections deep and described content that had been deleted; this one is
- * deliberately short, and everything factual on it — stop names, distance,
- * photos — comes from the published route, so it cannot claim anything the
- * product does not do.
- */
 const copy = {
   he: {
     langLink: "/?lang=en",
     langLabel: "EN",
-    kicker: "משחק חקירה ברחובות נמל תל אביב",
-    titleA: "הנמל זוכר הכול.",
-    titleB: "בואו לגלות מה.",
-    lede: "קבוצה אחת, טלפון אחד, שעה וחצי בין העגורן, הפסל והמגדלור. חידות שהתשובות שלהן כתובות על העיר עצמה.",
-    cta: "צרו משחק חינם",
-    ctaSub: "בלי תשלום, בלי תיאום — הקישורים נוצרים מיד",
-    stopsLine: (n: number, km: string) =>
-      `${n} תחנות · ${km} ק״מ הליכה · כל תחנה אומתה בשטח`,
-    how: [
-      ["צרו משחק", "שם, מייל, וכמה אתם. זהו."],
-      ["שתפו קישור", "כל מי שמצטרף מקבל את החידות לטלפון."],
-      ["צאו לדרך", "ניקוד, רמזים ולוח תוצאות — הכול אוטומטי."]
+    resume: "המשך משחק",
+    navStory: "הסיפור",
+    navRoute: "המסלול",
+    navStart: "התחלה",
+    scrollLabel: "המשיכו לגלול",
+    scenes: [
+      {
+        id: "city",
+        chapter: "פרק 1 — העיר",
+        title: "העיר היא לוח המשחק.",
+        body: "לא נכנסים לעולם אחר. פשוט מתחילים לראות את תל אביב אחרת."
+      },
+      {
+        id: "clues",
+        chapter: "פרק 2 — הרמזים",
+        title: "כל פרט יכול להיות רמז.",
+        body: "פסל, שלט, חלון או קו על הרצפה הופכים לחלק מהעלילה."
+      },
+      {
+        id: "system",
+        chapter: "פרק 3 — המערכת",
+        title: "הטלפון מריץ הכול.",
+        body: "חידות, רמזים, ניקוד ולוח תוצאות מתקדמים בזמן אמת."
+      },
+      {
+        id: "play",
+        chapter: "פרק 4 — אתם",
+        title: "אתם רק יוצאים לשחק.",
+        body: "קישור אחד, קבוצה אחת, והעיר מתחילה לזוז סביבכם."
+      }
     ] as const,
+    proofEyebrow: "TLV Quest / נמל תל אביב",
+    proofTitle: "לא צופים בעיר. נכנסים לתוכה.",
+    proofBody:
+      "הגלילה נגמרת, אבל המשחק רק מתחיל. המסלול משתמש בפרטים אמיתיים שכבר נמצאים ברחוב ומחבר אותם לחוויה אחת רציפה.",
+    stopsMetric: "תחנות",
+    distanceMetric: "ק״מ הליכה",
+    fieldMetric: "אימות בשטח",
+    fieldValue: "100%",
+    routeTitle: "הפריימים שראיתם הם מקומות אמיתיים במסלול.",
+    routeFallback: "תמונות המסלול יופיעו לאחר פרסום התחנות.",
+    bookEyebrow: "התחילו עכשיו",
+    bookTitle: "הפכו את העיר למשחק.",
+    bookBody:
+      "צרו משחק עצמאי וקבלו מיד קישור משתתפים, קישור ניהול ולוח תוצאות חי.",
     freeBadge: "חינם · לזמן מוגבל",
     freeNote: "עד שלושה משחקים לכל נרשם",
-    bigEvent: "מארגנים אירוע גדול או ערב חברה?",
-    bigEventCta: "דברו איתנו",
-    resume: "כבר באמצע משחק? המשיכו מכאן",
+    bigEvent: "מארגנים יום הולדת, ערב חברה או אירוע גדול?",
+    bigEventCta: "בקשו משחק מותאם",
     footer: "נוצר בתל אביב. משוחק בעולם האמיתי."
   },
   en: {
     langLink: "/",
     langLabel: "עב",
-    kicker: "A street investigation game at Tel Aviv Port",
-    titleA: "The port remembers everything.",
-    titleB: "Come find out what.",
-    lede: "One team, one phone, ninety minutes between the crane, the statue and the lighthouse. Riddles whose answers are written on the city itself.",
-    cta: "Create a free game",
-    ctaSub: "No payment, no scheduling — links are generated instantly",
-    stopsLine: (n: number, km: string) =>
-      `${n} stops · ${km} km on foot · every stop verified in the field`,
-    how: [
-      ["Create a game", "Name, email, group size. That's it."],
-      ["Share a link", "Everyone who joins gets the riddles on their phone."],
-      ["Head out", "Scoring, hints and a live leaderboard — all automatic."]
+    resume: "Resume game",
+    navStory: "The story",
+    navRoute: "The route",
+    navStart: "Start",
+    scrollLabel: "Keep scrolling",
+    scenes: [
+      {
+        id: "city",
+        chapter: "Chapter 1 — The city",
+        title: "The city is the game board.",
+        body: "You do not enter another world. You start seeing Tel Aviv differently."
+      },
+      {
+        id: "clues",
+        chapter: "Chapter 2 — The clues",
+        title: "Every detail can be a clue.",
+        body: "A sculpture, sign, window or line on the ground becomes part of the plot."
+      },
+      {
+        id: "system",
+        chapter: "Chapter 3 — The system",
+        title: "The phone runs everything.",
+        body: "Riddles, hints, scoring and the leaderboard advance in real time."
+      },
+      {
+        id: "play",
+        chapter: "Chapter 4 — You",
+        title: "You just go out and play.",
+        body: "One link, one group, and the city begins moving around you."
+      }
     ] as const,
+    proofEyebrow: "TLV Quest / Tel Aviv Port",
+    proofTitle: "Do not watch the city. Enter it.",
+    proofBody:
+      "The scroll ends, but the game is only beginning. The route uses real details already present in the street and connects them into one continuous experience.",
+    stopsMetric: "Stops",
+    distanceMetric: "Km on foot",
+    fieldMetric: "Field verified",
+    fieldValue: "100%",
+    routeTitle: "The frames you saw are real places on the route.",
+    routeFallback: "Route photography will appear when stops are published.",
+    bookEyebrow: "Start now",
+    bookTitle: "Turn the city into a game.",
+    bookBody:
+      "Create a self-guided game and instantly receive participant, management and live leaderboard links.",
     freeBadge: "Free · limited time",
     freeNote: "Up to three games per person",
-    bigEvent: "Planning a company evening or a big event?",
-    bigEventCta: "Talk to us",
-    resume: "Mid-game already? Continue here",
+    bigEvent: "Planning a birthday, company evening or larger event?",
+    bigEventCta: "Request a custom quest",
     footer: "Created in Tel Aviv. Played in the real world."
   }
 } as const;
@@ -70,89 +126,142 @@ export function MarketingHome({
 }) {
   const c = copy[locale];
   const rtl = locale === "he";
-  const photoStops = (route?.stops ?? []).filter((stop) => stop.photo);
+
+  const photoCandidates = [
+    route?.heroPhoto
+      ? {
+          url: route.heroPhoto,
+          alt: route.title[locale] ?? route.title.he ?? route.title.en ?? "TLV Quest"
+        }
+      : null,
+    ...(route?.stops ?? [])
+      .filter((stop) => stop.photo)
+      .map((stop) => ({ url: stop.photo as string, alt: stop.name }))
+  ].filter((photo): photo is { url: string; alt: string } => Boolean(photo));
+
+  const photos = photoCandidates.filter(
+    (photo, index, all) => all.findIndex((candidate) => candidate.url === photo.url) === index
+  );
+
+  const scenes: ScrollFilmScene[] = c.scenes.map((scene, index) => {
+    const photo = photos.length > 0 ? photos[index % photos.length] : null;
+    return {
+      ...scene,
+      image: photo?.url ?? null,
+      alt: photo?.alt ?? ""
+    };
+  });
+
+  const distance = route ? (route.metres / 1000).toFixed(1) : "—";
+  const routePhotos = (route?.stops ?? []).filter((stop) => stop.photo).slice(0, 5);
 
   return (
-    <main className="mk" dir={rtl ? "rtl" : "ltr"}>
-      <section
-        className="mk-hero"
-        style={
-          route?.heroPhoto
-            ? { backgroundImage: `url(${route.heroPhoto})` }
-            : undefined
-        }
-      >
-        <header className="mk-top">
-          <span className="mk-logo">TLV QUEST</span>
+    <main className="mk" dir={rtl ? "rtl" : "ltr"} id="top">
+      <header className="mk-header">
+        <a className="mk-logo" href="#top" aria-label="TLV Quest">
+          TLV<span>QUEST</span>
+        </a>
+
+        <nav className="mk-header-nav" aria-label={rtl ? "ניווט" : "Navigation"}>
+          <a href="#story">{c.navStory}</a>
+          <a href="#route">{c.navRoute}</a>
+          <a href="#book">{c.navStart}</a>
+        </nav>
+
+        <div className="mk-header-actions">
+          <Link href="/resume">{c.resume}</Link>
           <Link className="mk-lang" href={c.langLink}>
             {c.langLabel}
           </Link>
-        </header>
-
-        <div className="mk-hero-copy">
-          <span className="mk-kicker">{c.kicker}</span>
-          <h1>
-            {c.titleA}
-            <br />
-            <em>{c.titleB}</em>
-          </h1>
-          <p>{c.lede}</p>
-          <a className="mk-cta" href="#book">
-            {c.cta}
-          </a>
-          <span className="mk-cta-sub">{c.ctaSub}</span>
-          {route && (
-            <span className="mk-facts">
-              {c.stopsLine(
-                route.stops.length,
-                (route.metres / 1000).toFixed(1)
-              )}
-            </span>
-          )}
         </div>
-      </section>
+      </header>
 
-      {photoStops.length > 0 && (
-        <section className="mk-strip" aria-label={rtl ? "תחנות" : "Stops"}>
-          {photoStops.map((stop) => (
-            <figure key={stop.slug}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={stop.photo ?? ""} alt={stop.name} loading="lazy" />
-              <figcaption>{stop.name}</figcaption>
-            </figure>
-          ))}
-        </section>
-      )}
+      <div id="story">
+        <ScrollFilm scenes={scenes} scrollLabel={c.scrollLabel} />
+      </div>
 
-      <section className="mk-how">
-        {c.how.map(([title, text], index) => (
-          <div key={title}>
-            <span>{index + 1}</span>
-            <h3>{title}</h3>
-            <p>{text}</p>
+      <section className="mk-proof" id="route">
+        <div className="mk-proof-copy">
+          <p>{c.proofEyebrow}</p>
+          <h2>{c.proofTitle}</h2>
+          <span>{c.proofBody}</span>
+        </div>
+
+        <div className="mk-metrics">
+          <div>
+            <strong>{route?.stops.length ?? "—"}</strong>
+            <span>{c.stopsMetric}</span>
           </div>
-        ))}
+          <div>
+            <strong>{distance}</strong>
+            <span>{c.distanceMetric}</span>
+          </div>
+          <div>
+            <strong>{c.fieldValue}</strong>
+            <span>{c.fieldMetric}</span>
+          </div>
+        </div>
+
+        <div className="mk-route-head">
+          <h3>{c.routeTitle}</h3>
+        </div>
+
+        {routePhotos.length > 0 ? (
+          <div className="mk-route-strip">
+            {routePhotos.map((stop, index) => (
+              <figure key={stop.slug}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={stop.photo ?? ""} alt={stop.name} loading="lazy" />
+                <figcaption>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{stop.name}</strong>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : (
+          <p className="mk-empty">{c.routeFallback}</p>
+        )}
       </section>
 
       <section className="mk-book" id="book">
-        <div className="mk-book-head">
-          <span className="mk-badge">{c.freeBadge}</span>
-          <h2>{c.cta}</h2>
-          <p>{c.freeNote}</p>
+        <div className="mk-book-copy">
+          <p>{c.bookEyebrow}</p>
+          <h2>{c.bookTitle}</h2>
+          <span>{c.bookBody}</span>
+          <div className="mk-book-meta">
+            <strong>{c.freeBadge}</strong>
+            <small>{c.freeNote}</small>
+          </div>
         </div>
-        {route && <FreeBookingForm locale={locale} templateSlug={route.slug} checkpointCount={route.stops.length} />}
+
+        <div className="mk-book-form">
+          {route ? (
+            <FreeBookingForm
+              locale={locale}
+              templateSlug={route.slug}
+              checkpointCount={route.stops.length}
+            />
+          ) : (
+            <p className="mk-empty">{c.routeFallback}</p>
+          )}
+        </div>
+
         <details className="mk-lead">
           <summary>
-            {c.bigEvent} <strong>{c.bigEventCta}</strong>
+            <span>{c.bigEvent}</span>
+            <strong>{c.bigEventCta} ↗</strong>
           </summary>
           <LeadCaptureForm locale={locale} />
         </details>
       </section>
 
       <footer className="mk-footer">
-        <Link href="/resume">{c.resume} ↗</Link>
+        <a className="mk-logo" href="#top">
+          TLV<span>QUEST</span>
+        </a>
         <p>{c.footer}</p>
-        <small>© 2026 TLV Quest</small>
+        <small>© 2026</small>
       </footer>
     </main>
   );
