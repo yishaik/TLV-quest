@@ -1,3 +1,4 @@
+import "./marketing.css";
 import { MarketingHome } from "@/components/MarketingHome";
 import { getMarketingRoute } from "@/lib/marketing-route";
 
