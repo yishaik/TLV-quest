@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { FreeBookingForm } from "@/components/FreeBookingForm";
 import { LeadCaptureForm } from "@/components/LeadCaptureForm";
 import type { MarketingRoute } from "@/lib/marketing-route";
@@ -219,7 +220,7 @@ export function MarketingHome({
       <section className="pq-manifesto">
         <div className="pq-manifesto-lines">
           {c.manifesto.map((line, index) => (
-            <p key={line} style={{ "--line": index } as React.CSSProperties}>{line}</p>
+            <p key={line} style={{ "--line": index } as CSSProperties}>{line}</p>
           ))}
         </div>
         <p className="pq-manifesto-body">{c.manifestoBody}</p>
