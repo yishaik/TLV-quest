@@ -5,7 +5,7 @@ on:
     branches:
       - fix/unified-content-studio
     paths:
-      - .automation/unified-content.tar.gz.b64
+      - .automation/unified-content.ready
 
 permissions:
   contents: write
@@ -25,7 +25,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 --decode .automation/unified-content.tar.gz.b64 > /tmp/unified-content.tar.gz
+          cat .automation/unified-content.part-* > /tmp/unified-content.tar.gz.b64
+          base64 --decode /tmp/unified-content.tar.gz.b64 > /tmp/unified-content.tar.gz
           echo "fb06a2416f417945decd721e1e5e96ac0faa21b4f6f7c2fda293249c197305df  /tmp/unified-content.tar.gz" | sha256sum --check -
           tar -xzf /tmp/unified-content.tar.gz
 
