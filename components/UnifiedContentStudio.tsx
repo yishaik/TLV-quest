@@ -195,7 +195,8 @@ let mapLibrePromise: Promise<MapLibreNamespace> | null = null;
 
 function loadMapLibre(): Promise<MapLibreNamespace> {
   if (typeof window === "undefined") return Promise.reject(new Error("המפה זמינה בדפדפן בלבד"));
-  if (mapLibreWindow().maplibregl) return Promise.resolve(mapLibreWindow().maplibregl);
+  const existingMapLibre = mapLibreWindow().maplibregl;
+  if (existingMapLibre) return Promise.resolve(existingMapLibre);
   if (mapLibrePromise) return mapLibrePromise;
 
   mapLibrePromise = new Promise((resolve, reject) => {
