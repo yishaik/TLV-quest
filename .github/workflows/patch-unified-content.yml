@@ -19,16 +19,18 @@ jobs:
         with:
           ref: fix/unified-content-studio
           fetch-depth: 0
-      - name: Remove duplicate global MapLibre declaration
+      - name: Narrow the existing CDN global safely
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('components/UnifiedContentStudio.tsx')
           source = path.read_text()
-          source = source.replace('''declare global {\n  interface Window { maplibregl?: MapLibreNamespace }\n}\n\n''', '''const mapLibreWindow = () =>\n  window as unknown as { maplibregl?: MapLibreNamespace };\n\n''')
-          source = source.replace('window.maplibregl', 'mapLibreWindow().maplibregl')
-          path.write_text(source)
+          old = '  if (mapLibreWindow().maplibregl) return Promise.resolve(mapLibreWindow().maplibregl);'
+          new = '  const existingMapLibre = mapLibreWindow().maplibregl;\n  if (existingMapLibre) return Promise.resolve(existingMapLibre);'
+          if old not in source:
+              raise SystemExit('Expected MapLibre line was not found')
+          path.write_text(source.replace(old, new, 1))
           PY
       - name: Commit patch
         shell: bash
@@ -37,5 +39,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add components/UnifiedContentStudio.tsx
-          git commit -m "fix: scope MapLibre browser type locally"
+          git commit -m "fix: narrow MapLibre CDN global"
           git push origin HEAD:fix/unified-content-studio
