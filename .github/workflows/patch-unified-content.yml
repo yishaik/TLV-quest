@@ -19,18 +19,75 @@ jobs:
         with:
           ref: fix/unified-content-studio
           fetch-depth: 0
-      - name: Narrow the existing CDN global safely
+      - name: Harden CDN load and preserve content fields
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
+
           path = Path('components/UnifiedContentStudio.tsx')
           source = path.read_text()
-          old = '  if (mapLibreWindow().maplibregl) return Promise.resolve(mapLibreWindow().maplibregl);'
-          new = '  const existingMapLibre = mapLibreWindow().maplibregl;\n  if (existingMapLibre) return Promise.resolve(existingMapLibre);'
-          if old not in source:
-              raise SystemExit('Expected MapLibre line was not found')
-          path.write_text(source.replace(old, new, 1))
+
+          old_finish = '''    const finish = () => mapLibreWindow().maplibregl
+              ? resolve(mapLibreWindow().maplibregl)
+              : reject(new Error("MapLibre נטען אך לא אותחל"));'''
+          new_finish = '''    const finish = () => {
+              const loadedMapLibre = mapLibreWindow().maplibregl;
+              if (loadedMapLibre) resolve(loadedMapLibre);
+              else reject(new Error("MapLibre נטען אך לא אותחל"));
+            };'''
+          if old_finish not in source:
+              raise SystemExit('Expected MapLibre finish callback was not found')
+          source = source.replace(old_finish, new_finish, 1)
+
+          # The library response contains resolved image URLs and gallery data;
+          # do not overwrite it immediately with raw mutation responses.
+          source = source.replace('      setStationDraft(stationToDraft(saved));\n', '')
+
+          start = source.index('    await operation("save-riddle", async () => {')
+          saved = source.index('      const saved = riddleDraft.id', start)
+          replacement = '''    await operation("save-riddle", async () => {
+              const existingRiddle = riddles.find((item) => item.id === riddleDraft.id);
+              const existingHe = objectValue(existingRiddle?.content.he);
+              const existingEn = objectValue(existingRiddle?.content.en);
+              const existingHints = Array.isArray(existingRiddle?.hints) ? existingRiddle.hints : [];
+              const body = {
+                stationId: riddleDraft.stationId,
+                slug: riddleDraft.slug,
+                title: { he: riddleDraft.titleHe, en: riddleDraft.titleEn },
+                kind: riddleDraft.kind,
+                content: {
+                  ...(existingRiddle?.content ?? {}),
+                  he: {
+                    ...existingHe,
+                    title: riddleDraft.titleHe,
+                    story: riddleDraft.storyHe,
+                    prompt: riddleDraft.promptHe,
+                    locationHint: riddleDraft.locationHintHe,
+                    success: riddleDraft.successHe
+                  },
+                  en: { ...existingEn, title: riddleDraft.titleEn }
+                },
+                validation: buildValidation(riddleDraft),
+                hints: lines(riddleDraft.hints).map((hint, index) => {
+                  const previous = objectValue(existingHints[index]);
+                  return { ...previous, he: hint, en: textValue(previous.en), penalty: numberValue(previous.penalty, 10) };
+                }),
+                scoring: existingRiddle?.scoring ?? { basePoints: 100, wrongPenalty: 5, hintPenalty: 10, speedBonusMax: 20, speedBonusWindowSeconds: 420 },
+                fallback: existingRiddle?.fallback ?? null,
+                interaction: {
+                  ...(existingRiddle?.interaction ?? {}),
+                  primary: riddleDraft.kind === "photo" ? "photo" : "web",
+                  webFallback: true,
+                  requiresScan: ["scan", "hybrid"].includes(riddleDraft.kind)
+                },
+                tags: riddleDraft.tags.split(",").map((item) => item.trim()).filter(Boolean),
+                status: riddleDraft.status
+              };
+'''
+          source = source[:start] + replacement + source[saved:]
+          path.write_text(source)
           PY
       - name: Commit patch
         shell: bash
@@ -39,5 +96,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add components/UnifiedContentStudio.tsx
-          git commit -m "fix: narrow MapLibre CDN global"
+          git commit -m "fix: preserve question data and finish CDN load safely"
           git push origin HEAD:fix/unified-content-studio
