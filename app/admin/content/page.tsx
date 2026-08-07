@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { ContentStudioV2 } from "@/components/ContentStudioV2";
+import { ContentMapStudio } from "@/components/ContentMapStudio";
 
 export const metadata: Metadata = {
-  title: "Content Studio",
+  title: "Map Studio",
   robots: { index: false, follow: false }
 };
 
-export default function ContentStudioPage() {
-  return <ContentStudioV2 />;
+export default function ContentMapStudioPage() {
+  return <ContentMapStudio />;
 }
