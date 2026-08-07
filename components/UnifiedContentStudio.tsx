@@ -173,9 +173,8 @@ type GeoJsonFeatureCollection = {
   }>;
 };
 
-declare global {
-  interface Window { maplibregl?: MapLibreNamespace }
-}
+const mapLibreWindow = () =>
+  window as unknown as { maplibregl?: MapLibreNamespace };
 
 const MAPLIBRE_VERSION = "5.24.0";
 const MAPLIBRE_SCRIPT_ID = "tlv-maplibre-script";
@@ -196,7 +195,7 @@ let mapLibrePromise: Promise<MapLibreNamespace> | null = null;
 
 function loadMapLibre(): Promise<MapLibreNamespace> {
   if (typeof window === "undefined") return Promise.reject(new Error("המפה זמינה בדפדפן בלבד"));
-  if (window.maplibregl) return Promise.resolve(window.maplibregl);
+  if (mapLibreWindow().maplibregl) return Promise.resolve(mapLibreWindow().maplibregl);
   if (mapLibrePromise) return mapLibrePromise;
 
   mapLibrePromise = new Promise((resolve, reject) => {
@@ -210,8 +209,8 @@ function loadMapLibre(): Promise<MapLibreNamespace> {
 
     const existing = document.getElementById(MAPLIBRE_SCRIPT_ID) as HTMLScriptElement | null;
     const script = existing ?? document.createElement("script");
-    const finish = () => window.maplibregl
-      ? resolve(window.maplibregl)
+    const finish = () => mapLibreWindow().maplibregl
+      ? resolve(mapLibreWindow().maplibregl)
       : reject(new Error("MapLibre נטען אך לא אותחל"));
 
     if (!existing) {
@@ -222,7 +221,7 @@ function loadMapLibre(): Promise<MapLibreNamespace> {
       document.head.appendChild(script);
     }
 
-    if (window.maplibregl) finish();
+    if (mapLibreWindow().maplibregl) finish();
     else {
       script.addEventListener("load", finish, { once: true });
       script.addEventListener("error", () => {
