@@ -1,40 +1,57 @@
 # TLV Quest
 
-Autonomous urban quest platform. The first route is a teen-focused time-capsule adventure in the Tel Aviv Port.
+A self-running urban quest platform. An organizer gets one link, configures a game in a guided wizard, shares participant links — and then watches the event rather than operating it.
 
-Development happens through short-lived feature branches and pull requests. See `docs/product-spec.md` for the current MVP scope.
+**Live:** https://tlv-quest.vercel.app
 
-Copy `.env.example` to `.env.local` and replace every placeholder before
-running or building the app. The Supabase URL and publishable key are required;
-there is deliberately no production-project fallback in source.
+The first route is a bilingual (Hebrew / English) time-capsule adventure through the Tel Aviv Port: three checkpoints, answers over WhatsApp or web, QR/NFC arrival, a forced-perspective team photo, and a location-verified finale at the Reading lighthouse.
 
-Operational notes for Twilio's Public Beta typing indicator, including its
-read-receipt side effect and the long-running photo strategy, are in
-`docs/whatsapp-typing-indicators.md`.
+## How a game runs
 
-The Supabase browser-role allowlist, Realtime isolation model, credential
-handling, and production probe are documented in
-`docs/security-access-model.md`.
+1. An admin issues a single-use organizer invitation.
+2. The organizer completes the wizard and receives management, registration and live-board links.
+3. Participants register in Hebrew or English, get a personal web link, and can be onboarded through the Twilio WhatsApp sandbox.
+4. Teams are created or balanced. The game starts on a schedule, manually, or on a rolling basis.
+5. Any connected teammate can answer, request a hint, scan QR/NFC, verify location, or submit a photo.
+6. Atomic Postgres state transitions guarantee the first valid action advances shared team state exactly once.
+7. The live leaderboard updates without exposing precise locations or personal names.
+8. The game ends automatically after the finale; results stay available for 72 hours.
+9. A maintenance worker then deletes media and operational data, retaining anonymous aggregates only.
 
-The public API error contract, safe `AppError` usage, and correlation-ID
-workflow are documented in `docs/error-handling.md`.
+## Stack
 
-The production audit gate, Dependabot policy, and reviewed transitive
-dependency overrides are documented in `docs/dependency-security.md`.
+**Next.js on Vercel** — organizer wizard and emergency dashboard, participant web experience, public live leaderboard, Twilio webhooks, signed-token APIs, protected maintenance worker.
 
-`supabase/migrations/` is the source of truth for the database. `npm run
-verify:schema` rebuilds it from those files alone and fails if application code
-references a table or RPC no migration creates; it runs on every pull request.
-The drift this gate was built to close is documented in
-`docs/schema-integrity.md`.
+**Supabase** — Postgres as source of truth, atomic state-transition RPCs, private Storage bucket, Realtime for the sanitized leaderboard, deny-by-default RLS, magic-link auth for admins.
 
-The outbox and maintenance workers are scheduled by pg_cron inside Supabase,
-with single-use tokens rather than a stored secret. See
-`docs/scheduled-workers.md`.
+## The parts that took the longest
 
-Route content is verified in the field from `/admin/field`, which records
-coordinates, checklists, calibration photos and answer edits directly. See
-`docs/field-verification.md`.
+| Doc | What it covers |
+|---|---|
+| [schema-integrity](docs/schema-integrity.md) | `supabase/migrations/` is the only source of truth. `npm run verify:schema` rebuilds from migrations alone and fails the PR if app code references a table or RPC no migration creates — plus the drift that motivated the gate. |
+| [security-access-model](docs/security-access-model.md) | Supabase browser-role allowlist, Realtime isolation model, credential handling, production probe. |
+| [scheduled-workers](docs/scheduled-workers.md) | Outbox and maintenance workers on pg_cron inside Supabase, authenticated with single-use tokens rather than a stored secret. |
+| [whatsapp-typing-indicators](docs/whatsapp-typing-indicators.md) | Twilio's public-beta typing indicator, its read-receipt side effect, and the long-running photo strategy. |
+| [field-verification](docs/field-verification.md) | `/admin/field` — recording coordinates, checklists, calibration photos and answer edits on site. |
+| [error-handling](docs/error-handling.md) | Public API error contract, safe `AppError` usage, correlation-ID workflow. |
+| [realtime-architecture](docs/realtime-architecture.md) · [pwa-offline](docs/pwa-offline.md) | Live state propagation and offline behaviour on the participant device. |
+| [dependency-security](docs/dependency-security.md) | Production audit gate, Dependabot policy, reviewed transitive overrides. |
+| [production-runbook](docs/production-runbook.md) · [live-ops](docs/live-ops.md) | Go/no-go checklist, live incident response, retention behaviour, required production configuration. |
 
-The go/no-go checklist, live incident response, retention behaviour, and
-required production configuration are in `docs/production-runbook.md`.
+Current MVP scope is in [docs/product-spec.md](docs/product-spec.md); the full index is in [`docs/`](docs/).
+
+## Running it
+
+```bash
+cp .env.example .env.local     # replace every placeholder
+npm install
+npm run dev
+```
+
+The Supabase URL and publishable key are required. There is deliberately no production-project fallback in source.
+
+Development goes through short-lived feature branches and pull requests.
+
+## License
+
+MIT.
